@@ -1,0 +1,66 @@
+/**
+ * Design tokens for the genealogy archive.
+ *
+ * Aesthetic: a warm, archival, "family heirloom" feel — parchment surfaces,
+ * ink-dark text, a heritage green primary, and an archival burgundy accent
+ * reserved for documents and emphasis. Headings are set in a serif to evoke
+ * records and certificates; body copy uses the system sans for legibility.
+ *
+ * Everything is a CSS custom property so the entire look can be retuned here
+ * without touching a single component. Tailwind's semantic utilities
+ * (bg-surface, text-ink, …) all resolve to these variables.
+ */
+:root {
+  /* Typography — system stacks only, so no web fonts need to be shipped. */
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia,
+    "Times New Roman", serif;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+
+  /* Surfaces */
+  --color-canvas: #f6f1e7; /* page background — aged paper */
+  --color-surface: #fffdf8; /* cards, panels — fresh page */
+  --color-surface-sunken: #efe8d9; /* wells, insets */
+
+  /* Text */
+  --color-ink: #2c2620; /* primary text — warm near-black */
+  --color-ink-muted: #6f655a; /* secondary text */
+  --color-ink-subtle: #9b9183; /* placeholders, captions */
+  --color-ink-on-primary: #f7f3ea; /* text on primary/accent fills */
+
+  /* Lines */
+  --color-line: #e4dac8; /* default borders, dividers */
+  --color-line-strong: #cdbfa6; /* emphasized borders */
+
+  /* Brand — heritage green */
+  --color-primary: #3f5d4e;
+  --color-primary-hover: #344e42;
+  --color-primary-soft: #e3ebe4; /* tinted backgrounds */
+
+  /* Accent — archival burgundy */
+  --color-accent: #7c2d3a;
+  --color-accent-soft: #f0dfe1;
+
+  /* Status */
+  --color-success: #3f6f4f;
+  --color-success-soft: #e0ece1;
+  --color-warning: #9a6a16;
+  --color-warning-soft: #f4e8cf;
+  --color-danger: #a83228;
+  --color-danger-soft: #f4dcd7;
+
+  /* Focus */
+  --color-focus-ring: rgba(63, 93, 78, 0.55);
+
+  /* Radii */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-full: 9999px;
+
+  /* Shadows — soft, paper-like */
+  --shadow-sm: 0 1px 2px rgba(44, 38, 32, 0.06);
+  --shadow-md: 0 2px 8px rgba(44, 38, 32, 0.08), 0 1px 2px rgba(44, 38, 32, 0.06);
+  --shadow-lg: 0 8px 24px rgba(44, 38, 32, 0.12), 0 2px 6px rgba(44, 38, 32, 0.08);
+}
