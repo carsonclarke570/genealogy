@@ -1,0 +1,132 @@
+@import "tailwindcss";
+
+/*
+  Design system — "Clean & modern"
+  ---------------------------------
+  Cool-gray neutrals, white surfaces, indigo accent. Serif headings, sans body.
+  Tokens are defined as semantic CSS variables (light in :root, dark in .dark)
+  and exposed to Tailwind via @theme inline, so utilities like `bg-background`,
+  `text-muted-foreground`, `bg-primary`, `border-border`, `rounded-lg`, and
+  `font-serif` are driven by these tokens. Change a value here, change it app-wide.
+*/
+
+/* Enable class-based dark mode: `dark:` variants apply under a `.dark` ancestor. */
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Surfaces & text */
+  --background: #ffffff;
+  --foreground: #0f172a; /* slate-900 */
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+
+  /* Brand */
+  --primary: #4f46e5; /* indigo-600 */
+  --primary-foreground: #ffffff;
+
+  /* Neutral fills */
+  --secondary: #f1f5f9; /* slate-100 */
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9; /* slate-100 */
+  --muted-foreground: #64748b; /* slate-500 */
+  --accent: #eef2ff; /* indigo-50 */
+  --accent-foreground: #4338ca; /* indigo-700 */
+
+  /* Status */
+  --destructive: #dc2626; /* red-600 */
+  --destructive-foreground: #ffffff;
+  --success: #16a34a; /* green-600 */
+  --success-foreground: #ffffff;
+
+  /* Lines & focus */
+  --border: #e2e8f0; /* slate-200 */
+  --input: #e2e8f0; /* slate-200 */
+  --ring: #4f46e5; /* indigo-600 */
+
+  /* Radius scale (derived from a single base) */
+  --radius: 0.625rem; /* 10px */
+}
+
+.dark {
+  --background: #0b0f1a;
+  --foreground: #e2e8f0; /* slate-200 */
+  --card: #111726;
+  --card-foreground: #e2e8f0;
+  --popover: #111726;
+  --popover-foreground: #e2e8f0;
+
+  --primary: #6366f1; /* indigo-500 — lifts off dark ground */
+  --primary-foreground: #ffffff;
+
+  --secondary: #1e293b; /* slate-800 */
+  --secondary-foreground: #e2e8f0;
+  --muted: #1e293b; /* slate-800 */
+  --muted-foreground: #94a3b8; /* slate-400 */
+  --accent: #1e293b; /* slate-800 */
+  --accent-foreground: #c7d2fe; /* indigo-200 */
+
+  --destructive: #ef4444; /* red-500 */
+  --destructive-foreground: #ffffff;
+  --success: #22c55e; /* green-500 */
+  --success-foreground: #052e16;
+
+  --border: #233047;
+  --input: #2a3650;
+  --ring: #6366f1; /* indigo-500 */
+}
+
+@theme inline {
+  /* Colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Typography — serif display, sans UI/body */
+  --font-sans: var(--font-geist-sans);
+  --font-serif: var(--font-serif-display);
+  --font-mono: var(--font-geist-mono);
+
+  /* Radius scale */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Headings default to the serif display face. */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-serif), ui-serif, Georgia, serif;
+  }
+}

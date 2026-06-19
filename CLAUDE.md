@@ -72,18 +72,42 @@ Conventions:
 
 (Confirm/refine schema when building the data layer.)
 
-## Commands
+## Design system
 
-> The app is not scaffolded yet. Fill these in once `package.json` exists.
+Direction: **clean & modern** — cool-gray neutrals, white surfaces, **indigo**
+(`#4F46E5`) accent. **Serif headings** (Source Serif 4), **sans body/UI** (Geist
+Sans). Supports **light + dark** modes.
+
+- **Tokens** live in `src/app/globals.css` as semantic CSS variables (`:root` for
+  light, `.dark` for dark), exposed to Tailwind v4 via `@theme inline`. Always
+  style with semantic utilities (`bg-background`, `text-muted-foreground`,
+  `bg-primary`, `border-border`, `rounded-lg`, `font-serif`) — never raw hex.
+  Changing a token re-skins the whole app.
+- **Dark mode** is class-based (`.dark` on `<html>`), driven by `next-themes`
+  (`ThemeProvider` in the root layout, `ThemeToggle` component). The custom
+  `dark` variant is declared in `globals.css`.
+- **Primitives** live in `src/components/ui/` (`button`, `input`, `textarea`,
+  `label`, `card`, `badge`, `separator`, `avatar`). Variants use
+  `class-variance-authority`; compose classes with `cn()` from `src/lib/utils.ts`
+  (clsx + tailwind-merge). Keep these dependency-light (no Radix yet — add it when
+  building genuinely interactive primitives like dialogs/menus).
+- **Living style guide**: the home page (`src/app/page.tsx`) renders every token
+  and component. Run `npm run dev` and open `/` to preview; keep it updated as the
+  system grows.
+- Tailwind v4 is **CSS-first** — there is no `tailwind.config.js`. Configure via
+  `globals.css` (`@theme`, `@custom-variant`, `@layer`).
+
+## Commands
 
 ```bash
 npm install          # install dependencies
-npm run dev          # start the dev server
+npm run dev          # start the dev server (http://localhost:3000)
 npm run build        # production build
 npm run start        # run the production build
 npm run lint         # eslint
-npm run db:generate  # generate Drizzle migrations from schema
-npm run db:migrate   # apply migrations
+# Added with the data layer:
+# npm run db:generate  # generate Drizzle migrations from schema
+# npm run db:migrate   # apply migrations
 ```
 
 ## Deployment (Railway)
@@ -105,4 +129,6 @@ file **and** the uploads directory must live on a **mounted persistent volume**
 
 ## Status
 
-Greenfield. Repository initialized with this CLAUDE.md. Next up: design system.
+Scaffolded (Next.js 16 + React 19 + Tailwind v4) with the **design system
+foundation** in place: tokens, light/dark theming, base UI primitives, and a
+living style guide at `/`. Next up: data layer (Drizzle schema + SQLite) and auth.
