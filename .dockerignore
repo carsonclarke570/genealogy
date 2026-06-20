@@ -1,0 +1,24 @@
+# Rebuilt inside the image — never ship local copies.
+node_modules
+dist
+app/node_modules
+app/.next
+app/next-env.d.ts
+app/tsconfig.tsbuildinfo
+
+# VCS + local tooling / scratch state
+.git
+.gitignore
+.claude
+.impeccable
+.ds-sync
+ds-bundle
+.design-sync
+spike
+
+# Runtime data (SQLite db + uploads — lives on the Railway volume, not the image)
+data
+
+# Misc
+*.log
+.DS_Store
