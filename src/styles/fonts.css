@@ -1,0 +1,10 @@
+/*
+ * Brand fonts. Loaded from Google Fonts at runtime so the design system is
+ * self-contained without shipping binaries. In the production Next.js app these
+ * are loaded via next/font/google instead (see DESIGN.md), which overrides the
+ * --font-sans / --font-serif stacks for better performance and no layout shift.
+ *
+ *   Hanken Grotesk — warm humanist sans, the entire UI (labels, buttons, fields, data)
+ *   Spectral       — literary serif, reserved for human names, life-dates, page titles
+ */
+@import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Spectral:wght@400;500;600&display=swap");

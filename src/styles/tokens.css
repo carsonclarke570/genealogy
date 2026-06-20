@@ -1,0 +1,349 @@
+/*
+ * Family Archive — design tokens & theming
+ * Source of truth: DESIGN.md (frontmatter is normative; values here mirror it 1:1).
+ *
+ * Theming model — light & dark are equal peers:
+ *   1. :root defaults to the LIGHT palette.
+ *   2. @media (prefers-color-scheme: dark) applies DARK *unless* the user has
+ *      explicitly forced light via [data-theme="light"].
+ *   3. [data-theme="dark"] always wins (explicit user choice).
+ *
+ * To avoid a flash of the wrong theme, set data-theme on <html> before paint
+ * with the blocking script in src/lib/theme.ts (THEME_INIT_SCRIPT).
+ *
+ * Fonts: stacks below are fallbacks. In Next.js, load Hanken Grotesk + Spectral
+ * via next/font/google and expose them as --font-sans / --font-serif on <html>;
+ * those overrides will win over the literal stacks here.
+ */
+
+@layer reset, tokens, base;
+
+/* ── Tokens ──────────────────────────────────────────────────────────── */
+@layer tokens {
+  :root {
+    color-scheme: light;
+
+    /* Brand & surface — LIGHT (role tokens) */
+    --color-bg: oklch(1 0 0);
+    --color-surface: oklch(0.975 0.005 60);
+    --color-surface-sunken: oklch(0.96 0.006 60);
+    --color-ink: oklch(0.24 0.012 45);
+    --color-muted: oklch(0.47 0.016 45);
+    --color-faint: oklch(0.62 0.012 45);
+    --color-border: oklch(0.9 0.006 60);
+    --color-border-strong: oklch(0.83 0.008 55);
+
+    --color-primary: oklch(0.51 0.145 38);
+    --color-primary-deep: oklch(0.44 0.135 36);
+    --color-primary-tint: oklch(0.955 0.03 42);
+    --color-on-primary: oklch(1 0 0);
+
+    --color-accent: oklch(0.42 0.1 232);
+    --color-accent-deep: oklch(0.36 0.09 232);
+    --color-accent-tint: oklch(0.95 0.025 230);
+    --color-on-accent: oklch(1 0 0);
+
+    --color-success: oklch(0.52 0.1 150);
+    --color-success-tint: oklch(0.95 0.03 150);
+    --color-warning: oklch(0.62 0.13 68);
+    --color-warning-tint: oklch(0.95 0.04 75);
+    --color-danger: oklch(0.5 0.185 25);
+    --color-danger-tint: oklch(0.95 0.04 25);
+
+    /* Modal scrim (translucent ink over the page behind a dialog) */
+    --color-backdrop: oklch(0.24 0.012 45 / 0.4);
+
+    /* Document-type accents — alias the flipping role tokens so they theme too.
+       Used by the has-documents dot, document chips, filters, the media grid. */
+    --doc-photo: var(--color-accent);
+    --doc-certificate: var(--color-success);
+    --doc-article: var(--color-warning);
+    --doc-obituary: var(--color-muted);
+    --doc-other: var(--color-faint);
+
+    /* Family-tree graph (React Flow). Edges default to a hairline; the active
+       lineage warms to the sienna voice. */
+    --edge: var(--color-border-strong);
+    --edge-active: var(--color-primary);
+    --edge-width: 1.5px;
+    --edge-width-active: 2px;
+    --tree-node-gap: 48px;
+
+    /* Focus ring — the one a11y ring, reused everywhere */
+    --focus-ring-width: 2px;
+    --focus-ring-color: var(--color-primary);
+    --focus-ring-offset: 2px;
+
+    /* Elevation — LIGHT (warm-tinted, soft; flat at rest) */
+    --shadow-overlay-low: 0 1px 2px oklch(0.24 0.012 45 / 0.06),
+      0 4px 12px oklch(0.24 0.012 45 / 0.08);
+    --shadow-overlay-high: 0 8px 28px oklch(0.24 0.012 45 / 0.14);
+    --shadow-node-lift: 0 2px 8px oklch(0.24 0.012 45 / 0.1);
+
+    /* Typography */
+    --font-sans: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI",
+      system-ui, sans-serif;
+    --font-serif: "Spectral", Georgia, "Times New Roman", serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+
+    --text-display: 2rem;       /* serif — person name / family name      */
+    --text-headline: 1.5rem;    /* serif — section titles, prominent dates */
+    --text-title: 1.125rem;     /* sans  — card / panel / dialog titles    */
+    --text-body: 1rem;          /* sans  — default reading text            */
+    --text-body-sm: 0.875rem;   /* sans  — metadata, captions              */
+    --text-label: 0.8125rem;    /* sans  — labels, chips, buttons, nav     */
+
+    --lh-tight: 1.1;
+    --lh-snug: 1.2;
+    --lh-title: 1.35;
+    --lh-body: 1.55;
+
+    --fw-regular: 400;
+    --fw-medium: 500;
+    --fw-semibold: 600;
+
+    --measure: 70ch; /* prose line-length cap (65–75ch) */
+
+    /* Radii */
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 10px;
+    --radius-xl: 16px;
+    --radius-full: 9999px;
+
+    /* Spacing (4px base) */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 12px;
+    --space-lg: 16px;
+    --space-xl: 24px;
+    --space-2xl: 32px;
+    --space-3xl: 48px;
+    --space-4xl: 64px;
+
+    /* Motion — 150–250ms, ease-out; no bounce */
+    --dur-fast: 150ms;
+    --dur-base: 200ms;
+    --dur-slow: 250ms;
+    --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+    /* Z-index scale (semantic, not arbitrary) */
+    --z-dropdown: 1000;
+    --z-sticky: 1100;
+    --z-modal-backdrop: 1200;
+    --z-modal: 1300;
+    --z-toast: 1400;
+    --z-tooltip: 1500;
+  }
+
+  /*
+   * DARK palette overrides. Keep the two blocks below in sync — one applies on
+   * system preference, the other on explicit opt-in. (CSS can't share a
+   * declaration block across a media query and a plain selector.)
+   */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+
+      --color-bg: oklch(0.205 0.01 50);
+      --color-surface: oklch(0.245 0.01 50);
+      --color-surface-sunken: oklch(0.165 0.008 50);
+      --color-ink: oklch(0.93 0.008 65);
+      --color-muted: oklch(0.72 0.012 55);
+      --color-faint: oklch(0.55 0.01 55);
+      --color-border: oklch(0.32 0.01 50);
+      --color-border-strong: oklch(0.42 0.012 50);
+
+      --color-primary: oklch(0.53 0.145 40);
+      --color-primary-deep: oklch(0.46 0.135 38);
+      --color-primary-tint: oklch(0.32 0.05 40);
+      --color-on-primary: oklch(1 0 0);
+
+      --color-accent: oklch(0.72 0.1 228);
+      --color-accent-deep: oklch(0.8 0.09 228);
+      --color-accent-tint: oklch(0.3 0.05 230);
+      --color-on-accent: oklch(0.18 0.01 50);
+
+      --color-success: oklch(0.72 0.12 152);
+      --color-success-tint: oklch(0.28 0.05 150);
+      --color-warning: oklch(0.8 0.12 78);
+      --color-warning-tint: oklch(0.3 0.05 72);
+      --color-danger: oklch(0.66 0.17 28);
+      --color-danger-tint: oklch(0.3 0.07 26);
+      --color-backdrop: oklch(0 0 0 / 0.6);
+
+      /* Dark elevation: tone carries depth; overlays deepen with black */
+      --shadow-overlay-low: 0 1px 2px oklch(0 0 0 / 0.4),
+        0 6px 16px oklch(0 0 0 / 0.45);
+      --shadow-overlay-high: 0 12px 36px oklch(0 0 0 / 0.55);
+      --shadow-node-lift: 0 2px 10px oklch(0 0 0 / 0.4);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+
+    --color-bg: oklch(0.205 0.01 50);
+    --color-surface: oklch(0.245 0.01 50);
+    --color-surface-sunken: oklch(0.165 0.008 50);
+    --color-ink: oklch(0.93 0.008 65);
+    --color-muted: oklch(0.72 0.012 55);
+    --color-faint: oklch(0.55 0.01 55);
+    --color-border: oklch(0.32 0.01 50);
+    --color-border-strong: oklch(0.42 0.012 50);
+
+    --color-primary: oklch(0.53 0.145 40);
+    --color-primary-deep: oklch(0.46 0.135 38);
+    --color-primary-tint: oklch(0.32 0.05 40);
+    --color-on-primary: oklch(1 0 0);
+
+    --color-accent: oklch(0.72 0.1 228);
+    --color-accent-deep: oklch(0.8 0.09 228);
+    --color-accent-tint: oklch(0.3 0.05 230);
+    --color-on-accent: oklch(0.18 0.01 50);
+
+    --color-success: oklch(0.72 0.12 152);
+    --color-success-tint: oklch(0.28 0.05 150);
+    --color-warning: oklch(0.8 0.12 78);
+    --color-warning-tint: oklch(0.3 0.05 72);
+    --color-danger: oklch(0.66 0.17 28);
+    --color-danger-tint: oklch(0.3 0.07 26);
+    --color-backdrop: oklch(0 0 0 / 0.6);
+
+    --shadow-overlay-low: 0 1px 2px oklch(0 0 0 / 0.4),
+      0 6px 16px oklch(0 0 0 / 0.45);
+    --shadow-overlay-high: 0 12px 36px oklch(0 0 0 / 0.55);
+    --shadow-node-lift: 0 2px 10px oklch(0 0 0 / 0.4);
+  }
+}
+
+/* ── Reset ───────────────────────────────────────────────────────────── */
+@layer reset {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  * {
+    margin: 0;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  img,
+  picture,
+  svg,
+  video {
+    display: block;
+    max-width: 100%;
+  }
+
+  input,
+  button,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+}
+
+/* ── Base ────────────────────────────────────────────────────────────── */
+@layer base {
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--lh-body);
+    font-weight: var(--fw-regular);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    /* Gentle crossfade when the theme flips (disabled under reduced motion) */
+    transition: background-color var(--dur-base) var(--ease-standard),
+      color var(--dur-base) var(--ease-standard);
+  }
+
+  /* Serif is reserved for human names, life-dates, and page titles. */
+  .text-display {
+    font-family: var(--font-serif);
+    font-size: var(--text-display);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-tight);
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
+  .text-headline {
+    font-family: var(--font-serif);
+    font-size: var(--text-headline);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-snug);
+    letter-spacing: -0.005em;
+    text-wrap: balance;
+  }
+
+  .text-title {
+    font-family: var(--font-sans);
+    font-size: var(--text-title);
+    font-weight: var(--fw-semibold);
+    line-height: var(--lh-title);
+  }
+
+  /* Tabular figures so columns of dates/years align. */
+  .text-data {
+    font-size: var(--text-body-sm);
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* Prose blocks (notes, biographies) cap their line length. */
+  .prose {
+    max-width: var(--measure);
+    text-wrap: pretty;
+  }
+
+  a {
+    color: var(--color-accent);
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+    text-decoration-thickness: from-font;
+    transition: color var(--dur-fast) var(--ease-standard);
+  }
+
+  a:hover {
+    color: var(--color-accent-deep);
+  }
+
+  :focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
+    border-radius: var(--radius-sm);
+  }
+
+  ::selection {
+    background-color: var(--color-primary-tint);
+    color: var(--color-ink);
+  }
+
+  ::placeholder {
+    color: var(--color-muted);
+    opacity: 1;
+  }
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

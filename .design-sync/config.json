@@ -1,0 +1,15 @@
+{
+  "pkg": "@family-archive/ui",
+  "globalName": "FamilyArchiveUI",
+  "projectId": "2d2340c7-33d4-49f1-b39c-1f54f83c4f20",
+  "shape": "package",
+  "buildCmd": "npm run build",
+  "srcDir": "src",
+  "tsconfig": "tsconfig.json",
+  "cssEntry": "dist/family-archive.css",
+  "readmeHeader": ".design-sync/conventions.md",
+  "overrides": {
+    "Card": { "cardMode": "column" },
+    "Dialog": { "cardMode": "single", "primaryStory": "ConfirmDelete" }
+  }
+}

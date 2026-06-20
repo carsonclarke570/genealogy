@@ -1,0 +1,11 @@
+/*
+ * Family Archive — stylesheet entry.
+ * Import this once at the app root: `import "@family-archive/ui/styles.css"`.
+ *
+ *   fonts.css      — brand webfonts (Hanken Grotesk + Spectral)
+ *   tokens.css     — design tokens + light/dark theming + base layer
+ *   components.css — component classes (fa-*), built from the tokens
+ */
+@import "./fonts.css";
+@import "./tokens.css";
+@import "./components.css";

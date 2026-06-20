@@ -1,0 +1,22 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+
+# design-sync (converter scratch + machine state; durable config/notes ARE committed)
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+
+# data (SQLite db + uploads — see CLAUDE.md; volume in prod)
+data/
+
+# impeccable local machine state (hook cache, local config)
+.impeccable/
+
+# misc
+.DS_Store
+*.log
