@@ -50,6 +50,16 @@ Repo-specific gotchas for future syncs. Read this first.
   explicit dark override. If you add a doc type, add both the token (tokens.css)
   and the `ChipDot` union + `DOT_COLOR` map (Chip.tsx).
 
+## Card layout overrides (GRID_OVERFLOW)
+
+- Wide / form-shaped components crop in the product card grid unless set to
+  `cardMode: "column"` in `cfg.overrides`. Currently column: Card, Checkbox,
+  EmptyState, RadioGroup, Tabs, Textarea, Toast. Overlays use `cardMode:
+  "single"`: Dialog, Menu. If a new wide component trips `[GRID_OVERFLOW]` on
+  validate, add it to `cfg.overrides` as column and rebuild.
+- `cardMode` lives in config, so changing it trips `[CONFIG_STALE]` on a
+  targeted `preview-rebuild`; run a full `package-build.mjs` to re-stamp.
+
 ## Re-sync risks
 
 - `dist/family-archive.css` is a generated build artifact (gitignored via
