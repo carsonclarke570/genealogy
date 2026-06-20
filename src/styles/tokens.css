@@ -61,13 +61,17 @@
     --doc-obituary: var(--color-muted);
     --doc-other: var(--color-faint);
 
-    /* Family-tree graph (React Flow). Edges default to a hairline; the active
-       lineage warms to the sienna voice. */
-    --edge: var(--color-border-strong);
+    /* Family-tree graph (React Flow + relatives-tree). The layout scales off the
+       node cell size. Edges default to a visible hairline, the active lineage
+       warms to the sienna voice, and divorced/step/adoptive links go dashed. */
+    --tree-node-w: 240px;
+    --tree-node-h: 84px;
+    --tree-node-gap: 48px;
+    --edge: oklch(0.78 0.012 55);
     --edge-active: var(--color-primary);
     --edge-width: 1.5px;
     --edge-width-active: 2px;
-    --tree-node-gap: 48px;
+    --edge-dash: 4 3;
 
     /* Focus ring — the one a11y ring, reused everywhere */
     --focus-ring-width: 2px;
@@ -173,6 +177,7 @@
       --color-danger: oklch(0.66 0.17 28);
       --color-danger-tint: oklch(0.3 0.07 26);
       --color-backdrop: oklch(0 0 0 / 0.6);
+      --edge: oklch(0.42 0.012 55);
 
       /* Dark elevation: tone carries depth; overlays deepen with black */
       --shadow-overlay-low: 0 1px 2px oklch(0 0 0 / 0.4),
@@ -211,6 +216,7 @@
     --color-danger: oklch(0.66 0.17 28);
     --color-danger-tint: oklch(0.3 0.07 26);
     --color-backdrop: oklch(0 0 0 / 0.6);
+    --edge: oklch(0.42 0.012 55);
 
     --shadow-overlay-low: 0 1px 2px oklch(0 0 0 / 0.4),
       0 6px 16px oklch(0 0 0 / 0.45);

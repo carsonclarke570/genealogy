@@ -17,6 +17,11 @@ data/
 # impeccable local machine state (hook cache, local config)
 .impeccable/
 
+# spike generated artifacts (keep the source: build.mjs, package.json)
+spike/**/build.bundle.mjs
+spike/**/index.html
+spike/**/*.png
+
 # misc
 .DS_Store
 *.log

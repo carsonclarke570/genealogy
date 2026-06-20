@@ -34,7 +34,7 @@ colors:
   doc-article: "oklch(0.62 0.130 68)"
   doc-obituary: "oklch(0.47 0.016 45)"
   doc-other: "oklch(0.62 0.012 45)"
-  edge: "oklch(0.83 0.008 55)"
+  edge: "oklch(0.78 0.012 55)"
   edge-active: "oklch(0.51 0.145 38)"
   dark-bg: "oklch(0.205 0.010 50)"
   dark-surface: "oklch(0.245 0.010 50)"
@@ -237,7 +237,8 @@ A near-monochrome warm-neutral architecture, lit by a single burnt-sienna voice 
 These alias the flipping role tokens above, so they theme automatically. They exist as named tokens so the same colour is used wherever a thing appears.
 
 - **Document types** — the per-type dot on chips, the media grid, and filters: **Photo** (`--doc-photo` → teal), **Certificate** (`--doc-certificate` → success green), **Article** (`--doc-article` → amber), **Obituary** (`--doc-obituary` → muted), **Other** (`--doc-other` → faint). The colour is always paired with the type spelled out — never colour alone.
-- **Tree graph (React Flow)** — edges default to **Edge** (`--edge` → Hairline Strong) at `--edge-width` (1.5px); the highlighted lineage warms to **Edge Active** (`--edge-active` → Burnt Sienna) at `--edge-width-active` (2px). `--tree-node-gap` (48px) sets generation/sibling spacing.
+- **Tree graph (React Flow + `relatives-tree`)** — layout scales off the node cell size: **`--tree-node-w`** (240px) × **`--tree-node-h`** (84px). Edges default to **Edge** (`--edge`, a visible warm hairline) at `--edge-width` (1.5px); the highlighted lineage warms to **Edge Active** (`--edge-active` → Burnt Sienna) at `--edge-width-active` (2px). `--tree-node-gap` (48px) is breathing room between branches.
+  - **Relationship → edge style** (the layout returns *untyped* connectors, so the renderer applies this): `blood` / `married` = solid `--edge`; `divorced` / `half` / `adopted` (step) = dashed (`--edge-dash`, `4 3`); the active ancestor/descendant lineage = `--edge-active` at `--edge-width-active`. Never rely on the line style alone — pair with labels where it matters.
 - **Modal scrim** — **Backdrop** (`--color-backdrop`, a translucent ink wash) sits behind dialogs.
 
 ### Dark Mode (Night)

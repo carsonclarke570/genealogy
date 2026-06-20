@@ -37,8 +37,12 @@ the design tokens as CSS custom properties (never invent values):
   `--text-body-sm` `--text-label`.
 - **Document types** (chips, the has-documents dot, the media grid):
   `--doc-photo` `--doc-certificate` `--doc-article` `--doc-obituary` `--doc-other`.
-- **Family tree** (React Flow edges): `--edge` / `--edge-active` (warms to sienna
-  on the active lineage), `--edge-width` / `--edge-width-active`, `--tree-node-gap`.
+- **Family tree** (React Flow + relatives-tree): node cell `--tree-node-w` /
+  `--tree-node-h`; edges `--edge` / `--edge-active` (sienna on the active lineage),
+  `--edge-width` / `--edge-width-active`; `--edge-dash` for divorced/step/adoptive
+  links; `--tree-node-gap`. The layout returns untyped connectors — apply the
+  relationship→style mapping (solid for blood/married, dashed for divorced/half/
+  adopted) in the renderer.
 - **Focus ring** (reuse everywhere): `--focus-ring-width` `--focus-ring-color`
   `--focus-ring-offset`. **Modal scrim**: `--color-backdrop`.
 
