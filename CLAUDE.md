@@ -74,17 +74,26 @@ Conventions:
 
 ## Commands
 
-> The app is not scaffolded yet. Fill these in once `package.json` exists.
+> The design system is built; the Next.js app is not scaffolded yet. The
+> app/db commands below are placeholders to fill in once the app exists.
 
 ```bash
-npm install          # install dependencies
-npm run dev          # start the dev server
-npm run build        # production build
-npm run start        # run the production build
-npm run lint         # eslint
-npm run db:generate  # generate Drizzle migrations from schema
-npm run db:migrate   # apply migrations
+npm install              # install dependencies
+npm run build            # build the design system (tsup JS + .d.ts, Tailwind CSS, fonts)
+npm run storybook        # run Storybook (component explorer) on :6006
+npm run build-storybook  # static Storybook build
+npm run typecheck        # tsc --noEmit
+npm run lint             # eslint
+
+# Planned (Next.js app — not yet scaffolded):
+# npm run dev            # start the dev server
+# npm run start          # run the production build
+# npm run db:generate / db:migrate   # Drizzle migrations
 ```
+
+The design system lives in `src/components/ui/` (primitives), `src/styles/`
+(tokens + fonts), and `src/lib/cn.ts`. It syncs to Claude Design via
+`/design-sync` — see `.design-sync/` (config, conventions, NOTES).
 
 ## Deployment (Railway)
 
@@ -105,4 +114,8 @@ file **and** the uploads directory must live on a **mounted persistent volume**
 
 ## Status
 
-Greenfield. Repository initialized with this CLAUDE.md. Next up: design system.
+Design system built: 10 core primitives (Button, Input, Textarea, Field, Card,
+Badge, Avatar, Heading, Text, Spinner) on Tailwind-backed tokens, with a
+Storybook and a `/design-sync` setup (validated bundle, all components verified
+`match`; upload pending a session with the Design tool). Next up: scaffold the
+Next.js app (auth, db schema, routes) and consume these primitives.

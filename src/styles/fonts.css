@@ -1,0 +1,31 @@
+/**
+ * Self-hosted archival serif (Spectral) for headings and titles.
+ *
+ * Shipped with the design system so every surface — including the
+ * claude.ai/design runtime — renders the brand serif rather than a generic
+ * fallback. Weights: 400 (regular), 600 (semibold), 700 (bold).
+ * Source: @fontsource/spectral (SIL Open Font License).
+ */
+@font-face {
+  font-family: "Spectral";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/spectral-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Spectral";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./fonts/spectral-600.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Spectral";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./fonts/spectral-700.woff2") format("woff2");
+}

@@ -1,0 +1,11 @@
+{
+  "pkg": "@genealogy/design-system",
+  "globalName": "GenealogyDS",
+  "shape": "storybook",
+  "storybookConfigDir": ".storybook",
+  "storybookStatic": ".design-sync/sb-reference",
+  "buildCmd": "npm run build",
+  "cssEntry": "dist/styles.css",
+  "extraFonts": ["src/styles/fonts.css"],
+  "readmeHeader": ".design-sync/conventions.md"
+}
