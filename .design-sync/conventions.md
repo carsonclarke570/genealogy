@@ -67,15 +67,22 @@ prefer the React components over hand-writing those classes.
 - **The signature component is `PersonNode`** — the clickable atom of the family
   tree (avatar + serif name + life-dates, with `focused` / `inPath` /
   `hasDocuments` states). Build the tree from it.
+- **Records are sacred — show provenance.** Every recorded fact carries a
+  `<ProvenanceMark>` (`verified` / `unverified` / `estimated` / `disputed` — colour
+  + icon + tooltip, read-only by default; pass `onChange` to make it editable).
+  Marking a fact verified opens `<SourceCiteDialog>` to cite the document that
+  proves it. This is the product's core principle made visible — prefer it over a
+  bare Badge for fact confidence.
 
 ## The component set
 
 Forms/controls: `Input`, `Textarea`, `Select`, `Checkbox`, `RadioGroup`, `Switch`.
 Actions: `Button`, `Menu`. Surfaces: `Card`, `Chip`, `Badge`, `Avatar`, `Dialog`,
 `Tooltip`, `Toast`. Navigation/structure: `Tabs`, `Breadcrumb`, `PersonNode`.
-Loading/empty: `Spinner`, `Skeleton`, `EmptyState`. Prefer these over hand-built
-markup. `Dialog` is for interrupting tasks only (confirm/upload) — exhaust inline UI
-first. `Menu` is the overflow/actions dropdown for per-record commands. `Toast` is
+Loading/empty: `Spinner`, `Skeleton`, `EmptyState`. Provenance: `ProvenanceMark`
+(per-fact confidence) + `SourceCiteDialog` (cite the proving document). Prefer these
+over hand-built markup. `Dialog` is for interrupting tasks only (confirm/upload) —
+exhaust inline UI first. `Menu` is the overflow/actions dropdown for per-record commands. `Toast` is
 transient feedback (an app-level viewport stacks them at `--z-toast`). `EmptyState`
 teaches an empty surface rather than showing "nothing here"; `Skeleton` is preferred
 over `Spinner` when the incoming content's shape is known.

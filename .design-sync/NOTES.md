@@ -60,6 +60,30 @@ Repo-specific gotchas for future syncs. Read this first.
 - `cardMode` lives in config, so changing it trips `[CONFIG_STALE]` on a
   targeted `preview-rebuild`; run a full `package-build.mjs` to re-stamp.
 
+## Provenance component (two exports, one file)
+
+- `ProvenanceMark` and `SourceCiteDialog` are BOTH exported from
+  `src/components/Provenance.tsx`. The fuzzy src-find can't map either name to
+  `Provenance.tsx`, so `cfg.componentSrcMap` pins both at that file — keep both
+  entries if you rename the file.
+- Previews are split per export: `.design-sync/previews/ProvenanceMark.tsx`
+  (States + BesideFacts) and `.design-sync/previews/SourceCiteDialog.tsx`
+  (LinkSource). There is **no** `Provenance.tsx` preview — the converter matches
+  previews by component name, so a combined file would orphan and both would fall
+  to the floor card.
+- Card modes: `ProvenanceMark` → `column` (two short stories, full width);
+  `SourceCiteDialog` → `single` + `primaryStory: "LinkSource"` (it's a Dialog
+  overlay, so it needs the sized-stage trick like Dialog — see the Overlay
+  previews note above).
+- `conventions.md` documents both under "Records are sacred — show provenance"
+  and in the component set; added 2026-06-20.
+
+## Render check (WSL) — update
+
+- As of 2026-06-20 the headless-shell libs are present on this machine; the
+  render check ran clean (no `[RENDER_SKIPPED]`). The sudo `install-deps` step
+  above is still the fix for a fresh machine.
+
 ## Re-sync risks
 
 - `dist/family-archive.css` is a generated build artifact (gitignored via

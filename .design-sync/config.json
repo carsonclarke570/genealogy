@@ -8,7 +8,13 @@
   "tsconfig": "tsconfig.json",
   "cssEntry": "dist/family-archive.css",
   "readmeHeader": ".design-sync/conventions.md",
+  "componentSrcMap": {
+    "ProvenanceMark": "src/components/Provenance.tsx",
+    "SourceCiteDialog": "src/components/Provenance.tsx"
+  },
   "overrides": {
+    "ProvenanceMark": { "cardMode": "column" },
+    "SourceCiteDialog": { "cardMode": "single", "primaryStory": "LinkSource" },
     "Card": { "cardMode": "column" },
     "Checkbox": { "cardMode": "column" },
     "EmptyState": { "cardMode": "column" },

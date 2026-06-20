@@ -1013,3 +1013,101 @@ button.fa-chip:hover {
   from { background-position: 200% 0; }
   to { background-position: -200% 0; }
 }
+
+/* ── Provenance ──────────────────────────────────────────────────────────
+ * The signature confidence mark beside a recorded fact, plus the source-cite
+ * dialog body. Colour + icon + label together — never colour alone.
+ */
+.fa-prov {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  padding: 0;
+  border: none;
+  background: transparent;
+  line-height: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+}
+.fa-prov--verified { color: var(--color-success); }
+.fa-prov--unverified { color: var(--color-muted); }
+.fa-prov--estimated { color: var(--color-warning); }
+.fa-prov--disputed { color: var(--color-danger); }
+.fa-prov--editable {
+  cursor: pointer;
+  padding: 0.1875rem;
+  transition: background-color var(--dur-fast) var(--ease-standard);
+}
+.fa-prov--editable:hover {
+  background-color: var(--color-surface-sunken);
+}
+.fa-prov--editable:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Link-a-source dialog body (rendered inside fa-dialog__body) */
+.fa-sourcecite {
+  display: grid;
+  gap: var(--space-sm);
+  max-height: 18.75rem;
+  overflow: auto;
+}
+.fa-sourcecite__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  text-align: start;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg);
+  font-family: var(--font-sans);
+  font-size: var(--text-body-sm);
+  color: var(--color-ink);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard);
+}
+.fa-sourcecite__row:hover {
+  border-color: var(--color-border-strong);
+}
+.fa-sourcecite__row.is-selected {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-tint);
+}
+.fa-sourcecite__row:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+.fa-sourcecite__dot {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--radius-full);
+}
+.fa-sourcecite__dot--upload {
+  width: 1.25rem;
+  height: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
+  color: var(--color-muted);
+}
+.fa-sourcecite__label {
+  flex: 1;
+  min-width: 0;
+}
+.fa-sourcecite__type {
+  flex: none;
+  font-size: var(--text-label);
+  color: var(--color-muted);
+}
+.fa-sourcecite__check {
+  flex: none;
+  display: inline-flex;
+  color: var(--color-primary);
+}
