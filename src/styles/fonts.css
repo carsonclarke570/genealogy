@@ -1,10 +1,12 @@
 /*
- * Brand fonts. Loaded from Google Fonts at runtime so the design system is
- * self-contained without shipping binaries. In the production Next.js app these
- * are loaded via next/font/google instead (see DESIGN.md), which overrides the
- * --font-sans / --font-serif stacks for better performance and no layout shift.
+ * Brand fonts — Hanken Grotesk (warm humanist sans; the entire UI) and Spectral
+ * (literary serif; human names, life-dates, page titles).
  *
- *   Hanken Grotesk — warm humanist sans, the entire UI (labels, buttons, fields, data)
- *   Spectral       — literary serif, reserved for human names, life-dates, page titles
+ * Font *files* are intentionally not loaded here. The Next.js app loads them via
+ * next/font/google (self-hosted + preloaded; see app/src/app/layout.tsx and
+ * DESIGN.md) and binds them to the --font-sans / --font-serif tokens. A previous
+ * `@import url(fonts.googleapis.com...)` was removed: with next/font in front of
+ * it, that rule no longer sat at the top of the bundle, so browsers ignored it
+ * and logged a warning. The token stacks in tokens.css still name the families
+ * (with system fallbacks), so standalone, non-Next consumers degrade gracefully.
  */
-@import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Spectral:wght@400;500;600&display=swap");

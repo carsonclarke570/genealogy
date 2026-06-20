@@ -117,11 +117,15 @@ function Tree({
     drag.current = { x: e.clientX, y: e.clientY, tx: view.tx, ty: view.ty, moved: false };
   };
   const onMove = (e: React.MouseEvent) => {
-    if (!drag.current) return;
-    const dx = e.clientX - drag.current.x;
-    const dy = e.clientY - drag.current.y;
-    if (Math.abs(dx) + Math.abs(dy) > 3) drag.current.moved = true;
-    setView((v) => ({ ...v, tx: drag.current!.tx + dx, ty: drag.current!.ty + dy }));
+    const d = drag.current;
+    if (!d) return;
+    const dx = e.clientX - d.x;
+    const dy = e.clientY - d.y;
+    if (Math.abs(dx) + Math.abs(dy) > 3) d.moved = true;
+    // Close over the captured `d`, not the mutable `drag.current` ref: React may
+    // replay this updater during a later render, by which point endDrag may have
+    // set drag.current = null (was throwing "Cannot read properties of null").
+    setView((v) => ({ ...v, tx: d.tx + dx, ty: d.ty + dy }));
   };
   const endDrag = () => {
     drag.current = null;
