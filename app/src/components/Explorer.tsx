@@ -10,7 +10,6 @@ import {
 import type { CSSProperties } from "react";
 import { Avatar, Badge, Button, PersonNode } from "@family-archive/ui";
 import {
-  people,
   shortName,
   fullName,
   lifeDates,
@@ -19,6 +18,7 @@ import {
   provSummary,
   relationsOf,
 } from "@/lib/family-data";
+import { useDataset } from "@/lib/dataset";
 import {
   compute,
   lineage,
@@ -50,12 +50,13 @@ function Tree({
   onFocus: (id: string) => void;
   controlsRef: React.MutableRefObject<TreeControls | null>;
 }) {
+  const { people, units } = useDataset();
   const wrapRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View>({ tx: 0, ty: 0, k: 1 });
   const drag = useRef<{ x: number; y: number; tx: number; ty: number; moved: boolean } | null>(null);
 
-  const layout = useMemo(() => compute(mode), [mode]);
-  const lin = useMemo(() => (focusId ? lineage(focusId) : null), [focusId]);
+  const layout = useMemo(() => compute(units, mode), [units, mode]);
+  const lin = useMemo(() => (focusId ? lineage(units, focusId) : null), [units, focusId]);
   const b = layout.bounds;
   const worldW = b.maxX - b.minX;
   const worldH = b.maxY - b.minY;
@@ -275,8 +276,9 @@ function Peek({
   onOpen: (id: string, mode?: "edit") => void;
   onFocusRelative: (id: string) => void;
 }) {
+  const { people, units } = useDataset();
   const p = people[id];
-  const rel = relationsOf(id);
+  const rel = relationsOf(units, id);
   const Section = ({ title, items }: { title: string; items: { id: string; rel?: string }[] }) =>
     items.length ? (
       <div style={{ marginTop: "var(--space-lg)" }}>

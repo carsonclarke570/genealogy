@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Avatar, Badge, Button, Card, Chip, EmptyState } from "@family-archive/ui";
-import { people, media, fullName, lifeDates, docCount, relationsOf } from "@/lib/family-data";
+import { fullName, lifeDates, docCount, relationsOf } from "@/lib/family-data";
+import { useDataset } from "@/lib/dataset";
 import { Icon } from "./Icon";
 import { DocDot } from "./shared";
 import type { Screen } from "./AppShell";
@@ -14,6 +15,7 @@ export function Search({
   onOpen: (id: string) => void;
   onNavigate: (screen: Screen) => void;
 }) {
+  const { people, media, units } = useDataset();
   const [q, setQ] = useState("whitfield");
   const [scope, setScope] = useState<string>("all");
 
@@ -113,7 +115,7 @@ export function Search({
                 </div>
                 <div style={{ display: "grid", gap: "var(--space-sm)" }}>
                   {matchedPeople.map((p) => {
-                    const rel = relationsOf(p.id);
+                    const rel = relationsOf(units, p.id);
                     const hint = rel.spouse[0]
                       ? "Spouse of " + people[rel.spouse[0].id].given.split(" ")[0]
                       : rel.children.length
