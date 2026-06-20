@@ -60,6 +60,8 @@ body {
   font-weight: 500;
   color: var(--color-muted);
   cursor: pointer;
+  appearance: none;
+  border: none;
   border-left: 3px solid transparent;
   user-select: none;
   background: none;
