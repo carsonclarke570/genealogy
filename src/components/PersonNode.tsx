@@ -17,31 +17,27 @@ export interface PersonNodeProps
   inPath?: boolean;
   /** Show the teal indicator that this person has attached documents. */
   hasDocuments?: boolean;
-}
-
-function lifespan(birth?: string, death?: string): string | null {
-  if (birth && death) return `${birth} – ${death}`;
-  if (birth) return `b. ${birth}`;
-  if (death) return `d. ${death}`;
-  return null;
+  /**
+   * Whether the person is living. When omitted, it's inferred as living if no
+   * `death` date is given. Living people show a "Living" tag (and no † glyph),
+   * which also flags privacy-sensitive records.
+   */
+  living?: boolean;
 }
 
 /**
  * PersonNode — the atom of the family tree.
  *
  * A compact, clickable card: portrait (or monogram), the person's name in the
- * Spectral serif, and life-dates in tabular figures. At rest it is flat; on hover
- * it lifts, `focused` draws the sienna ring (and sets `aria-current`), `inPath`
- * tints the highlighted lineage, and `hasDocuments` shows the teal dot. It is a
- * real `<button>`, so the whole node is keyboard-focusable and clickable.
+ * Spectral serif, and life-dates with genealogy glyphs (✳ born, † died) in
+ * tabular figures. Living people instead show a quiet "Living" tag. At rest it is
+ * flat; on hover it lifts, `focused` draws the sienna ring (and sets
+ * `aria-current`), `inPath` tints the highlighted lineage, and `hasDocuments`
+ * shows the teal dot. A real `<button>` — keyboard-focusable and clickable.
  *
  * @example
- * <PersonNode
- *   name="Eleanor Margaret Whitfield"
- *   birth="1888" death="1971"
- *   focused hasDocuments
- *   onClick={() => openRecord(id)}
- * />
+ * <PersonNode name="Eleanor Whitfield" birth="1888" death="1971" focused hasDocuments />
+ * <PersonNode name="Aoife Reardon" birth="1992" onClick={() => openRecord(id)} />
  */
 export function PersonNode({
   name,
@@ -51,6 +47,7 @@ export function PersonNode({
   focused = false,
   inPath = false,
   hasDocuments = false,
+  living,
   className,
   type = "button",
   ...rest
@@ -64,7 +61,8 @@ export function PersonNode({
     .filter(Boolean)
     .join(" ");
 
-  const dates = lifespan(birth, death);
+  const isLiving = living ?? !death;
+  const hasDates = Boolean(birth || death || isLiving);
 
   return (
     <button
@@ -76,7 +74,23 @@ export function PersonNode({
       <Avatar name={name} src={photoUrl} size="md" />
       <span className="fa-person__body">
         <span className="fa-person__name">{name}</span>
-        {dates && <span className="fa-person__dates">{dates}</span>}
+        {hasDates && (
+          <span className="fa-person__dates">
+            {birth && (
+              <span className="fa-person__life" aria-label={`born ${birth}`}>
+                <span className="fa-person__glyph" aria-hidden="true">✳</span>
+                {birth}
+              </span>
+            )}
+            {death && (
+              <span className="fa-person__life" aria-label={`died ${death}`}>
+                <span className="fa-person__glyph" aria-hidden="true">†</span>
+                {death}
+              </span>
+            )}
+            {isLiving && <span className="fa-person__living">Living</span>}
+          </span>
+        )}
       </span>
       {hasDocuments && (
         <span

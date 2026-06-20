@@ -388,10 +388,34 @@ button.fa-chip:hover {
 }
 
 .fa-person__dates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 0.625rem;
   font-family: var(--font-sans);
   font-size: var(--text-body-sm);
   font-feature-settings: "tnum" 1;
   color: var(--color-muted);
+}
+
+.fa-person__life {
+  display: inline-flex;
+  align-items: baseline;
+}
+
+.fa-person__glyph {
+  color: var(--color-faint);
+  margin-inline-end: 0.2em;
+}
+
+.fa-person__living {
+  font-size: 0.6875rem;
+  font-weight: var(--fw-medium);
+  line-height: 1.4;
+  color: var(--color-success);
+  background-color: var(--color-success-tint);
+  padding: 0.05rem 0.4rem;
+  border-radius: var(--radius-full);
 }
 
 .fa-person__docdot {
