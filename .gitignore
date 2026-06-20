@@ -4,6 +4,12 @@ node_modules/
 # build output
 dist/
 
+# next.js app (app/)
+app/.next/
+app/node_modules/
+app/next-env.d.ts
+app/tsconfig.tsbuildinfo
+
 # design-sync (converter scratch + machine state; durable config/notes ARE committed)
 .ds-sync/
 ds-bundle/

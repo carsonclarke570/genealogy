@@ -1,0 +1,366 @@
+/* App-shell layout glue for the Family Archive app. Only structural styling —
+   every value is a design-system token so light/dark flip automatically.
+   Components themselves come from @family-archive/ui. */
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+.app {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: var(--color-bg);
+}
+
+/* ---- sidebar ---------------------------------------------------------- */
+.app-side {
+  width: 232px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-lg) var(--space-md);
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+}
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm) var(--space-lg);
+}
+.app-brand-name {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--color-ink);
+}
+.app-brand-sub {
+  font-size: var(--text-label);
+  color: var(--color-muted);
+  margin-top: 2px;
+}
+
+.app-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 9px 10px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-label);
+  font-weight: 500;
+  color: var(--color-muted);
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  user-select: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  transition: background-color 0.12s, color 0.12s;
+}
+.app-nav:hover {
+  background: var(--color-surface-sunken);
+  color: var(--color-ink);
+}
+.app-nav.on {
+  background: var(--color-primary-tint);
+  color: var(--color-ink);
+  border-left-color: var(--color-primary);
+}
+.app-nav svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.app-curator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  border-top: 1px solid var(--color-border);
+}
+
+/* ---- topbar ----------------------------------------------------------- */
+.app-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-top {
+  height: 60px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: 0 var(--space-xl);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+.app-top-title {
+  font-family: var(--font-serif);
+  font-size: 1.375rem;
+  font-weight: 500;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+.app-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 7px 12px;
+  width: 260px;
+  cursor: text;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+}
+.app-search svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+/* ---- content + canvas ------------------------------------------------- */
+.app-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.app-scroll {
+  overflow: auto;
+}
+.app-scroll::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+.app-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 999px;
+  border: 3px solid var(--color-bg);
+}
+.app-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app-canvas {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  cursor: grab;
+}
+.app-canvas.grabbing {
+  cursor: grabbing;
+}
+
+/* node wrapper: fixes the PersonNode to the layout cell so edge math lines up */
+.app-node {
+  position: absolute;
+}
+.app-node.dim {
+  opacity: 0.34;
+  transition: opacity 0.15s;
+}
+
+/* floating clusters on the canvas */
+.app-float {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-overlay-low);
+}
+.app-seg {
+  display: flex;
+  padding: 4px;
+  gap: 3px;
+}
+.app-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+}
+.app-iconbtn:hover {
+  background: var(--color-surface-sunken);
+  color: var(--color-ink);
+}
+.app-iconbtn svg {
+  width: 18px;
+  height: 18px;
+}
+.app-segbtn {
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-label);
+  font-weight: 500;
+  padding: 6px 11px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-muted);
+}
+.app-segbtn.on {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+/* peek panel */
+.app-peek {
+  position: absolute;
+  top: var(--space-md);
+  right: var(--space-md);
+  bottom: var(--space-md);
+  width: 360px;
+  z-index: 6;
+  overflow: auto;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-overlay-high);
+  padding: var(--space-xl);
+}
+
+/* generic helpers */
+.app-display {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  line-height: 1.1;
+  color: var(--color-ink);
+  letter-spacing: -0.01em;
+}
+.app-muted {
+  color: var(--color-muted);
+}
+.app-label {
+  font-size: var(--text-label);
+  font-weight: 500;
+  color: var(--color-muted);
+}
+.app-divider {
+  height: 1px;
+  background: var(--color-border);
+  border: 0;
+}
+.app-link {
+  color: var(--color-accent);
+  text-decoration: none;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font: inherit;
+  padding: 0;
+}
+.app-link:hover {
+  text-decoration: underline;
+}
+
+.app-ph {
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-faint, var(--color-muted));
+  font-size: var(--text-body-sm);
+  border-radius: var(--radius-sm);
+}
+.app-dropzone {
+  border: 1.5px dashed var(--color-border-strong);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--color-muted);
+  cursor: pointer;
+  width: 100%;
+}
+.app-dropzone:hover {
+  border-color: var(--color-primary);
+  color: var(--color-ink);
+}
+.app-dropzone svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* doc-type dot */
+.app-docdot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: none;
+}
+.app-docdot.photo {
+  background: var(--doc-photo);
+}
+.app-docdot.certificate {
+  background: var(--doc-certificate);
+}
+.app-docdot.article {
+  background: var(--doc-article);
+}
+.app-docdot.obituary {
+  background: var(--doc-obituary);
+}
+.app-docdot.other {
+  background: var(--doc-other);
+}
+
+.app-mininode {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+}
+.app-mininode:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface);
+}
+.app-mininode .nm {
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  line-height: 1.1;
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.app-mininode .dt {
+  font-size: var(--text-body-sm);
+  color: var(--color-muted);
+  font-feature-settings: "tnum" 1;
+}
+
+.tnum {
+  font-feature-settings: "tnum" 1;
+}
