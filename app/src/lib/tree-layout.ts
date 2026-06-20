@@ -6,7 +6,7 @@
  * and computes spouse + parent→child edges and lineage highlighting. Pure
  * functions — no DOM, no React.
  */
-import { units, type Unit } from "./family-data";
+import { type Unit } from "./family-data";
 
 export type TreeMode = "vertical" | "horizontal" | "radial";
 
@@ -59,7 +59,7 @@ export interface Layout {
   mode: TreeMode;
 }
 
-function buildIndexes() {
+function buildIndexes(units: Unit[]) {
   const byUnit: Record<string, PackedUnit> = {};
   units.forEach((u) => (byUnit[u.id] = { ...u, _start: 0, _center: 0 }));
   const childrenOf: Record<string, string[]> = {};
@@ -76,8 +76,8 @@ function buildIndexes() {
 
 const nBoxes = (u: PackedUnit) => (u.partner ? 2 : 1);
 
-export function compute(mode: TreeMode): Layout {
-  const { byUnit, childrenOf } = buildIndexes();
+export function compute(units: Unit[], mode: TreeMode): Layout {
+  const { byUnit, childrenOf } = buildIndexes(units);
   const depth: Record<string, number> = {};
   let cursor = 0;
 
@@ -199,8 +199,8 @@ export interface Lineage {
   units: Set<string>;
 }
 
-export function lineage(focusId: string): Lineage {
-  const { byUnit, childrenOf, unitOfPerson } = buildIndexes();
+export function lineage(units: Unit[], focusId: string): Lineage {
+  const { byUnit, childrenOf, unitOfPerson } = buildIndexes(units);
   const uid = unitOfPerson[focusId];
   if (!uid) return { people: new Set(), units: new Set() };
 

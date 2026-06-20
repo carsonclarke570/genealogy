@@ -1,6 +1,9 @@
+"use client";
+
 import { Avatar } from "@family-archive/ui";
 import type { DocType } from "@family-archive/ui";
-import { people, shortName, lifeDates } from "@/lib/family-data";
+import { shortName, lifeDates } from "@/lib/family-data";
+import { useDataset } from "@/lib/dataset";
 
 /** Small colour-coded dot for a document type (matches --doc-* tokens). */
 export function DocDot({ type }: { type: DocType }) {
@@ -17,6 +20,7 @@ export function MiniNode({
   rel?: string;
   onOpen?: (id: string) => void;
 }) {
+  const { people } = useDataset();
   const p = people[id];
   if (!p) return null;
   return (

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { Avatar, Button, Card, Chip, Select } from "@family-archive/ui";
 import type { ChipDot } from "@family-archive/ui";
-import { people, media, fullName } from "@/lib/family-data";
+import { fullName } from "@/lib/family-data";
+import { useDataset } from "@/lib/dataset";
 import { Icon } from "./Icon";
 import { DocDot } from "./shared";
 
@@ -17,6 +18,7 @@ const types: [string, string, ChipDot | undefined][] = [
 ];
 
 export function Gallery({ onOpen }: { onOpen: (id: string) => void }) {
+  const { people, media } = useDataset();
   const [filter, setFilter] = useState<string>("all");
   const items = media.filter((m) => filter === "all" || m.type === filter);
 

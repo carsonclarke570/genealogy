@@ -15,6 +15,7 @@ import {
 } from "@family-archive/ui";
 import type { ProvenanceStatus } from "@family-archive/ui";
 import { sourceOptions } from "@/lib/family-data";
+import { useDataset } from "@/lib/dataset";
 import { Icon } from "./Icon";
 import type { Screen } from "./AppShell";
 
@@ -30,8 +31,9 @@ export function AddPerson({
   onNavigate: (screen: Screen) => void;
   onToast: (message: string) => void;
 }) {
+  const { media } = useDataset();
   const [prov, setProv] = useState<Record<string, ProvState>>({});
-  const sources = sourceOptions();
+  const sources = sourceOptions(media);
   const stOf = (k: string): ProvenanceStatus => prov[k]?.status ?? "unverified";
   const setP = (k: string, status: ProvenanceStatus, source?: string) =>
     setProv((s) => ({ ...s, [k]: { status, source } }));

@@ -14,8 +14,6 @@ import {
 } from "@family-archive/ui";
 import type { ChipDot } from "@family-archive/ui";
 import {
-  people,
-  media as allMedia,
   fullName,
   lifeDates,
   docCount,
@@ -25,6 +23,7 @@ import {
   type Person,
   type Relation,
 } from "@/lib/family-data";
+import { useDataset } from "@/lib/dataset";
 import { Icon } from "./Icon";
 import { MiniNode, DocDot } from "./shared";
 import type { Screen } from "./AppShell";
@@ -55,8 +54,9 @@ export function PersonRecord({
   onOpen: (id: string, mode?: "edit") => void;
   onNavigate: (screen: Screen) => void;
 }) {
+  const { people, media: allMedia, units } = useDataset();
   const p = people[id];
-  const rel = relationsOf(id);
+  const rel = relationsOf(units, id);
   const media = allMedia.filter((m) => m.people.includes(id));
   const [docFilter, setDocFilter] = useState<string>("all");
 

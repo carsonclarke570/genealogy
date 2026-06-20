@@ -61,29 +61,49 @@ Conventions:
   authenticated route handler that checks the session first.
 - Match the surrounding code's style. Run lint/format before committing.
 
-## Data model (initial sketch)
+## Data model
 
-- **person** — id, names, sex, birth/death date + place, notes, timestamps.
-- **relationship** — connects two people (parent/child, spouse/partner). Model
-  parentage and partnerships explicitly so the tree can be reconstructed.
-- **media** — id, file path, mime type, original filename, title/description,
-  document type (photo | certificate | article | obituary | other), upload time.
+Schema in `app/src/db/schema.ts`; refined from the initial sketch:
+
+- **person** — id, names, sex, birth/death year + place, living, notes, timestamps.
+  Two sparse JSON columns ride along: `docs` (recorded document tally per type)
+  and `prov` (per-fact confidence). They are Zod-validated on read; `docs` will
+  migrate to a count derived from `person_media` once real upload lands.
+- **relationship** — one table, two kinds of edge: `spouse` (the two partners,
+  with married/divorced status) and `parent` (parent → child). By convention a
+  spouse row's `personId` is the blood-line ("anchor") side, so the couple-unit
+  tree the Explorer draws can be reconstructed deterministically.
+- **media** — id, type (photo | certificate | article | obituary | other), title,
+  year, plus file fields (path, mime, original filename, description) left null
+  until upload exists.
 - **person_media** — links media to one or more people.
 
-(Confirm/refine schema when building the data layer.)
+The read model in `app/src/lib/queries.ts` assembles an in-memory `Dataset`
+({ people, units, media }) — deriving couple-units from `relationship` rows via
+`app/src/lib/units.ts` — which the server hands to the client through a context
+(`app/src/lib/dataset.tsx`). The Whitfield seed lives in
+`app/src/db/seed-data.ts`. On boot the client (`app/src/db/client.ts`)
+auto-applies migrations and seeds an empty database (both idempotent).
 
 ## Commands
 
-> The app is not scaffolded yet. Fill these in once `package.json` exists.
+The design-system library is the **root** package; the Next.js app is in `app/`
+and depends on the library via `file:..`. Build the library before the app
+(`dist/` is gitignored) — see the Dockerfile.
 
 ```bash
-npm install          # install dependencies
+# Root (design system)
+npm install          # install library deps
+npm run build        # build dist/ (needed before the app compiles)
+
+# App (cd app/)
+npm install          # install app deps
 npm run dev          # start the dev server
 npm run build        # production build
 npm run start        # run the production build
-npm run lint         # eslint
-npm run db:generate  # generate Drizzle migrations from schema
-npm run db:migrate   # apply migrations
+npm run db:generate  # generate a Drizzle migration after editing schema.ts
+npm run db:migrate   # apply migrations to the DB (DATA_DIR)
+npm run db:seed      # seed an empty DB with the Whitfield family (idempotent)
 ```
 
 ## Deployment (Railway)
@@ -105,4 +125,8 @@ file **and** the uploads directory must live on a **mounted persistent volume**
 
 ## Status
 
-Greenfield. Repository initialized with this CLAUDE.md. Next up: design system.
+Design system + Next.js app scaffolded; the UI now runs off a real **SQLite +
+Drizzle** data layer (schema, migrations, seed, server read model wired into the
+app) instead of static fixtures. Still stubbed: writes (Add person persists
+nothing yet), real media upload + protected serving, and Auth.js (a shared
+password gate stands in). Next up: make Add person persist, then media upload.

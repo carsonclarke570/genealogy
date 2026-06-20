@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { Avatar, Button, Toast } from "@family-archive/ui";
 import { getResolvedTheme, toggleTheme, type Theme } from "@/lib/theme";
+import { DatasetProvider } from "@/lib/dataset";
+import type { Dataset } from "@/lib/family-data";
 import { Icon, type IconName } from "./Icon";
 import { Explorer } from "./Explorer";
 import { PersonRecord } from "./PersonRecord";
@@ -33,7 +35,7 @@ const TITLES: Record<Screen, string> = {
   add: "Add a person",
 };
 
-export function AppShell() {
+export function AppShell({ data }: { data: Dataset }) {
   const [route, setRoute] = useState<Route>({ screen: "explorer", personId: "eleanor" });
   const [focusId, setFocusId] = useState<string | null>(null);
   const [layout, setLayout] = useState<TreeMode>("vertical");
@@ -56,6 +58,7 @@ export function AppShell() {
     mode === "edit" ? navigate("add", personId) : navigate("person", personId);
 
   return (
+    <DatasetProvider value={data}>
     <div className="app">
       <aside className="app-side">
         <div className="app-brand">
@@ -146,5 +149,6 @@ export function AppShell() {
         </div>
       )}
     </div>
+    </DatasetProvider>
   );
 }
