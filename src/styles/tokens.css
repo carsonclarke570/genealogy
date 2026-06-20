@@ -2,14 +2,13 @@
  * Family Archive — design tokens & theming
  * Source of truth: DESIGN.md (frontmatter is normative; values here mirror it 1:1).
  *
- * Theming model — light & dark are equal peers:
+ * Theming model — light & dark are equal peers, via the attribute strategy:
  *   1. :root defaults to the LIGHT palette.
- *   2. @media (prefers-color-scheme: dark) applies DARK *unless* the user has
- *      explicitly forced light via [data-theme="light"].
- *   3. [data-theme="dark"] always wins (explicit user choice).
- *
- * To avoid a flash of the wrong theme, set data-theme on <html> before paint
- * with the blocking script in src/lib/theme.ts (THEME_INIT_SCRIPT).
+ *   2. :root[data-theme="dark"] holds the DARK palette — the single theme scope.
+ *   3. THEME_INIT_SCRIPT (src/lib/theme.ts) sets data-theme on <html> before
+ *      first paint: a stored choice if present, else the OS preference resolved
+ *      from prefers-color-scheme. So "system" users still get dark, with no
+ *      flash and no separate media-query block (one unambiguous theme scope).
  *
  * Fonts: stacks below are fallbacks. In Next.js, load Hanken Grotesk + Spectral
  * via next/font/google and expose them as --font-sans / --font-serif on <html>;
@@ -64,19 +63,19 @@
     /* Family-tree graph (React Flow + relatives-tree). The layout scales off the
        node cell size. Edges default to a visible hairline, the active lineage
        warms to the sienna voice, and divorced/step/adoptive links go dashed. */
-    --tree-node-w: 240px;
-    --tree-node-h: 84px;
-    --tree-node-gap: 48px;
+    --tree-node-w: 240px; /* @kind other */
+    --tree-node-h: 84px; /* @kind other */
+    --tree-node-gap: 48px; /* @kind other */
     --edge: oklch(0.78 0.012 55);
     --edge-active: var(--color-primary);
-    --edge-width: 1.5px;
-    --edge-width-active: 2px;
-    --edge-dash: 4 3;
+    --edge-width: 1.5px; /* @kind other */
+    --edge-width-active: 2px; /* @kind other */
+    --edge-dash: 4 3; /* @kind other */
 
     /* Focus ring — the one a11y ring, reused everywhere */
-    --focus-ring-width: 2px;
+    --focus-ring-width: 2px; /* @kind other */
     --focus-ring-color: var(--color-primary);
-    --focus-ring-offset: 2px;
+    --focus-ring-offset: 2px; /* @kind other */
 
     /* Elevation — LIGHT (warm-tinted, soft; flat at rest) */
     --shadow-overlay-low: 0 1px 2px oklch(0.24 0.012 45 / 0.06),
@@ -97,16 +96,16 @@
     --text-body-sm: 0.875rem;   /* sans  — metadata, captions              */
     --text-label: 0.8125rem;    /* sans  — labels, chips, buttons, nav     */
 
-    --lh-tight: 1.1;
-    --lh-snug: 1.2;
-    --lh-title: 1.35;
-    --lh-body: 1.55;
+    --lh-tight: 1.1; /* @kind font */
+    --lh-snug: 1.2; /* @kind font */
+    --lh-title: 1.35; /* @kind font */
+    --lh-body: 1.55; /* @kind font */
 
-    --fw-regular: 400;
-    --fw-medium: 500;
-    --fw-semibold: 600;
+    --fw-regular: 400; /* @kind font */
+    --fw-medium: 500; /* @kind font */
+    --fw-semibold: 600; /* @kind font */
 
-    --measure: 70ch; /* prose line-length cap (65–75ch) */
+    --measure: 70ch; /* @kind font — prose line-length cap (65–75ch) */
 
     /* Radii */
     --radius-sm: 4px;
@@ -126,67 +125,28 @@
     --space-4xl: 64px;
 
     /* Motion — 150–250ms, ease-out; no bounce */
-    --dur-fast: 150ms;
-    --dur-base: 200ms;
-    --dur-slow: 250ms;
-    --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
-    --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
-    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --dur-fast: 150ms; /* @kind other */
+    --dur-base: 200ms; /* @kind other */
+    --dur-slow: 250ms; /* @kind other */
+    --ease-standard: cubic-bezier(0.4, 0, 0.2, 1); /* @kind other */
+    --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1); /* @kind other */
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1); /* @kind other */
 
     /* Z-index scale (semantic, not arbitrary) */
-    --z-dropdown: 1000;
-    --z-sticky: 1100;
-    --z-modal-backdrop: 1200;
-    --z-modal: 1300;
-    --z-toast: 1400;
-    --z-tooltip: 1500;
+    --z-dropdown: 1000; /* @kind other */
+    --z-sticky: 1100; /* @kind other */
+    --z-modal-backdrop: 1200; /* @kind other */
+    --z-modal: 1300; /* @kind other */
+    --z-toast: 1400; /* @kind other */
+    --z-tooltip: 1500; /* @kind other */
   }
 
   /*
-   * DARK palette overrides. Keep the two blocks below in sync — one applies on
-   * system preference, the other on explicit opt-in. (CSS can't share a
-   * declaration block across a media query and a plain selector.)
+   * DARK palette — applied via data-theme="dark" on <html> (set by
+   * THEME_INIT_SCRIPT, which resolves the OS preference for "system" users
+   * before first paint). One explicit theme scope; no prefers-color-scheme
+   * block, so the cascade and design tooling stay unambiguous.
    */
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      color-scheme: dark;
-
-      --color-bg: oklch(0.205 0.01 50);
-      --color-surface: oklch(0.245 0.01 50);
-      --color-surface-sunken: oklch(0.165 0.008 50);
-      --color-ink: oklch(0.93 0.008 65);
-      --color-muted: oklch(0.72 0.012 55);
-      --color-faint: oklch(0.55 0.01 55);
-      --color-border: oklch(0.32 0.01 50);
-      --color-border-strong: oklch(0.42 0.012 50);
-
-      --color-primary: oklch(0.53 0.145 40);
-      --color-primary-deep: oklch(0.46 0.135 38);
-      --color-primary-tint: oklch(0.32 0.05 40);
-      --color-on-primary: oklch(1 0 0);
-
-      --color-accent: oklch(0.72 0.1 228);
-      --color-accent-deep: oklch(0.8 0.09 228);
-      --color-accent-tint: oklch(0.3 0.05 230);
-      --color-on-accent: oklch(0.18 0.01 50);
-
-      --color-success: oklch(0.72 0.12 152);
-      --color-success-tint: oklch(0.28 0.05 150);
-      --color-warning: oklch(0.8 0.12 78);
-      --color-warning-tint: oklch(0.3 0.05 72);
-      --color-danger: oklch(0.66 0.17 28);
-      --color-danger-tint: oklch(0.3 0.07 26);
-      --color-backdrop: oklch(0 0 0 / 0.6);
-      --edge: oklch(0.42 0.012 55);
-
-      /* Dark elevation: tone carries depth; overlays deepen with black */
-      --shadow-overlay-low: 0 1px 2px oklch(0 0 0 / 0.4),
-        0 6px 16px oklch(0 0 0 / 0.45);
-      --shadow-overlay-high: 0 12px 36px oklch(0 0 0 / 0.55);
-      --shadow-node-lift: 0 2px 10px oklch(0 0 0 / 0.4);
-    }
-  }
-
   :root[data-theme="dark"] {
     color-scheme: dark;
 

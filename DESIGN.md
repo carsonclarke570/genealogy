@@ -187,8 +187,9 @@ The system ships **light and dark as equal peers** — this is a tool people sit
 for long stretches, and a comfortable low-glare reading mode is a first-class concern,
 not a toggle bolted on at the end. Dark mode is not an inversion: the brand identity
 (the sienna voice, the teal accent, the serif-for-names) is constant across both; only
-the surfaces and text are re-lit for a dim room. Default to the reader's
-`prefers-color-scheme`, expose a manual toggle, and remember their choice.
+the surfaces and text are re-lit for a dim room. The applied theme lives in a
+single `data-theme` attribute on `<html>` (attribute strategy): default it to the
+reader's `prefers-color-scheme`, expose a manual toggle, and remember their choice.
 
 This system explicitly rejects four things. It is **not** Ancestry-style corporate
 genealogy: no ad clutter, no upsell dashboards, no stock imagery. It is **not** cheesy

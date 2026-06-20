@@ -13,8 +13,10 @@ warmth from content not chrome. Light and dark are equal peers.
 
 ## Theming (light + dark)
 
-- Default follows the OS via `prefers-color-scheme`. Force a theme by setting
-  `data-theme="light"` or `data-theme="dark"` on `<html>`.
+- The theme is applied via `data-theme` on `<html>`, which always reads
+  `"light"` or `"dark"` (attribute strategy — no `prefers-color-scheme` block).
+  The app sets it before paint, resolving the OS preference for new users. To
+  preview dark, set `data-theme="dark"` on a container.
 - **Every colour is a token that flips between themes.** Never hardcode a hex or
   `oklch()` value in app code — always use the `var(--*)` tokens below, so your
   own layout glue stays correct in both themes automatically.
