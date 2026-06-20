@@ -36,7 +36,8 @@ the design tokens as CSS custom properties (never invent values):
 - **Radius**: `--radius-sm` `--radius-md` `--radius-lg` `--radius-full`.
 - **Type**: `--font-sans` (Hanken Grotesk — all UI) and `--font-serif` (Spectral).
   Sizes: `--text-display` `--text-headline` `--text-title` `--text-body`
-  `--text-body-sm` `--text-label`.
+  `--text-body-sm` `--text-label`. `--font-mono` is reserved for record IDs /
+  technical metadata — use the `.text-mono` class, not the serif or sans.
 - **Document types** (chips, the has-documents dot, the media grid):
   `--doc-photo` `--doc-certificate` `--doc-article` `--doc-obituary` `--doc-other`.
 - **Family tree** (React Flow + relatives-tree): node cell `--tree-node-w` /
@@ -69,11 +70,15 @@ prefer the React components over hand-writing those classes.
 
 ## The component set
 
-`Button`, `Input`, `Select`, `Card`, `Chip`, `Badge`, `Avatar`, `PersonNode`,
-`Tabs`, `Tooltip`, `Dialog`, `EmptyState`. Prefer these over hand-built markup.
-`Dialog` is for interrupting tasks only (confirm/upload) — exhaust inline UI first.
-`EmptyState` teaches an empty surface (empty tree, no documents, no search results)
-rather than showing "nothing here".
+Forms/controls: `Input`, `Textarea`, `Select`, `Checkbox`, `RadioGroup`, `Switch`.
+Actions: `Button`, `Menu`. Surfaces: `Card`, `Chip`, `Badge`, `Avatar`, `Dialog`,
+`Tooltip`, `Toast`. Navigation/structure: `Tabs`, `Breadcrumb`, `PersonNode`.
+Loading/empty: `Spinner`, `Skeleton`, `EmptyState`. Prefer these over hand-built
+markup. `Dialog` is for interrupting tasks only (confirm/upload) — exhaust inline UI
+first. `Menu` is the overflow/actions dropdown for per-record commands. `Toast` is
+transient feedback (an app-level viewport stacks them at `--z-toast`). `EmptyState`
+teaches an empty surface rather than showing "nothing here"; `Skeleton` is preferred
+over `Spinner` when the incoming content's shape is known.
 
 ## Where the truth lives
 

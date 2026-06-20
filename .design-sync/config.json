@@ -10,6 +10,7 @@
   "readmeHeader": ".design-sync/conventions.md",
   "overrides": {
     "Card": { "cardMode": "column" },
-    "Dialog": { "cardMode": "single", "primaryStory": "ConfirmDelete" }
+    "Dialog": { "cardMode": "single", "primaryStory": "ConfirmDelete" },
+    "Menu": { "cardMode": "single", "primaryStory": "Default" }
   }
 }

@@ -277,7 +277,8 @@ The same room after dark. Re-light, do not invert. Surfaces step from a warm cha
 - **Body** (Hanken Grotesk, 400, 1rem/16px, line-height 1.55): Default reading text — notes, biographies. Capped at **65–75ch** for prose.
 - **Body Small** (Hanken Grotesk, 400, 0.875rem/14px, line-height 1.45): Metadata, captions, secondary detail.
 - **Label** (Hanken Grotesk, 500, 0.8125rem/13px, letter-spacing 0.005em, **sentence case**): Form labels, chips, nav, buttons. Quietly emphasized by weight, not by uppercase tracking.
-- **Data** (Hanken Grotesk, 400, 0.875rem/14px, tabular figures): Dates and IDs in tables and lists, so columns of years align.
+- **Data** (Hanken Grotesk, 400, 0.875rem/14px, tabular figures): Dates and years in tables and lists, so columns align.
+- **Mono** (`--font-mono`, ~0.8125rem, via `.text-mono`): Record IDs, coordinates, and technical metadata only (e.g. `P-00417`) — the one place the monospace face appears. Never for prose or labels.
 
 ### Named Rules
 **The Serif-For-People Rule.** The serif is reserved for human names, life-dates, and top-level page titles. It never appears on a button, label, table header, or field. If a serif shows up on a control, delete it.
@@ -349,6 +350,27 @@ The atom of the family tree. A compact card (Paper White, 6px radius, 1px Hairli
 
 ### Empty State
 - Teaches the interface, never "nothing here": a calm icon on a quiet disc, a plain sans title, one guiding sentence (Muted, ≤38ch), and the action that fills the void. Centered, generous spacing.
+
+### Textarea
+- The multi-line counterpart to Input (same label / hint / error contract, 4px radius, sienna focus ring). Resizes vertically. For prose, cap rendered width near `--measure`.
+
+### Checkbox & Radio
+- Native controls tinted with `--color-primary` (`accent-color`) — themed and fully accessible, never reinvented boxes. The whole label row is the target. **Checkbox** for booleans (a "living person" flag, export opt-ins); **RadioGroup** (`<fieldset>` + `<legend>`) for one-of-N (relationship type, visibility). Options may carry a description line.
+
+### Switch
+- An instant on/off toggle (`role="switch"`); track fills sienna when on. Use for settings that apply immediately (privacy/visibility), as opposed to a Checkbox in a submitted form.
+
+### Toast
+- Transient action feedback (saved / uploaded / failed). Surface panel, hairline, `shadow-overlay-low`, a tone-coloured leading icon (success/info/warning/danger), optional dismiss. `danger`/`warning` are `role="alert"`; others `role="status"`. An **app-level viewport** stacks and times them at `--z-toast`. Pairs with Dialog.
+
+### Menu (Dropdown)
+- The overflow/actions menu for per-record commands (edit, share, merge, delete). Trigger + a panel of `role="menuitem"`s at `--z-dropdown`; destructive items use the danger colour. Reach for it instead of a row of buttons. (In deep `overflow:hidden` containers, render via a portal.)
+
+### Breadcrumb
+- Hierarchical / lineage navigation (Tree › line › ancestor › person). Muted links, faint chevron separators, the last crumb bold Ink with `aria-current="page"`.
+
+### Spinner & Skeleton
+- **Spinner** — a compact indeterminate ring (sienna arc) for unknown-duration waits. **Skeleton** — content-shaped placeholders (text lines, a person card, a media tile) that shimmer gently; preferred over a Spinner when the incoming shape is known (less layout shift). The shimmer stops under `prefers-reduced-motion`.
 
 ## 6. Do's and Don'ts
 

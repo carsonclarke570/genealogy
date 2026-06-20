@@ -267,6 +267,13 @@
     font-feature-settings: "tnum" 1;
   }
 
+  /* Monospace for record IDs, coordinates, and technical metadata. */
+  .text-mono {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    letter-spacing: -0.01em;
+  }
+
   /* Prose blocks (notes, biographies) cap their line length. */
   .prose {
     max-width: var(--measure);
