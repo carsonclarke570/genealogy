@@ -20,6 +20,9 @@ ds-bundle/
 # data (SQLite db + uploads — see CLAUDE.md; volume in prod)
 data/
 
+# local env / secrets (SITE_PASSWORD, AUTH_SECRET, ...)
+.env*.local
+
 # impeccable local machine state (hook cache, local config)
 .impeccable/
 
