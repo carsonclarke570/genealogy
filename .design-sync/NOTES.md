@@ -107,6 +107,34 @@ Repo-specific gotchas for future syncs. Read this first.
   render check ran clean (no `[RENDER_SKIPPED]`). The sudo `install-deps` step
   above is still the fix for a fresh machine.
 
+## Combobox (added 2026-06-21)
+
+- `Combobox` is a searchable single-select (`src/components/Combobox.tsx`); preview
+  `.design-sync/previews/Combobox.tsx` (PickRelative/Selected/Empty/WithError).
+  Card mode `column` + `primaryStory: "PickRelative"` (like MultiSelect) — the open
+  panel is absolute, so the primary story reserves `paddingBottom` to capture it,
+  and it uses the component's `open` prop to force the panel open for the static
+  shot. Graded all-good 2026-06-21.
+
+## Playwright / render check on a fresh `.ds-sync`
+
+- A freshly-staged `.ds-sync/` only has `esbuild ts-morph @types/react` — playwright
+  is NOT included, so the first validate fails `[RENDER_SKIPPED]`. The cached
+  chromium build is `chromium-1228` (`~/.cache/ms-playwright/`); install the
+  matching release: `(cd .ds-sync && npm i playwright@1.61.0)` — 1.61.0 pins build
+  1228, so no browser download. Then validate runs the render check clean.
+
+## Fonts: `[FONT_MISSING]`, not `[FONT_REMOTE]`
+
+- Current validate reports `! [FONT_MISSING]` for Hanken Grotesk / Spectral /
+  Cascadia Mono (the bundle ships no `fonts/` dir; families load via the remote
+  Google-Fonts `@import` in `fonts.css`). It's a **warning, non-blocking** — the
+  prod Next app serves these via `next/font`. (The project still carries leftover
+  `fonts/CascadiaMono-*.ttf` from an earlier sync; harmless, not produced by the
+  current build.) Earlier this note expected `[FONT_REMOTE]`; the tag is now
+  `[FONT_MISSING]`. Treat as known/expected unless you intend to ship woff2 via
+  `cfg.extraFonts`.
+
 ## Re-sync risks
 
 - `dist/family-archive.css` is a generated build artifact (gitignored via

@@ -78,8 +78,12 @@ prefer the React components over hand-writing those classes.
 
 Forms/controls: `Input`, `Textarea`, `Select`, `Checkbox`, `RadioGroup`, `Switch`,
 `MultiSelect` (popover combobox — pick several at once; stays open while ticking),
-`DateField` (precision-aware date — year only, year + month, or full day, for facts
-we may only partly know; pairs with the `formatPartialDate` helper).
+`Combobox` (searchable single-select — type to filter a long list down to one
+choice, e.g. picking a relative or place; pass `value`/`onChange`, `null` clears.
+Use over `Select` when the list is long enough to need search, over `MultiSelect`
+when only one value is wanted), `DateField` (precision-aware date — year only,
+year + month, or full day, for facts we may only partly know; pairs with the
+`formatPartialDate` helper).
 Actions: `Button`, `Menu`. Surfaces: `Card`, `Chip`, `Badge`, `Avatar`, `Dialog`,
 `Tooltip`, `Toast` (+ `ToastViewport`, the fixed app-level stack), `IconBadge` (a
 tinted, ringed glyph), `DocChip` (a document-type dot + label — labelling, not
