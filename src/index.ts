@@ -72,3 +72,21 @@ export type {
   SourceOption,
   DocType,
 } from "./components/Provenance";
+
+export { SegmentedControl } from "./components/SegmentedControl";
+export type { SegmentedControlProps, SegmentItem } from "./components/SegmentedControl";
+
+export { MultiSelect } from "./components/MultiSelect";
+export type { MultiSelectProps, MultiSelectOption } from "./components/MultiSelect";
+
+export { Timeline, TimelineItem } from "./components/Timeline";
+export type { TimelineProps, TimelineItemProps } from "./components/Timeline";
+
+export { IconBadge } from "./components/IconBadge";
+export type { IconBadgeProps } from "./components/IconBadge";
+
+export { ToastViewport } from "./components/ToastViewport";
+export type { ToastViewportProps, ToastViewportPosition } from "./components/ToastViewport";
+
+export { DocChip } from "./components/DocChip";
+export type { DocChipProps } from "./components/DocChip";

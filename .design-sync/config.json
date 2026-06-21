@@ -23,6 +23,9 @@
     "Textarea": { "cardMode": "column" },
     "Toast": { "cardMode": "column" },
     "Dialog": { "cardMode": "single", "primaryStory": "ConfirmDelete" },
-    "Menu": { "cardMode": "single", "primaryStory": "Default" }
+    "Menu": { "cardMode": "single", "primaryStory": "Default" },
+    "Timeline": { "cardMode": "column", "primaryStory": "LifeEvents" },
+    "MultiSelect": { "cardMode": "column", "primaryStory": "FilterByPerson" },
+    "ToastViewport": { "cardMode": "single", "primaryStory": "Stack" }
   }
 }

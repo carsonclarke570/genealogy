@@ -2,6 +2,29 @@
 
 Repo-specific gotchas for future syncs. Read this first.
 
+## Running resync.mjs (two things bite every fresh run)
+
+- **Self-link must exist.** `package-build` resolves the library's `.d.ts` from
+  `node_modules/@family-archive/ui/dist`, but the root package has no self-link
+  by default, so the build dies with `ENOENT … @family-archive/ui/package.json`.
+  Create it once (gitignored): `mkdir -p node_modules/@family-archive && ln -s
+  ../.. node_modules/@family-archive/ui`. (The `app/` workspace already has its
+  own link; this is the root one the converter needs.)
+- **The `--remote` anchor must live OUTSIDE `ds-bundle/`.** Fetch the remote
+  `_ds_sync.json` (DesignSync `get_file`) to a local file and pass it as
+  `--remote`, but put it at the repo root, NOT inside `--out` — `package-build`
+  wipes the OUT dir at the start, so an anchor placed in `ds-bundle/` is deleted
+  before the diff stage reads it and the run falls back to `anchor: unreadable`
+  (re-uploads all 30 components instead of just the changed ones).
+- Full invocation that worked: `node .ds-sync/resync.mjs --config
+  .design-sync/config.json --node-modules node_modules --out ./ds-bundle
+  --remote .remote-anchor.json` (delete the temp `.remote-anchor.json` after).
+- `_ds_manifest.json` / `_adherence.oxlintrc.json` are **app-generated** on
+  claude.ai from the `@dsCard` markers — they are not in the local bundle; never
+  add them to the upload plan. Upload set = changed component dirs + their
+  `_preview/*.js` + `_ds_bundle.{js,css}` + `styles.css` + `README.md`, with
+  `_ds_sync.json` written **last**.
+
 ## Build / CSS
 
 - **Tokens live in the same package** (`src/styles/tokens.css`), not a separate

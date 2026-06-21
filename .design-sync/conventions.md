@@ -76,9 +76,14 @@ prefer the React components over hand-writing those classes.
 
 ## The component set
 
-Forms/controls: `Input`, `Textarea`, `Select`, `Checkbox`, `RadioGroup`, `Switch`.
+Forms/controls: `Input`, `Textarea`, `Select`, `Checkbox`, `RadioGroup`, `Switch`,
+`MultiSelect` (popover combobox — pick several at once; stays open while ticking).
 Actions: `Button`, `Menu`. Surfaces: `Card`, `Chip`, `Badge`, `Avatar`, `Dialog`,
-`Tooltip`, `Toast`. Navigation/structure: `Tabs`, `Breadcrumb`, `PersonNode`.
+`Tooltip`, `Toast` (+ `ToastViewport`, the fixed app-level stack), `IconBadge` (a
+tinted, ringed glyph), `DocChip` (a document-type dot + label — labelling, not
+filtering). Navigation/structure: `Tabs`, `Breadcrumb`, `PersonNode`,
+`SegmentedControl` (single-choice view switch — layout/mode toggles), `Timeline` +
+`TimelineItem` (a vertical rail of dated events).
 Loading/empty: `Spinner`, `Skeleton`, `EmptyState`. Provenance: `ProvenanceMark`
 (per-fact confidence) + `SourceCiteDialog` (cite the proving document). Prefer these
 over hand-built markup. `Dialog` is for interrupting tasks only (confirm/upload) —
