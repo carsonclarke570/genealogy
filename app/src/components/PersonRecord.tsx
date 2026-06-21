@@ -100,7 +100,7 @@ export function PersonRecord({
           ))}
         </div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-xl)" }}>
+      <div className="app-grid-rels">
         <RelGroup title="Parents" items={rel.parents} />
         <RelGroup title="Spouse" items={rel.spouse} />
         <RelGroup title="Children" items={rel.children} />
@@ -126,7 +126,7 @@ export function PersonRecord({
           </Chip>
         ))}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--space-lg)" }}>
+      <div className="app-grid-docs">
         {shownDocs.map((m) => (
           <Card key={m.id} style={{ padding: 0, overflow: "hidden" }}>
             <div className="app-ph" style={{ height: 130, borderRadius: 0, borderWidth: "0 0 1px 0" }}>
@@ -270,7 +270,7 @@ export function PersonRecord({
             </div>
           </div>
           <hr className="app-divider" style={{ margin: "var(--space-lg) 0 var(--space-md)" }} />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--space-lg)" }}>
+          <div className="app-grid-facts">
             {facts.map((f) => (
               <div key={f.k}>
                 <div style={{ fontSize: "var(--text-body-sm)", color: "var(--color-muted)" }}>{f.k}</div>

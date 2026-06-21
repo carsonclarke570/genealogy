@@ -58,7 +58,7 @@ export function AddPerson({
   );
 
   const RelRow = ({ rel }: { rel: string }) => (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: "var(--space-sm)" }}>
+    <div className="app-field-row" style={{ alignItems: "flex-end" }}>
       <div style={{ width: 130, flex: "none" }}>
         <Select defaultValue={rel} aria-label="Relationship type">
           <option>Parent</option>
@@ -95,18 +95,18 @@ export function AddPerson({
           Records are sacred — fill what you know, leave the rest blank. Nothing is published outside the family.
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 308px", gap: "var(--space-2xl)", alignItems: "start" }}>
+        <div className="app-form-grid">
           <div style={{ display: "grid", gap: "var(--space-xl)" }}>
             <Card title="Identity">
               <div className="app-muted" style={{ fontSize: "var(--text-body-sm)", marginBottom: "var(--space-md)" }}>
                 Tap the mark by any field to set its confidence — verified (cite a source), estimated, or disputed.
               </div>
               <div style={{ display: "grid", gap: "var(--space-lg)" }}>
-                <div style={{ display: "flex", gap: "var(--space-md)" }}>
+                <div className="app-field-row">
                   <ProvField label="Given names" placeholder="e.g. Eleanor Margaret" k="given" />
                   <ProvField label="Surname" placeholder="e.g. Whitfield" k="surname" />
                 </div>
-                <div style={{ display: "flex", gap: "var(--space-md)", alignItems: "flex-end" }}>
+                <div className="app-field-row" style={{ alignItems: "flex-end" }}>
                   <ProvField label="Maiden name (optional)" placeholder="e.g. Hartley" k="maiden" />
                   <div style={{ width: 160, flex: "none" }}>
                     <Select label="Sex" defaultValue="">
@@ -130,7 +130,7 @@ export function AddPerson({
                   <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
                     Birth
                   </div>
-                  <div style={{ display: "flex", gap: "var(--space-md)" }}>
+                  <div className="app-field-row">
                     <ProvField label="Date" placeholder="YYYY-MM-DD" k="birthDate" />
                     <ProvField label="Place" placeholder="City, country" k="birthPlace" />
                   </div>
@@ -139,7 +139,7 @@ export function AddPerson({
                   <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
                     Death <span style={{ fontWeight: 400 }}>(if applicable)</span>
                   </div>
-                  <div style={{ display: "flex", gap: "var(--space-md)" }}>
+                  <div className="app-field-row">
                     <ProvField label="Date" placeholder="YYYY-MM-DD" k="deathDate" />
                     <ProvField label="Place" placeholder="City, country" k="deathPlace" />
                   </div>
