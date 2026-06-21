@@ -14,10 +14,23 @@ import * as schema from "@/db/schema";
 import type { Person, MediaItem, Dataset } from "./family-data";
 import { buildUnits } from "./units";
 import { provStatuses } from "./prov";
+import { parsePartialDate } from "./dates";
 
 // Keys are validated structurally (string); values carry the real constraints.
 const docsSchema = z.record(z.string(), z.number()).catch({});
-const provSchema = z.record(z.string(), z.enum(provStatuses)).catch({});
+// A fact is stored as `{ status, source? }`; legacy rows hold a bare status
+// string. Accept both and normalise to the object shape on the way out.
+const provFactSchema = z.union([
+  z.enum(provStatuses).transform((status) => ({ status, source: null })),
+  z.object({
+    status: z.enum(provStatuses),
+    source: z
+      .string()
+      .nullish()
+      .transform((s) => s ?? null),
+  }),
+]);
+const provSchema = z.record(z.string(), provFactSchema).catch({});
 
 function parseJson<T>(raw: string, schema: z.ZodType<T>): T {
   try {
@@ -36,17 +49,22 @@ export async function getDataset(): Promise<Dataset> {
 
   const people: Record<string, Person> = {};
   for (const r of personRows) {
+    const bornDate = parsePartialDate(r.bornDate);
+    const diedDate = parsePartialDate(r.diedDate);
     people[r.id] = {
       id: r.id,
       given: r.given,
       surname: r.surname,
       maiden: r.maiden,
       sex: r.sex,
-      born: r.bornYear,
+      born: bornDate?.year ?? r.bornYear,
+      bornDate,
       bornPlace: r.bornPlace,
-      died: r.diedYear,
+      died: diedDate?.year ?? r.diedYear,
+      diedDate,
       diedPlace: r.diedPlace,
       living: r.living,
+      notes: r.notes,
       docs: parseJson(r.docs, docsSchema),
       prov: parseJson(r.prov, provSchema),
     };

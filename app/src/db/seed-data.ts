@@ -13,24 +13,24 @@ import type { Person, Unit, MediaItem } from "@/lib/family-data";
 
 export const people: Record<string, Person> = {
   // Gen 0 — great-great-grandparents
-  thomas: { id: "thomas", given: "Thomas Edward", surname: "Rivers", maiden: null, sex: "m", born: 1888, bornPlace: "Sheffield, England", died: 1971, diedPlace: "Boston, MA", living: false, docs: { photo: 3, certificate: 1, obituary: 1 }, prov: { born: "estimated", bornPlace: "estimated", died: "verified", diedPlace: "verified" } },
+  thomas: { id: "thomas", given: "Thomas Edward", surname: "Rivers", maiden: null, sex: "m", born: 1888, bornPlace: "Sheffield, England", died: 1971, diedPlace: "Boston, MA", living: false, docs: { photo: 3, certificate: 1, obituary: 1 }, prov: { born: { status: "estimated" }, bornPlace: { status: "estimated" }, died: { status: "verified" }, diedPlace: { status: "verified" } } },
   alice: { id: "alice", given: "Alice Mary", surname: "Rivers", maiden: "Hartley", sex: "f", born: 1891, bornPlace: "Leeds, England", died: 1975, diedPlace: "Boston, MA", living: false, docs: { photo: 2, certificate: 1 } },
 
   // Gen 1 — great-grandparents
-  eleanor: { id: "eleanor", given: "Eleanor Margaret", surname: "Rivers", maiden: null, sex: "f", born: 1915, bornPlace: "Boston, MA", died: 2001, diedPlace: "Concord, MA", living: false, docs: { photo: 6, certificate: 2, article: 1, obituary: 1 }, prov: { born: "verified", bornPlace: "verified", died: "verified", diedPlace: "verified" } },
+  eleanor: { id: "eleanor", given: "Eleanor Margaret", surname: "Rivers", maiden: null, sex: "f", born: 1915, bornPlace: "Boston, MA", died: 2001, diedPlace: "Concord, MA", living: false, docs: { photo: 6, certificate: 2, article: 1, obituary: 1 }, prov: { born: { status: "verified", source: "Massachusetts birth index (1915)" }, bornPlace: { status: "verified", source: "Massachusetts birth index (1915)" }, died: { status: "verified", source: "Obituary, Concord Monitor (2001)" }, diedPlace: { status: "verified", source: "Obituary, Concord Monitor (2001)" } } },
   frederick: { id: "frederick", given: "Frederick John", surname: "Bain", maiden: null, sex: "m", born: 1912, bornPlace: "Glasgow, Scotland", died: 1989, diedPlace: "Concord, MA", living: false, docs: { photo: 2, article: 1 } },
-  arthur: { id: "arthur", given: "Arthur James", surname: "Rivers", maiden: null, sex: "m", born: 1918, bornPlace: "Boston, MA", died: 1944, diedPlace: "Normandy, France", living: false, docs: { photo: 1, article: 2, obituary: 1 }, prov: { born: "verified", bornPlace: "verified", died: "disputed", diedPlace: "estimated" } },
+  arthur: { id: "arthur", given: "Arthur James", surname: "Rivers", maiden: null, sex: "m", born: 1918, bornPlace: "Boston, MA", died: 1944, diedPlace: "Normandy, France", living: false, docs: { photo: 1, article: 2, obituary: 1 }, prov: { born: { status: "verified" }, bornPlace: { status: "verified" }, died: { status: "disputed" }, diedPlace: { status: "estimated" } } },
   rose: { id: "rose", given: "Rose Adeline", surname: "Rivers", maiden: null, sex: "f", born: 1921, bornPlace: "Boston, MA", died: 2010, diedPlace: "Portland, ME", living: false, docs: { photo: 4, certificate: 1 } },
   walter: { id: "walter", given: "Walter Henry", surname: "Cole", maiden: null, sex: "m", born: 1919, bornPlace: "Portland, ME", died: 1998, diedPlace: "Portland, ME", living: false, docs: { photo: 1 } },
 
   // Gen 2 — grandparents
-  james: { id: "james", given: "James Frederick", surname: "Bain", maiden: null, sex: "m", born: 1943, bornPlace: "Concord, MA", died: 2018, diedPlace: "Concord, MA", living: false, docs: { photo: 5, certificate: 1, obituary: 1 }, prov: { born: "verified", bornPlace: "verified", died: "verified", diedPlace: "unverified" } },
+  james: { id: "james", given: "James Frederick", surname: "Bain", maiden: null, sex: "m", born: 1943, bornPlace: "Concord, MA", died: 2018, diedPlace: "Concord, MA", living: false, docs: { photo: 5, certificate: 1, obituary: 1 }, prov: { born: { status: "verified" }, bornPlace: { status: "verified" }, died: { status: "verified" }, diedPlace: { status: "unverified" } } },
   patricia: { id: "patricia", given: "Patricia Anne", surname: "Bain", maiden: "Nolan", sex: "f", born: 1945, bornPlace: "Albany, NY", died: null, diedPlace: null, living: true, docs: { photo: 3 } },
   margaret: { id: "margaret", given: "Margaret Rose", surname: "Reed", maiden: "Bain", sex: "f", born: 1946, bornPlace: "Concord, MA", died: null, diedPlace: null, living: true, docs: { photo: 2, certificate: 1 } },
   donald: { id: "donald", given: "Donald Ray", surname: "Reed", maiden: null, sex: "m", born: 1944, bornPlace: "Hartford, CT", died: 2011, diedPlace: "Hartford, CT", living: false, docs: {} },
 
   // Gen 3 — parents
-  sarah: { id: "sarah", given: "Sarah Eleanor", surname: "Tran", maiden: "Bain", sex: "f", born: 1972, bornPlace: "Concord, MA", died: null, diedPlace: null, living: true, docs: { photo: 8, certificate: 1 }, prov: { born: "verified", bornPlace: "unverified" } },
+  sarah: { id: "sarah", given: "Sarah Eleanor", surname: "Tran", maiden: "Bain", sex: "f", born: 1972, bornPlace: "Concord, MA", died: null, diedPlace: null, living: true, docs: { photo: 8, certificate: 1 }, prov: { born: { status: "verified" }, bornPlace: { status: "unverified" } } },
   michael: { id: "michael", given: "Michael Long", surname: "Tran", maiden: null, sex: "m", born: 1970, bornPlace: "San Jose, CA", died: null, diedPlace: null, living: true, docs: { photo: 3 } },
   david: { id: "david", given: "David Arthur", surname: "Bain", maiden: null, sex: "m", born: 1975, bornPlace: "Concord, MA", died: null, diedPlace: null, living: true, docs: { photo: 1 } },
 
