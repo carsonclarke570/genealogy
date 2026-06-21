@@ -13,7 +13,7 @@ export interface SpinnerProps extends HTMLAttributes<HTMLSpanElement> {
  *
  * For async work without a known duration (the tree resolving, a media fetch).
  * Prefer Skeleton when you can hint at the shape of incoming content; use the
- * Spinner for buttons-elsewhere or compact spots. `role="status"` + a label.
+ * Spinner inside buttons or other compact spots. `role="status"` + a label.
  *
  * @example
  * <Spinner />

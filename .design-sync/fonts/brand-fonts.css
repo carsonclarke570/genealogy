@@ -1,0 +1,39 @@
+/* Brand fonts for the Claude Design pane — Hanken Grotesk + Spectral
+ * (SIL Open Font License). Latin woff2 subsets fetched from Google Fonts.
+ * Shipped only with the design-sync bundle via cfg.extraFonts; the
+ * production Next.js app loads these via next/font instead.
+ *
+ * Hanken Grotesk is a variable font (one file spans the weight axis);
+ * Spectral ships a static face per weight used (400 / 500 / 600). */
+
+@font-face {
+  font-family: "Hanken Grotesk";
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("./HankenGrotesk.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Spectral";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./Spectral-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Spectral";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./Spectral-500.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Spectral";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./Spectral-600.woff2") format("woff2");
+}

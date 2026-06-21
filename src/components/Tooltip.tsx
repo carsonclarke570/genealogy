@@ -1,5 +1,5 @@
-import { useId } from "react";
-import type { ReactNode } from "react";
+import { cloneElement, isValidElement, useId } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 export interface TooltipProps {
   /** The tooltip text. */
@@ -27,9 +27,19 @@ export function Tooltip({ label, open, children }: TooltipProps) {
   const classes = ["fa-tooltip", open && "fa-tooltip--open"]
     .filter(Boolean)
     .join(" ");
+
+  // Associate the bubble with its trigger so assistive tech announces it.
+  const trigger = isValidElement(children)
+    ? cloneElement(children as ReactElement<{ "aria-describedby"?: string }>, {
+        "aria-describedby": [children.props["aria-describedby"], id]
+          .filter(Boolean)
+          .join(" "),
+      })
+    : children;
+
   return (
     <span className="fa-tooltip-wrap">
-      {children}
+      {trigger}
       <span role="tooltip" id={id} className={classes}>
         {label}
       </span>

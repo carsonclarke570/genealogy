@@ -36,7 +36,7 @@ export function Badge({
     <span className={classes} {...rest}>
       {dot && (
         <span
-          className="fa-chip__dot"
+          className="fa-badge__dot"
           style={{ ["--dot" as string]: "currentColor" }}
           aria-hidden="true"
         />

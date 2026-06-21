@@ -62,6 +62,7 @@ export function Input({
         className={inputClasses}
         aria-invalid={invalid || undefined}
         aria-describedby={invalid ? errorId : hint ? hintId : undefined}
+        required={required}
         aria-required={required || undefined}
         {...rest}
       />
