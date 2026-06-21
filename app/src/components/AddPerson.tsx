@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Avatar,
   Breadcrumb,
   Button,
   Card,
   Checkbox,
+  Combobox,
   Input,
   ProvenanceMark,
   RadioGroup,
@@ -15,15 +17,91 @@ import {
   Textarea,
 } from "@family-archive/ui";
 import type { ProvenanceStatus } from "@family-archive/ui";
-import { sourceOptions } from "@/lib/family-data";
+import { fullName, lifeDates, sourceOptions } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
-import { createPerson } from "@/lib/actions";
+import { createPerson, type RelationDraft } from "@/lib/actions";
 import { Icon } from "./Icon";
 import type { Screen } from "./AppShell";
 
 interface ProvState {
   status: ProvenanceStatus;
   source?: string;
+}
+
+/** A relationship being drafted in the form, before it's submitted. */
+interface RelRowState {
+  /** Stable React key, local to the form. */
+  key: string;
+  /** How the chosen person relates to the one being added. */
+  type: RelationDraft["type"];
+  /** The existing person on the other end, or null until picked. */
+  personId: string | null;
+}
+
+let relKeySeq = 0;
+const newRelRow = (type: RelationDraft["type"]): RelRowState => ({
+  key: `rel-${relKeySeq++}`,
+  type,
+  personId: null,
+});
+
+interface PersonOption {
+  value: string;
+  label: string;
+  description: string;
+  leading: React.ReactNode;
+}
+
+/**
+ * One row of the Relationships editor: a relationship type + a searchable
+ * person picker. Defined at module scope (not inside AddPerson) so React keeps
+ * the Combobox mounted across the parent's re-renders — inlining it would
+ * remount and reset the picker every time another row changed.
+ */
+function RelRow({
+  row,
+  options,
+  onUpdate,
+  onRemove,
+}: {
+  row: RelRowState;
+  options: PersonOption[];
+  onUpdate: (patch: Partial<RelRowState>) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="app-field-row" style={{ alignItems: "flex-end" }}>
+      <div style={{ width: 130, flex: "none" }}>
+        <Select
+          value={row.type}
+          aria-label="Relationship type"
+          onChange={(e) => onUpdate({ type: e.target.value as RelationDraft["type"] })}
+        >
+          <option value="parent">Parent</option>
+          <option value="spouse">Spouse</option>
+          <option value="child">Child</option>
+          <option value="sibling">Sibling</option>
+        </Select>
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <Combobox
+          aria-label="Related person"
+          placeholder="Search people in the tree…"
+          emptyMessage="No one by that name yet"
+          options={options}
+          value={row.personId}
+          onChange={(personId) => onUpdate({ personId })}
+        />
+      </div>
+      <Button
+        variant="ghost"
+        size="sm"
+        iconStart={<Icon name="close" size={16} />}
+        aria-label="Remove relationship"
+        onClick={onRemove}
+      />
+    </div>
+  );
 }
 
 export function AddPerson({
@@ -33,12 +111,40 @@ export function AddPerson({
   onNavigate: (screen: Screen, personId?: string) => void;
   onToast: (message: string) => void;
 }) {
-  const { media } = useDataset();
+  const { media, people } = useDataset();
   const router = useRouter();
   const [prov, setProv] = useState<Record<string, ProvState>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [rels, setRels] = useState<RelRowState[]>(() => [
+    newRelRow("parent"),
+    newRelRow("spouse"),
+  ]);
   const [pending, startTransition] = useTransition();
   const sources = sourceOptions(media);
+
+  // Everyone already in the archive is a candidate to connect to.
+  const personOptions = useMemo(
+    () =>
+      Object.values(people)
+        .map((p) => ({
+          value: p.id,
+          label: fullName(p),
+          description: lifeDates(p),
+          leading: <Avatar name={fullName(p)} size="sm" />,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [people],
+  );
+
+  const updateRel = (key: string, patch: Partial<RelRowState>) =>
+    setRels((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  const removeRel = (key: string) => setRels((rs) => rs.filter((r) => r.key !== key));
+  const addRel = () => setRels((rs) => [...rs, newRelRow("parent")]);
+
+  // Only rows with a person chosen are submitted.
+  const relationships: RelationDraft[] = rels
+    .filter((r) => r.personId)
+    .map((r) => ({ type: r.type, personId: r.personId! }));
   const stOf = (k: string): ProvenanceStatus => prov[k]?.status ?? "unverified";
   const setP = (k: string, status: ProvenanceStatus, source?: string) =>
     setProv((s) => ({ ...s, [k]: { status, source } }));
@@ -88,23 +194,6 @@ export function AddPerson({
     </div>
   );
 
-  const RelRow = ({ rel }: { rel: string }) => (
-    <div className="app-field-row" style={{ alignItems: "flex-end" }}>
-      <div style={{ width: 130, flex: "none" }}>
-        <Select defaultValue={rel} aria-label="Relationship type">
-          <option>Parent</option>
-          <option>Spouse</option>
-          <option>Child</option>
-          <option>Sibling</option>
-        </Select>
-      </div>
-      <div style={{ flex: 1 }}>
-        <Input placeholder="Find or create a person…" />
-      </div>
-      <Button variant="ghost" size="sm" iconStart={<Icon name="close" size={16} />} aria-label="Remove relationship" />
-    </div>
-  );
-
   return (
     <div
       className="app-scroll"
@@ -128,6 +217,7 @@ export function AddPerson({
 
         <form className="app-form-grid" action={handleSubmit}>
           <input type="hidden" name="prov" value={JSON.stringify(prov)} />
+          <input type="hidden" name="relationships" value={JSON.stringify(relationships)} />
           <div style={{ display: "grid", gap: "var(--space-xl)" }}>
             <Card title="Identity">
               <div className="app-muted" style={{ fontSize: "var(--text-body-sm)", marginBottom: "var(--space-md)" }}>
@@ -181,11 +271,28 @@ export function AddPerson({
             </Card>
 
             <Card title="Relationships">
+              <div className="app-muted" style={{ fontSize: "var(--text-body-sm)", marginBottom: "var(--space-md)" }}>
+                Connect this person to others already in the tree. Anyone left
+                unconnected waits in the “Unplaced” shelf until you link them.
+              </div>
               <div style={{ display: "grid", gap: "var(--space-md)" }}>
-                <RelRow rel="Parent" />
-                <RelRow rel="Spouse" />
+                {rels.map((row) => (
+                  <RelRow
+                    key={row.key}
+                    row={row}
+                    options={personOptions}
+                    onUpdate={(patch) => updateRel(row.key, patch)}
+                    onRemove={() => removeRel(row.key)}
+                  />
+                ))}
                 <div>
-                  <Button variant="ghost" size="sm" iconStart={<Icon name="plus" size={16} />}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    iconStart={<Icon name="plus" size={16} />}
+                    onClick={addRel}
+                  >
                     Add relationship
                   </Button>
                 </div>

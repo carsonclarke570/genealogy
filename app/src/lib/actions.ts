@@ -11,15 +11,42 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/db/client";
-import { person } from "@/db/schema";
+import { person, relationship } from "@/db/schema";
 import { provStatuses } from "./prov";
 import { indexPerson } from "./search/index-doc";
 
 export type CreatePersonResult =
   | { ok: true; id: string }
   | { ok: false; errors: Record<string, string> };
+
+/** A relationship the Add-person form drafts, relative to the new person. */
+export type RelationDraft = {
+  /** How the chosen person relates to the one being added. */
+  type: "parent" | "spouse" | "child" | "sibling";
+  /** The existing person on the other end. */
+  personId: string;
+};
+
+const relationDraftSchema = z
+  .array(
+    z.object({
+      type: z.enum(["parent", "spouse", "child", "sibling"]),
+      personId: z.string().min(1),
+    }),
+  )
+  .catch([]);
+
+function parseRelationships(raw: FormDataEntryValue | null): RelationDraft[] {
+  if (typeof raw !== "string" || !raw.length) return [];
+  try {
+    return relationDraftSchema.parse(JSON.parse(raw));
+  } catch {
+    return [];
+  }
+}
 
 /** Optional free-text field → trimmed string or null. */
 const optionalText = z
@@ -81,6 +108,101 @@ function remapProv(raw: FormDataEntryValue | null): string {
   return JSON.stringify(out);
 }
 
+type DB = Awaited<ReturnType<typeof getDb>>;
+
+interface RelEdge {
+  kind: "spouse" | "parent";
+  personId: string;
+  relatedId: string;
+  status?: "married" | "divorced";
+}
+
+/**
+ * Translate the form's person-relative relationship drafts into `relationship`
+ * rows, then insert them. Edges follow the schema convention (see schema.ts):
+ *   - parent  → the chosen person is the new person's parent
+ *   - child   → the chosen person is the new person's child
+ *   - spouse  → a partnership; the existing person anchors the couple-unit
+ *   - sibling → no sibling edge exists; instead the new person inherits the
+ *               chosen sibling's recorded parents (a shared-parents link). With
+ *               no recorded parents there's nothing to share, so it's skipped.
+ *
+ * Drafts pointing at a person that doesn't exist are dropped (the picker only
+ * offers real people, but validate at the boundary anyway).
+ */
+async function persistRelationships(
+  db: DB,
+  newId: string,
+  drafts: RelationDraft[],
+): Promise<void> {
+  if (drafts.length === 0) return;
+
+  const targetIds = [...new Set(drafts.map((d) => d.personId))].filter((pid) => pid !== newId);
+  if (targetIds.length === 0) return;
+  const existing = await db
+    .select({ id: person.id })
+    .from(person)
+    .where(inArray(person.id, targetIds));
+  const valid = new Set(existing.map((r) => r.id));
+
+  // Siblings need the chosen person's parents; gather them in one query.
+  const siblingIds = drafts
+    .filter((d) => d.type === "sibling" && valid.has(d.personId))
+    .map((d) => d.personId);
+  const parentsBySibling = new Map<string, string[]>();
+  if (siblingIds.length > 0) {
+    const parentRows = await db
+      .select({ parent: relationship.personId, child: relationship.relatedId })
+      .from(relationship)
+      .where(and(eq(relationship.kind, "parent"), inArray(relationship.relatedId, siblingIds)));
+    for (const r of parentRows) {
+      const list = parentsBySibling.get(r.child) ?? [];
+      list.push(r.parent);
+      parentsBySibling.set(r.child, list);
+    }
+  }
+
+  const edges: RelEdge[] = [];
+  for (const d of drafts) {
+    if (!valid.has(d.personId)) continue;
+    switch (d.type) {
+      case "parent":
+        edges.push({ kind: "parent", personId: d.personId, relatedId: newId });
+        break;
+      case "child":
+        edges.push({ kind: "parent", personId: newId, relatedId: d.personId });
+        break;
+      case "spouse":
+        edges.push({ kind: "spouse", personId: d.personId, relatedId: newId, status: "married" });
+        break;
+      case "sibling":
+        for (const parentId of parentsBySibling.get(d.personId) ?? []) {
+          edges.push({ kind: "parent", personId: parentId, relatedId: newId });
+        }
+        break;
+    }
+  }
+
+  // Drop duplicate edges (e.g. two siblings sharing a parent).
+  const seen = new Set<string>();
+  const rows = edges
+    .filter((e) => {
+      const k = `${e.kind}:${e.personId}:${e.relatedId}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    })
+    .map((e) => ({
+      id: randomUUID(),
+      kind: e.kind,
+      personId: e.personId,
+      relatedId: e.relatedId,
+      status: e.status ?? null,
+    }));
+
+  if (rows.length > 0) await db.insert(relationship).values(rows);
+}
+
 export async function createPerson(formData: FormData): Promise<CreatePersonResult> {
   const parsed = createPersonSchema.safeParse({
     given: formData.get("given") ?? "",
@@ -109,6 +231,7 @@ export async function createPerson(formData: FormData): Promise<CreatePersonResu
 
   const id = randomUUID();
   const db = await getDb();
+  const relationships = parseRelationships(formData.get("relationships"));
   await db.insert(person).values({
     id,
     given: parsed.data.given,
@@ -124,6 +247,8 @@ export async function createPerson(formData: FormData): Promise<CreatePersonResu
     docs: "{}",
     prov: remapProv(formData.get("prov")),
   });
+
+  await persistRelationships(db, id, relationships);
 
   // Best-effort: index the new person for search. A failure here (embedding
   // server down, etc.) must never fail the create — the boot/`db:reindex`
