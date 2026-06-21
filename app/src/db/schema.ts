@@ -15,7 +15,8 @@
  * document tally and per-fact confidence that the UI already renders; when real
  * media upload lands, `docs` can migrate to a count derived from `person_media`.
  */
-import { pgTable, text, integer, boolean, timestamp, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, timestamp, primaryKey, vector, index } from "drizzle-orm/pg-core";
+import { EMBEDDING_DIM } from "../lib/search/config";
 
 const timestamps = {
   createdAt: timestamp("created_at").defaultNow(),
@@ -81,7 +82,36 @@ export const personMedia = pgTable(
   (t) => ({ pk: primaryKey({ columns: [t.personId, t.mediaId] }) }),
 );
 
+/**
+ * Search index — a decoupled, denormalised view of the searchable corpus
+ * (people + media), one row per indexed entity, kept in sync by the indexing
+ * pipeline (lib/search/index-doc.ts). Hybrid search (lib/search/query.ts) ranks
+ * over `embedding` (dense, pgvector cosine via the HNSW index) and `tsv`
+ * (Postgres full-text, GIN index), fused by Reciprocal Rank Fusion.
+ *
+ * `embedding` is nullable: lexical-only deployments (no embedding server) still
+ * write rows and remain searchable via `tsv`. `tsv` is a STORED generated column
+ * added in the migration — drizzle-kit can't express it, so it isn't declared
+ * here and stays invisible to the ORM (queried via raw SQL).
+ */
+export const searchDoc = pgTable(
+  "search_doc",
+  {
+    id: text("id").primaryKey(), // `${kind}:${refId}`
+    kind: text("kind", { enum: ["person", "media"] }).notNull(),
+    refId: text("ref_id").notNull(),
+    content: text("content").notNull(),
+    place: text("place"), // person places, denormalised for the Places scope; null for media
+    embedding: vector("embedding", { dimensions: EMBEDDING_DIM }),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (t) => ({
+    embeddingIdx: index("search_doc_embedding_idx").using("hnsw", t.embedding.op("vector_cosine_ops")),
+  }),
+);
+
 export type PersonRow = typeof person.$inferSelect;
 export type RelationshipRow = typeof relationship.$inferSelect;
 export type MediaRow = typeof media.$inferSelect;
 export type PersonMediaRow = typeof personMedia.$inferSelect;
+export type SearchDocRow = typeof searchDoc.$inferSelect;

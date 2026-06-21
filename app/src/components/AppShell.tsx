@@ -70,11 +70,12 @@ export function AppShell({ data }: { data: Dataset }) {
             <div className="app-brand-sub">family archive</div>
           </div>
         </div>
-        <nav style={{ display: "grid", gap: 4 }}>
+        <nav className="app-nav-list">
           {NAV.map(([k, label, icon]) => (
             <button
               key={k}
               className={"app-nav" + (route.screen === k ? " on" : "")}
+              aria-current={route.screen === k ? "page" : undefined}
               onClick={() => navigate(k)}
             >
               <Icon name={icon} /> {label}
@@ -106,10 +107,16 @@ export function AppShell({ data }: { data: Dataset }) {
       <main className="app-main">
         <header className="app-top">
           <div className="app-top-title">{TITLES[route.screen]}</div>
-          <div className="app-search app-hide-mobile" style={{ marginLeft: "auto" }} onClick={() => navigate("search")}>
+          <button
+            type="button"
+            className="app-search app-hide-mobile"
+            style={{ marginLeft: "auto" }}
+            aria-label="Search people and documents"
+            onClick={() => navigate("search")}
+          >
             <Icon name="search" />
             <span>Search people &amp; docs</span>
-          </div>
+          </button>
           <button
             className="app-iconbtn app-only-mobile"
             style={{ marginLeft: "auto" }}
@@ -149,6 +156,7 @@ export function AppShell({ data }: { data: Dataset }) {
           <button
             key={k}
             className={"app-mobnav-item" + (route.screen === k ? " on" : "")}
+            aria-current={route.screen === k ? "page" : undefined}
             onClick={() => navigate(k)}
           >
             <Icon name={icon} />
@@ -158,14 +166,7 @@ export function AppShell({ data }: { data: Dataset }) {
       </nav>
 
       {toast && (
-        <div
-          style={{
-            position: "fixed",
-            right: "var(--space-xl)",
-            bottom: "var(--space-xl)",
-            zIndex: 1400,
-          }}
-        >
+        <div className="app-toast-viewport">
           <Toast tone="success" title="Saved" onDismiss={() => setToast(null)}>
             {toast}
           </Toast>

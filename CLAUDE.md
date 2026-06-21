@@ -28,8 +28,10 @@ never be served without an authenticated session.
 | File storage   | Object storage (Railway bucket / S3), served via protected routes |
 | Auth           | Auth.js (NextAuth) — session required for all app routes      |
 | Graph viz      | React Flow (`@xyflow/react`) for the explorable tree          |
+| Search         | Hybrid: pgvector (dense) + Postgres full-text, fused by RRF    |
+| Embeddings     | Self-hosted Hugging Face TEI (open-source model) — no 3rd party |
 | Validation     | Zod for all input/boundary validation                         |
-| Hosting        | Railway (managed Postgres service — see Deployment)           |
+| Hosting        | Railway (managed Postgres + a TEI service — see Deployment)    |
 
 > Decisions were made deliberately for a private, low-maintenance, self-contained
 > family archive. Prefer simple, boring, well-supported tools over novelty.
@@ -100,21 +102,49 @@ and depends on the library via `file:..`. Build the library before the app
 npm install          # install library deps
 npm run build        # build dist/ (needed before the app compiles)
 
-# Local Postgres (repo root) — dev needs a database to talk to
-docker compose up -d # start Postgres at localhost:5432 (see docker-compose.yml)
+# Local services (repo root) — dev needs a database (and, for semantic search,
+# an embedding server) to talk to. docker-compose starts both:
+docker compose up -d # Postgres (pgvector/pgvector:pg16) at :5432 + TEI at :8080
 
 # App (cd app/)
 npm install          # install app deps
-npm run dev          # start the dev server (auto-migrates + seeds the demo family)
+npm run dev          # dev server (auto-migrates + seeds the demo family + reindexes search)
 npm run build        # production build
 npm run start        # run the production build
 npm run db:generate  # generate a Drizzle migration after editing schema.ts
 npm run db:migrate   # apply migrations to the DB (uses DATABASE_URL)
 npm run db:seed      # seed an empty DB with the demo family (idempotent)
+npm run db:reindex   # rebuild the search index from the tables (idempotent)
 ```
 
 The app reads `DATABASE_URL` (and `AUTH_SECRET` / `SITE_PASSWORD`) from
-`app/.env.local` in dev; it defaults to the local Postgres above.
+`app/.env.local` in dev; it defaults to the local Postgres above. For semantic
+search set `EMBEDDINGS_URL=http://localhost:8080` (the docker-compose TEI
+service); leave it unset to run search in lexical-only (keyword) mode.
+
+### Search / embeddings
+
+Search is **hybrid**: a dense pgvector cosine arm (HNSW index) and a Postgres
+full-text arm (`tsv` GIN index) are fused with Reciprocal Rank Fusion in one SQL
+query (`app/src/lib/search/query.ts`), behind `POST /api/search`. The searchable
+corpus lives in a decoupled `search_doc` table, kept in sync by
+`app/src/lib/search/index-doc.ts` (on person create, on boot for missing rows,
+and via `db:reindex`).
+
+Embeddings come from a **self-hosted, open-source** model — Hugging Face Text
+Embeddings Inference (TEI, Apache-2.0) running `BAAI/bge-small-en-v1.5` — reached
+over HTTP at `EMBEDDINGS_URL`. **No family data is sent to any third party.** When
+`EMBEDDINGS_URL` is unset/unreachable the dense arm is skipped and search degrades
+to lexical-only, so the repo runs keyless/serviceless.
+
+- Env vars: `EMBEDDINGS_URL` (empty ⇒ lexical-only), `EMBEDDING_DIM` (default 384,
+  **must equal** the migration's `vector(N)`), `EMBEDDINGS_MODEL` (informational).
+- **Ordering is load-bearing**: the migration runs `CREATE EXTENSION vector`
+  before the HNSW index; reindex must run before semantic queries return results.
+  `getDb()` enforces migrate → seed → reindex on boot.
+- **Dimension lock-in**: changing to a model with a different dimension needs a new
+  migration (drop/recreate the `embedding` column + HNSW index) and a full
+  `db:reindex`.
 
 ## Deployment (Railway)
 
@@ -126,6 +156,14 @@ rely on it for data).
   reference variable: `DATABASE_URL = ${{ Postgres.DATABASE_URL }}` (prefer the
   private-network URL). Migrations apply automatically on first boot (`getDb()`).
 - Back up the Postgres database periodically — it is the single source of truth.
+- **Embeddings service**: add a service from the public image
+  `ghcr.io/huggingface/text-embeddings-inference:cpu-1.5` with args
+  `--model-id BAAI/bge-small-en-v1.5`, give it a volume for the model cache, and
+  point the app at it via a private-network reference variable
+  `EMBEDDINGS_URL = http://${{ embeddings.RAILWAY_PRIVATE_DOMAIN }}:80`. The model
+  runs on infra you own — no data leaves the project. Omit the service (and the
+  var) to run search lexical-only. The managed Postgres supports pgvector; the
+  migration enables the extension on first boot.
 - **Media uploads** (not built yet) can't go on the ephemeral container disk either;
   they'll need object storage (a Railway bucket or S3), streamed through an
   authenticated route handler.
@@ -140,7 +178,10 @@ rely on it for data).
 
 Design system + Next.js app scaffolded; the UI runs off a real **Postgres +
 Drizzle** data layer (schema, migrations, seed, async server read model + write
-path wired into the app). Add person persists. Production runs on a managed
-Railway Postgres and boots empty; local dev uses Docker Postgres seeded with the
-demo family. Still stubbed: real media upload + protected serving (needs object
-storage), and Auth.js (a shared password gate stands in). Next up: media upload.
+path wired into the app). Add person persists. **Hybrid semantic search** is live
+(pgvector + full-text, RRF) over a `search_doc` index, powered by a self-hosted
+open-source embedding server, with a lexical-only fallback. Production runs on a
+managed Railway Postgres and boots empty; local dev uses Docker Postgres seeded
+with the demo family. Still stubbed: real media upload + protected serving (needs
+object storage), and Auth.js (a shared password gate stands in). Next up: media
+upload.

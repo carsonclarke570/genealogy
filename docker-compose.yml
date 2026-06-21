@@ -1,13 +1,18 @@
-# Local Postgres for development. Production uses a managed Railway Postgres
-# (see CLAUDE.md "Deployment"); this just gives `npm run dev` a database to talk
-# to. Start it with `docker compose up -d`, then run the app from `app/`.
+# Local services for development. Production uses a managed Railway Postgres and a
+# self-hosted Railway TEI service (see CLAUDE.md "Deployment"); this just gives
+# `npm run dev` a database + embedding server to talk to. Start with
+# `docker compose up -d`, then run the app from `app/`.
 #
-# The app reads DATABASE_URL (app/.env.local defaults to this instance):
-#   postgresql://postgres:postgres@localhost:5432/genealogy
+# The app reads (app/.env.local defaults to these):
+#   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/genealogy
+#   EMBEDDINGS_URL=http://localhost:8080   (omit it to run search lexical-only)
 
 services:
   db:
-    image: postgres:16-alpine
+    # pgvector image (not plain postgres:16-alpine) — search needs the `vector`
+    # extension, which the migration enables. The existing genealogy-pgdata volume
+    # is reused; only the image changes, so no data is lost.
+    image: pgvector/pgvector:pg16
     container_name: genealogy-db
     restart: unless-stopped
     environment:
@@ -24,5 +29,24 @@ services:
       timeout: 5s
       retries: 5
 
+  # Open-source embedding server (Hugging Face Text Embeddings Inference, Apache-2.0).
+  # Runs the model locally — no data leaves the machine. Optional: stop this service
+  # (or unset EMBEDDINGS_URL) and search falls back to lexical-only.
+  embeddings:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.5
+    container_name: genealogy-embeddings
+    restart: unless-stopped
+    command: ["--model-id", "BAAI/bge-small-en-v1.5"]
+    ports:
+      - "8080:80"
+    volumes:
+      - genealogy-tei-cache:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:80/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
 volumes:
   genealogy-pgdata:
+  genealogy-tei-cache:

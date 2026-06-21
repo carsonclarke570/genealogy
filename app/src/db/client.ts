@@ -19,8 +19,10 @@ import path from "node:path";
 import { Pool } from "pg";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
+import { count } from "drizzle-orm";
 import * as schema from "./schema";
 import { seed } from "./seed";
+import { reindex } from "./reindex";
 
 export type DB = NodePgDatabase<typeof schema>;
 
@@ -41,7 +43,27 @@ async function init(): Promise<DB> {
   // Auto-seed demo data outside production only; prod boots empty (see header).
   // Still idempotent — no-ops once the family table is populated.
   if (process.env.NODE_ENV !== "production") await seed(db);
+  await reindexIfStale(db);
   return db;
+}
+
+/**
+ * Backfill the search index for any people/media missing a search_doc row.
+ * Best-effort: an embedding-server or extension error must never block boot
+ * (search degrades to whatever rows exist; `npm run db:reindex` can reconcile).
+ * Future media-create / person-edit / delete paths should call
+ * indexMedia/indexPerson/removeDoc directly, the way createPerson does.
+ */
+async function reindexIfStale(db: DB): Promise<void> {
+  try {
+    const [{ n: people }] = await db.select({ n: count() }).from(schema.person);
+    const [{ n: docsMedia }] = await db.select({ n: count() }).from(schema.media);
+    const [{ n: indexed }] = await db.select({ n: count() }).from(schema.searchDoc);
+    if (indexed === people + docsMedia) return; // already in sync — skip
+    await reindex(db);
+  } catch (err) {
+    console.error("Search reindex on boot failed (continuing):", err);
+  }
 }
 
 export function getDb(): Promise<DB> {

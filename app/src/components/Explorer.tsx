@@ -17,6 +17,7 @@ import {
   provOf,
   provSummary,
   relationsOf,
+  type Unit,
 } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import {
@@ -465,6 +466,27 @@ export function Explorer({
     return Object.keys(people).filter((id) => !placed.has(id));
   }, [people, units]);
 
+  // Tree depth: each unit's generation is its distance from a parentless root,
+  // so the count is the deepest chain + 1. Mode-independent; mirrors the
+  // layout's `place` recursion.
+  const generations = useMemo(() => {
+    const byId: Record<string, Unit> = {};
+    for (const u of units) byId[u.id] = u;
+    const depthCache: Record<string, number> = {};
+    const depthOf = (id: string): number => {
+      if (id in depthCache) return depthCache[id];
+      const u = byId[id];
+      const d = u && u.parent && byId[u.parent] ? depthOf(u.parent) + 1 : 0;
+      depthCache[id] = d;
+      return d;
+    };
+    let max = -1;
+    for (const u of units) max = Math.max(max, depthOf(u.id));
+    return max + 1;
+  }, [units]);
+
+  const personCount = Object.keys(people).length;
+
   return (
     <div style={{ position: "absolute", inset: 0 }}>
       <Tree mode={layout} focusId={focusId} onFocus={setFocusId} controlsRef={controls} />
@@ -474,7 +496,7 @@ export function Explorer({
           Our Family
         </div>
         <div className="app-muted app-canvas-sub" style={{ fontSize: "var(--text-body-sm)", marginTop: 2 }}>
-          5 generations · 16 people · double-click to open a record
+          {generations} {generations === 1 ? "generation" : "generations"} · {personCount} {personCount === 1 ? "person" : "people"} · double-click to open a record
         </div>
       </div>
 

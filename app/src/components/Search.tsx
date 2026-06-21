@@ -1,12 +1,40 @@
 "use client";
 
-import { useState } from "react";
-import { Avatar, Badge, Button, Card, Chip, EmptyState } from "@family-archive/ui";
+/**
+ * Search screen — a debounced client over the hybrid search endpoint
+ * (POST /api/search): dense pgvector similarity fused with Postgres full-text.
+ * The API returns ranked hits (ids + scores + snippets); we hydrate the result
+ * cards from the in-memory Dataset context by id, so the payload stays small.
+ * Falls back to keyword-only ranking when the embedding server is offline.
+ */
+import { useEffect, useMemo, useState } from "react";
+import { Avatar, Badge, Button, Card, Chip, EmptyState, Spinner } from "@family-archive/ui";
 import { fullName, lifeDates, docCount, relationsOf } from "@/lib/family-data";
+import type { MediaItem } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import { Icon } from "./Icon";
 import { DocDot } from "./shared";
 import type { Screen } from "./AppShell";
+
+type Scope = "all" | "people" | "docs" | "places";
+interface Hit {
+  id: string;
+  kind: "person" | "media";
+  score: number;
+  snippet: string;
+  matchedPlace: boolean;
+}
+interface ApiResult {
+  hits: Hit[];
+  mode: "vector" | "lexical";
+}
+
+const SCOPES: [Scope, string][] = [
+  ["all", "Everything"],
+  ["people", "People"],
+  ["docs", "Documents"],
+  ["places", "Places"],
+];
 
 export function Search({
   onOpen,
@@ -17,17 +45,56 @@ export function Search({
 }) {
   const { people, media, units } = useDataset();
   const [q, setQ] = useState("");
-  const [scope, setScope] = useState<string>("all");
+  const [scope, setScope] = useState<Scope>("all");
+  const [hits, setHits] = useState<Hit[]>([]);
+  const [mode, setMode] = useState<"vector" | "lexical">("vector");
+  const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [reloadKey, setReloadKey] = useState(0);
 
-  const matchedPeople = Object.values(people).filter((p) =>
-    `${fullName(p)} ${p.maiden || ""}`.toLowerCase().includes(q.toLowerCase())
-  );
-  const docs = media.filter((m) =>
-    `${m.title} ${m.people.map((id) => fullName(people[id])).join(" ")}`.toLowerCase().includes(q.toLowerCase())
-  );
-  const showPeople = scope === "all" || scope === "people";
-  const showDocs = scope === "all" || scope === "docs";
-  const total = (showPeople ? matchedPeople.length : 0) + (showDocs ? docs.length : 0);
+  // Debounced, abortable search. Prior results stay on screen while reloading.
+  useEffect(() => {
+    const query = q.trim();
+    if (!query) {
+      setHits([]);
+      setStatus("idle");
+      return;
+    }
+    const ctrl = new AbortController();
+    setStatus("loading");
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch("/api/search", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ q: query, scope, limit: 30 }),
+          signal: ctrl.signal,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data: ApiResult = await res.json();
+        setHits(data.hits);
+        setMode(data.mode);
+        setStatus("ready");
+      } catch (err) {
+        if ((err as Error).name === "AbortError") return;
+        setStatus("error");
+      }
+    }, 250);
+    return () => {
+      clearTimeout(timer);
+      ctrl.abort();
+    };
+  }, [q, scope, reloadKey]);
+
+  const mediaById = useMemo(() => {
+    const m: Record<string, MediaItem> = {};
+    for (const x of media) m[x.id] = x;
+    return m;
+  }, [media]);
+
+  // Keep only hits we can actually render (id present in the loaded Dataset).
+  const peopleHits = hits.filter((h) => h.kind === "person" && people[h.id]);
+  const docHits = hits.filter((h) => h.kind === "media" && mediaById[h.id]);
+  const total = peopleHits.length + docHits.length;
 
   return (
     <div
@@ -63,6 +130,7 @@ export function Search({
               color: "var(--color-ink)",
             }}
           />
+          {status === "loading" && <Spinner size="sm" />}
           {q && (
             <button
               onClick={() => setQ("")}
@@ -74,22 +142,41 @@ export function Search({
           )}
         </div>
 
-        <div style={{ display: "flex", gap: "var(--space-sm)", marginTop: "var(--space-md)" }}>
-          {(
-            [
-              ["all", "Everything"],
-              ["people", "People"],
-              ["docs", "Documents"],
-              ["places", "Places"],
-            ] as const
-          ).map(([k, label]) => (
+        <div style={{ display: "flex", gap: "var(--space-sm)", marginTop: "var(--space-md)", alignItems: "center" }}>
+          {SCOPES.map(([k, label]) => (
             <Chip key={k} selected={scope === k} onClick={() => setScope(k)}>
               {label}
             </Chip>
           ))}
+          {status === "ready" && mode === "lexical" && (
+            <span className="app-muted" style={{ fontSize: "var(--text-body-sm)", marginLeft: "auto" }}>
+              Keyword search
+            </span>
+          )}
         </div>
 
-        {total === 0 ? (
+        {status === "idle" ? (
+          <div style={{ marginTop: "var(--space-2xl)" }}>
+            <EmptyState
+              icon={<Icon name="search" size={26} />}
+              title="Search your family archive"
+              description="Find people and documents by name, place, year, or a description of what you remember."
+            />
+          </div>
+        ) : status === "error" ? (
+          <div style={{ marginTop: "var(--space-2xl)" }}>
+            <EmptyState
+              icon={<Icon name="search" size={26} />}
+              title="Search is unavailable"
+              description="Something went wrong running that search. Please try again."
+              action={
+                <Button variant="primary" onClick={() => setReloadKey((k) => k + 1)}>
+                  Retry
+                </Button>
+              }
+            />
+          </div>
+        ) : total === 0 && status === "ready" ? (
           <div style={{ marginTop: "var(--space-2xl)" }}>
             <EmptyState
               icon={<Icon name="search" size={26} />}
@@ -105,16 +192,17 @@ export function Search({
         ) : (
           <>
             <div className="app-muted" style={{ fontSize: "var(--text-body-sm)", margin: "var(--space-xl) 0 var(--space-md)" }}>
-              {total} results for “{q}”
+              {total} {total === 1 ? "result" : "results"} for “{q}”
             </div>
 
-            {showPeople && matchedPeople.length > 0 && (
+            {peopleHits.length > 0 && (
               <div style={{ marginBottom: "var(--space-2xl)" }}>
                 <div className="app-label" style={{ marginBottom: "var(--space-md)" }}>
                   People
                 </div>
                 <div style={{ display: "grid", gap: "var(--space-sm)" }}>
-                  {matchedPeople.map((p) => {
+                  {peopleHits.map((hit) => {
+                    const p = people[hit.id];
                     const rel = relationsOf(units, p.id);
                     const hint = rel.spouse[0]
                       ? "Spouse of " + people[rel.spouse[0].id].given.split(" ")[0]
@@ -122,7 +210,7 @@ export function Search({
                         ? rel.children.length + " children"
                         : "";
                     return (
-                      <Card key={p.id} style={{ padding: "10px 14px", cursor: "pointer" }}>
+                      <Card key={hit.id} style={{ padding: "10px 14px", cursor: "pointer" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "var(--space-md)" }} onClick={() => onOpen(p.id)}>
                           <Avatar name={fullName(p)} size="md" />
                           <div style={{ flex: 1, minWidth: 0 }}>
@@ -139,6 +227,11 @@ export function Search({
                               {lifeDates(p)}
                               {hint ? " · " + hint : ""}
                             </div>
+                            {hit.snippet && (
+                              <div className="app-muted" style={{ fontSize: "var(--text-body-sm)", marginTop: 2 }}>
+                                <Highlighted text={hit.snippet} />
+                              </div>
+                            )}
                           </div>
                           {docCount(p) > 0 && <Badge tone="info">{docCount(p)} docs</Badge>}
                           <span style={{ color: "var(--color-faint, var(--color-muted))", display: "inline-flex" }}>
@@ -152,40 +245,51 @@ export function Search({
               </div>
             )}
 
-            {showDocs && docs.length > 0 && (
+            {docHits.length > 0 && (
               <div>
                 <div className="app-label" style={{ marginBottom: "var(--space-md)" }}>
                   Documents
                 </div>
                 <div style={{ display: "grid", gap: "var(--space-sm)" }}>
-                  {docs.map((m) => (
-                    <Card key={m.id} style={{ padding: "10px 14px", cursor: "pointer" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-md)" }}>
-                        <div className="app-ph" style={{ width: 46, height: 46, flex: "none", fontSize: 11 }}>
-                          {m.type === "photo" ? "img" : "doc"}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: "var(--text-body)" }}>{m.title}</div>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 6,
-                              fontSize: "var(--text-body-sm)",
-                              color: "var(--color-muted)",
-                              marginTop: 2,
-                            }}
-                          >
-                            <DocDot type={m.type} />
-                            {m.type} · <span className="tnum">{m.year}</span>
+                  {docHits.map((hit) => {
+                    const m = mediaById[hit.id];
+                    return (
+                      <Card key={hit.id} style={{ padding: "10px 14px", cursor: "pointer" }}>
+                        <div
+                          style={{ display: "flex", alignItems: "center", gap: "var(--space-md)" }}
+                          onClick={() => onNavigate("gallery")}
+                        >
+                          <div className="app-ph" style={{ width: 46, height: 46, flex: "none", fontSize: 11 }}>
+                            {m.type === "photo" ? "img" : "doc"}
                           </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: "var(--text-body)" }}>{m.title}</div>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                                fontSize: "var(--text-body-sm)",
+                                color: "var(--color-muted)",
+                                marginTop: 2,
+                              }}
+                            >
+                              <DocDot type={m.type} />
+                              {m.type} · <span className="tnum">{m.year}</span>
+                            </div>
+                            {hit.snippet && (
+                              <div className="app-muted" style={{ fontSize: "var(--text-body-sm)", marginTop: 2 }}>
+                                <Highlighted text={hit.snippet} />
+                              </div>
+                            )}
+                          </div>
+                          <span style={{ color: "var(--color-faint, var(--color-muted))", display: "inline-flex" }}>
+                            <Icon name="chevron" />
+                          </span>
                         </div>
-                        <span style={{ color: "var(--color-faint, var(--color-muted))", display: "inline-flex" }}>
-                          <Icon name="chevron" />
-                        </span>
-                      </div>
-                    </Card>
-                  ))}
+                      </Card>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -193,5 +297,27 @@ export function Search({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Render a ts_headline snippet whose matches are wrapped in ⟪ ⟫ sentinels
+ * (set in lib/search/query.ts). Splitting on the sentinels keeps highlighting
+ * without injecting HTML — odd segments are the highlighted spans.
+ */
+function Highlighted({ text }: { text: string }) {
+  const parts = text.split(/⟪|⟫/);
+  return (
+    <>
+      {parts.map((part, i) =>
+        i % 2 === 1 ? (
+          <strong key={i} style={{ color: "var(--color-ink)", fontWeight: 600 }}>
+            {part}
+          </strong>
+        ) : (
+          <span key={i}>{part}</span>
+        ),
+      )}
+    </>
   );
 }

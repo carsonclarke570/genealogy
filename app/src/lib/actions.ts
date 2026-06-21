@@ -15,6 +15,7 @@ import { z } from "zod";
 import { getDb } from "@/db/client";
 import { person } from "@/db/schema";
 import { provStatuses } from "./prov";
+import { indexPerson } from "./search/index-doc";
 
 export type CreatePersonResult =
   | { ok: true; id: string }
@@ -123,6 +124,15 @@ export async function createPerson(formData: FormData): Promise<CreatePersonResu
     docs: "{}",
     prov: remapProv(formData.get("prov")),
   });
+
+  // Best-effort: index the new person for search. A failure here (embedding
+  // server down, etc.) must never fail the create — the boot/`db:reindex`
+  // backfill will reconcile any missed rows.
+  try {
+    await indexPerson(db, id);
+  } catch (err) {
+    console.error("Failed to index new person for search:", err);
+  }
 
   revalidatePath("/");
   return { ok: true, id };
