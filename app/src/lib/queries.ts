@@ -13,8 +13,7 @@ import { db } from "@/db/client";
 import * as schema from "@/db/schema";
 import type { Person, MediaItem, Dataset } from "./family-data";
 import { buildUnits } from "./units";
-
-const provStatuses = ["verified", "unverified", "estimated", "disputed"] as const;
+import { provStatuses } from "./prov";
 
 // Keys are validated structurally (string); values carry the real constraints.
 const docsSchema = z.record(z.string(), z.number()).catch({});

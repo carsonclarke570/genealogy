@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   Breadcrumb,
   Button,
@@ -16,6 +17,7 @@ import {
 import type { ProvenanceStatus } from "@family-archive/ui";
 import { sourceOptions } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
+import { createPerson } from "@/lib/actions";
 import { Icon } from "./Icon";
 import type { Screen } from "./AppShell";
 
@@ -28,20 +30,49 @@ export function AddPerson({
   onNavigate,
   onToast,
 }: {
-  onNavigate: (screen: Screen) => void;
+  onNavigate: (screen: Screen, personId?: string) => void;
   onToast: (message: string) => void;
 }) {
   const { media } = useDataset();
+  const router = useRouter();
   const [prov, setProv] = useState<Record<string, ProvState>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [pending, startTransition] = useTransition();
   const sources = sourceOptions(media);
   const stOf = (k: string): ProvenanceStatus => prov[k]?.status ?? "unverified";
   const setP = (k: string, status: ProvenanceStatus, source?: string) =>
     setProv((s) => ({ ...s, [k]: { status, source } }));
 
-  const ProvField = ({ label, placeholder, k }: { label: string; placeholder: string; k: string }) => (
+  const handleSubmit = (formData: FormData) =>
+    startTransition(async () => {
+      const result = await createPerson(formData);
+      if (result.ok) {
+        setErrors({});
+        onToast("Person saved to the family archive");
+        router.refresh();
+        onNavigate("person", result.id);
+      } else {
+        setErrors(result.errors);
+      }
+    });
+
+  const ProvField = ({
+    label,
+    placeholder,
+    k,
+    required,
+  }: {
+    label: string;
+    placeholder: string;
+    k: string;
+    required?: boolean;
+  }) => (
     <div style={{ flex: 1 }}>
       <Input
+        name={k}
         placeholder={placeholder}
+        required={required}
+        error={errors[k]}
         label={
           <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
             {label}
@@ -95,7 +126,8 @@ export function AddPerson({
           Records are sacred — fill what you know, leave the rest blank. Nothing is published outside the family.
         </div>
 
-        <div className="app-form-grid">
+        <form className="app-form-grid" action={handleSubmit}>
+          <input type="hidden" name="prov" value={JSON.stringify(prov)} />
           <div style={{ display: "grid", gap: "var(--space-xl)" }}>
             <Card title="Identity">
               <div className="app-muted" style={{ fontSize: "var(--text-body-sm)", marginBottom: "var(--space-md)" }}>
@@ -103,21 +135,22 @@ export function AddPerson({
               </div>
               <div style={{ display: "grid", gap: "var(--space-lg)" }}>
                 <div className="app-field-row">
-                  <ProvField label="Given names" placeholder="e.g. Eleanor Margaret" k="given" />
-                  <ProvField label="Surname" placeholder="e.g. Whitfield" k="surname" />
+                  <ProvField label="Given names" placeholder="e.g. Eleanor Margaret" k="given" required />
+                  <ProvField label="Surname" placeholder="e.g. Whitfield" k="surname" required />
                 </div>
                 <div className="app-field-row" style={{ alignItems: "flex-end" }}>
                   <ProvField label="Maiden name (optional)" placeholder="e.g. Hartley" k="maiden" />
                   <div style={{ width: 160, flex: "none" }}>
-                    <Select label="Sex" defaultValue="">
+                    <Select label="Sex" name="sex" defaultValue="" required error={errors.sex}>
                       <option value="">—</option>
-                      <option>Female</option>
-                      <option>Male</option>
-                      <option>Other</option>
+                      <option value="f">Female</option>
+                      <option value="m">Male</option>
+                      <option value="o">Other</option>
                     </Select>
                   </div>
                 </div>
                 <Checkbox
+                  name="living"
                   label="Living person"
                   description="Hides sensitive details (certificates, exact dates) from non-curators."
                 />
@@ -160,7 +193,7 @@ export function AddPerson({
             </Card>
 
             <Card title="Notes">
-              <Textarea rows={4} placeholder="Biography, anecdotes, sources to follow up…" />
+              <Textarea name="notes" rows={4} placeholder="Biography, anecdotes, sources to follow up…" />
             </Card>
           </div>
 
@@ -193,10 +226,10 @@ export function AddPerson({
             </Card>
             <Card>
               <div style={{ display: "grid", gap: "var(--space-sm)" }}>
-                <Button variant="primary" fullWidth onClick={() => onToast("Person saved to the family archive")}>
+                <Button type="submit" variant="primary" fullWidth loading={pending}>
                   Save person
                 </Button>
-                <Button variant="secondary" fullWidth onClick={() => onNavigate("explorer")}>
+                <Button type="button" variant="secondary" fullWidth disabled={pending} onClick={() => onNavigate("explorer")}>
                   Cancel
                 </Button>
                 <div className="app-muted" style={{ fontSize: "var(--text-label)", textAlign: "center" }}>
@@ -205,7 +238,7 @@ export function AddPerson({
               </div>
             </Card>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );
