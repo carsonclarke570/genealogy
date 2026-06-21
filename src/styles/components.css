@@ -1597,51 +1597,85 @@ button.fa-chip:hover {
 }
 
 /* ── DateField ───────────────────────────────────────────────────────────
- * A precision-aware date entry: the segmented control sets how much is known
- * (year / month / day) and the fields appear left-to-right, coarse to fine, so
- * a record never claims more certainty than it has.
+ * A precision-aware calendar picker. The trigger reads like a Select; it opens a
+ * popover where a segmented control sets how much is known (year / month / day)
+ * and a drill-down calendar (years → months → days) does the picking — the same
+ * drill that reaches a century away in two clicks is what records the precision.
  */
 .fa-datefield {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-md);
+  position: relative;
+  display: inline-flex;
 }
-.fa-datefield__fields {
-  display: flex;
+
+/* Trigger — shares the Select/Input vocabulary so the form reads as one set. */
+.fa-datefield__trigger {
+  display: inline-flex;
   align-items: center;
   gap: var(--space-sm);
+  min-width: 13rem;
+  width: 100%;
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: 1.4;
+  color: var(--color-ink);
+  text-align: start;
+  background-color: var(--color-bg);
+  padding: 0.5rem 0.625rem 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-fast) var(--ease-standard);
 }
-/* Year is free-typed numerals — sized for four digits, tabular so they don't jitter. */
-.fa-datefield__year {
-  width: 5.25rem;
+.fa-datefield__trigger:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+}
+.fa-datefield__trigger:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring-color);
+}
+.fa-datefield__trigger[aria-expanded="true"] {
+  border-color: var(--color-primary);
+}
+.fa-datefield__trigger:disabled {
+  background-color: var(--color-surface-sunken);
+  color: var(--color-muted);
+  cursor: not-allowed;
+}
+.fa-datefield__trigger--invalid {
+  border-color: var(--color-danger);
+}
+.fa-datefield__trigger--invalid:focus-visible {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 var(--focus-ring-width) var(--color-danger);
+}
+.fa-datefield__icon {
+  flex: none;
+  color: var(--color-muted);
+}
+.fa-datefield__value {
+  flex: 1;
+  min-width: 0;
   font-feature-settings: "tnum" 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-/* Month/day are native selects; size them to their content rather than stretch. */
-.fa-datefield__month .fa-select {
-  width: auto;
-  min-width: 8.5rem;
-}
-.fa-datefield__day .fa-select {
-  width: auto;
-  min-width: 5rem;
-  font-feature-settings: "tnum" 1;
-}
-/* A finer field sliding in as precision increases — a quiet state cue, not choreography. */
-.fa-datefield__month,
-.fa-datefield__day {
-  animation: fa-datefield-reveal var(--dur-fast) var(--ease-out-quart);
+.fa-datefield__trigger--placeholder .fa-datefield__value {
+  color: var(--color-muted);
+  font-feature-settings: normal;
 }
 .fa-datefield__clear {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-inline-start: -0.125rem;
   color: var(--color-muted);
   background: transparent;
-  border: 1px solid transparent;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: color var(--dur-fast) var(--ease-standard),
@@ -1653,15 +1687,212 @@ button.fa-chip:hover {
 }
 .fa-datefield__clear:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: 1px;
+}
+
+/* Popover — a floating overlay, so it earns the low overlay shadow. */
+.fa-cal {
+  position: absolute;
+  top: calc(100% + 6px);
+  inset-inline-start: 0;
+  z-index: var(--z-dropdown);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 19rem;
+  padding: var(--space-sm);
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-overlay-low);
+  animation: fa-cal-in var(--dur-fast) var(--ease-out-quart);
+  transform-origin: top center;
+}
+
+/* Month/year header: ‹ label › — the label drills up a level. */
+.fa-cal__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.fa-cal__step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  color: var(--color-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard);
+}
+.fa-cal__step:hover {
+  color: var(--color-ink);
+  background-color: var(--color-surface-sunken);
+}
+.fa-cal__step:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset);
 }
-@keyframes fa-datefield-reveal {
+.fa-cal__title {
+  flex: 1;
+  text-align: center;
+  font-family: var(--font-sans);
+  font-size: var(--text-body-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--color-ink);
+  font-feature-settings: "tnum" 1;
+}
+.fa-cal__title--button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+}
+.fa-cal__title--button:hover {
+  background-color: var(--color-surface-sunken);
+}
+.fa-cal__title--button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.fa-cal__body {
+  animation: fa-cal-fade var(--dur-fast) var(--ease-standard);
+}
+.fa-cal__weekrow {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: var(--space-xs);
+}
+.fa-cal__weekday {
+  text-align: center;
+  font-size: var(--text-label);
+  font-weight: var(--fw-medium);
+  color: var(--color-muted);
+}
+.fa-cal__grid {
+  display: grid;
+  gap: 2px;
+}
+.fa-cal__grid--days {
+  grid-template-columns: repeat(7, 1fr);
+}
+.fa-cal__grid--cells {
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-xs);
+}
+
+/* A single selectable cell — day, month, or year. */
+.fa-cal__cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  font-family: var(--font-sans);
+  font-size: var(--text-body-sm);
+  font-feature-settings: "tnum" 1;
+  color: var(--color-ink);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+.fa-cal__cell--wide {
+  aspect-ratio: auto;
+  padding-block: 0.5rem;
+}
+.fa-cal__cell--pad {
+  cursor: default;
+}
+.fa-cal__cell:hover:not(:disabled):not(.fa-cal__cell--selected) {
+  background-color: var(--color-surface-sunken);
+}
+.fa-cal__cell:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: -1px;
+}
+.fa-cal__cell:disabled {
+  color: var(--color-faint);
+  cursor: not-allowed;
+}
+/* Today: a quiet ring, never colour alone. */
+.fa-cal__cell--today:not(.fa-cal__cell--selected) {
+  border-color: var(--color-border-strong);
+  font-weight: var(--fw-semibold);
+}
+/* The recorded value — the one sienna voice inside the picker. */
+.fa-cal__cell--selected {
+  background-color: var(--color-primary);
+  color: #fff;
+  font-weight: var(--fw-medium);
+}
+
+.fa-cal__foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-xs) 0;
+  border-top: 1px solid var(--color-border);
+  margin-top: 2px;
+  padding-top: var(--space-sm);
+}
+.fa-cal__preview {
+  font-size: var(--text-body-sm);
+  color: var(--color-muted);
+  font-feature-settings: "tnum" 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fa-cal__clearlink {
+  flex: none;
+  font-family: var(--font-sans);
+  font-size: var(--text-label);
+  color: var(--color-accent);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  padding: 0;
+}
+.fa-cal__clearlink:hover {
+  text-decoration: underline;
+}
+.fa-cal__clearlink:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+@keyframes fa-cal-in {
   from {
     opacity: 0;
-    transform: translateX(-6px);
+    transform: translateY(-4px) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes fa-cal-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fa-cal,
+  .fa-cal__body {
+    animation: none;
   }
 }

@@ -141,6 +141,37 @@ Repo-specific gotchas for future syncs. Read this first.
   `cfg.runtimeFontPrefixes`. The leftover `fonts/CascadiaMono-*.ttf` from an earlier
   sync were **deleted** from the project, so its `fonts/` now matches the build.
 
+## Running from a git worktree (`.claude/worktrees/…`)
+
+- A worktree's own `node_modules` is empty; node resolves react/typescript from
+  the MAIN repo's `node_modules` via parent traversal, so `npm run build` works.
+  But the converter needs `--node-modules` to hold both react/react-dom AND an
+  `@family-archive/ui` self-link pointing at **this worktree** (not main). Set it
+  up once per worktree (all gitignored):
+  ```sh
+  MAIN=/home/carson/genealogy
+  mkdir -p node_modules/@family-archive && ln -sfn ../.. node_modules/@family-archive/ui
+  ln -sfn $MAIN/node_modules/react node_modules/react
+  ln -sfn $MAIN/node_modules/react-dom node_modules/react-dom
+  ln -sfn $MAIN/node_modules/@types node_modules/@types
+  ln -sfn $MAIN/.ds-sync/node_modules .ds-sync/node_modules   # reuse esbuild/ts-morph/playwright
+  ```
+  Then run the driver with `--node-modules node_modules` from the worktree root.
+- The main repo's self-link points at main's checkout; do NOT run the converter
+  from main when the change lives only on a worktree branch — its dist is stale.
+
+## DateField — open-calendar preview
+
+- `DateField` (redesigned 2026-06-21 to a calendar popover) has no `open` prop;
+  the `PickingADay` story in `.design-sync/previews/DateField.tsx` auto-opens the
+  popover via a wrapper `ref` + `useEffect(() => …querySelector(".fa-datefield__trigger")?.click())`,
+  with a `minHeight: 400` wrapper so the `position: absolute` popover sits inside
+  the card instead of overlapping the next story. Keep `cardMode: "column"` so
+  every story is full-width. (Unlike Dialog, the popover is absolute, not fixed —
+  no transformed-stage trick needed; just reserve height.)
+- Don't add a `hint` to `PickingADay`: the open popover overlays it and the hint's
+  tail peeks out from the right edge. Closed-trigger stories keep their hints.
+
 ## Re-sync risks
 
 - `dist/family-archive.css` is a generated build artifact (gitignored via
