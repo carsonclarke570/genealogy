@@ -24,12 +24,12 @@ never be served without an authenticated session.
 | -------------- | ------------------------------------------------------------- |
 | Framework      | Next.js (App Router) + React + TypeScript                     |
 | Styling        | Tailwind CSS + a project design system (tokens + components)  |
-| Database       | SQLite via Drizzle ORM (`better-sqlite3` driver)              |
-| File storage   | Local disk (uploads dir), served only through protected routes |
+| Database       | Postgres via Drizzle ORM (`pg` / node-postgres driver)        |
+| File storage   | Object storage (Railway bucket / S3), served via protected routes |
 | Auth           | Auth.js (NextAuth) — session required for all app routes      |
 | Graph viz      | React Flow (`@xyflow/react`) for the explorable tree          |
 | Validation     | Zod for all input/boundary validation                         |
-| Hosting        | Railway (with a persistent volume — see Deployment)           |
+| Hosting        | Railway (managed Postgres service — see Deployment)           |
 
 > Decisions were made deliberately for a private, low-maintenance, self-contained
 > family archive. Prefer simple, boring, well-supported tools over novelty.
@@ -81,11 +81,13 @@ Schema in `app/src/db/schema.ts`; refined from the initial sketch:
 The read model in `app/src/lib/queries.ts` assembles an in-memory `Dataset`
 ({ people, units, media }) — deriving couple-units from `relationship` rows via
 `app/src/lib/units.ts` — which the server hands to the client through a context
-(`app/src/lib/dataset.tsx`). The demo seed lives in
-`app/src/db/seed-data.ts`. On boot the client (`app/src/db/client.ts`)
-auto-applies migrations; **outside production** it also seeds an empty database
-with the demo family (both idempotent). Production boots empty so the real
-family is entered by hand.
+(`app/src/lib/dataset.tsx`). The demo seed lives in `app/src/db/seed-data.ts`.
+
+DB access goes through `getDb()` (`app/src/db/client.ts`) — a memoized
+`Promise<DB>` over a `pg` pool (Postgres queries are async). On first use it
+applies pending migrations; **outside production** it then seeds an empty
+database with the demo family (both idempotent). Production boots empty so the
+real family is entered by hand.
 
 ## Commands
 
@@ -98,26 +100,35 @@ and depends on the library via `file:..`. Build the library before the app
 npm install          # install library deps
 npm run build        # build dist/ (needed before the app compiles)
 
+# Local Postgres (repo root) — dev needs a database to talk to
+docker compose up -d # start Postgres at localhost:5432 (see docker-compose.yml)
+
 # App (cd app/)
 npm install          # install app deps
-npm run dev          # start the dev server
+npm run dev          # start the dev server (auto-migrates + seeds the demo family)
 npm run build        # production build
 npm run start        # run the production build
 npm run db:generate  # generate a Drizzle migration after editing schema.ts
-npm run db:migrate   # apply migrations to the DB (DATA_DIR)
+npm run db:migrate   # apply migrations to the DB (uses DATABASE_URL)
 npm run db:seed      # seed an empty DB with the demo family (idempotent)
 ```
 
+The app reads `DATABASE_URL` (and `AUTH_SECRET` / `SITE_PASSWORD`) from
+`app/.env.local` in dev; it defaults to the local Postgres above.
+
 ## Deployment (Railway)
 
-**Critical:** Railway's container filesystem is ephemeral. The SQLite database
-file **and** the uploads directory must live on a **mounted persistent volume**
-(e.g. mounted at `/data`), or all data is lost on every deploy/restart.
+Data lives in a **managed Railway Postgres service** in the same project, so the
+app container stays stateless (Railway's container filesystem is ephemeral — never
+rely on it for data).
 
-- Point the SQLite connection and the uploads path at the volume mount (configure
-  via env var, e.g. `DATA_DIR=/data`).
-- Keep the local dev `data/` directory gitignored.
-- Back up the volume periodically — it is the single source of truth.
+- The Postgres service exposes `DATABASE_URL`; the app service gets it as a Railway
+  reference variable: `DATABASE_URL = ${{ Postgres.DATABASE_URL }}` (prefer the
+  private-network URL). Migrations apply automatically on first boot (`getDb()`).
+- Back up the Postgres database periodically — it is the single source of truth.
+- **Media uploads** (not built yet) can't go on the ephemeral container disk either;
+  they'll need object storage (a Railway bucket or S3), streamed through an
+  authenticated route handler.
 
 ## Working agreement
 
@@ -127,8 +138,9 @@ file **and** the uploads directory must live on a **mounted persistent volume**
 
 ## Status
 
-Design system + Next.js app scaffolded; the UI now runs off a real **SQLite +
-Drizzle** data layer (schema, migrations, seed, server read model wired into the
-app) instead of static fixtures. Still stubbed: writes (Add person persists
-nothing yet), real media upload + protected serving, and Auth.js (a shared
-password gate stands in). Next up: make Add person persist, then media upload.
+Design system + Next.js app scaffolded; the UI runs off a real **Postgres +
+Drizzle** data layer (schema, migrations, seed, async server read model + write
+path wired into the app). Add person persists. Production runs on a managed
+Railway Postgres and boots empty; local dev uses Docker Postgres seeded with the
+demo family. Still stubbed: real media upload + protected serving (needs object
+storage), and Auth.js (a shared password gate stands in). Next up: media upload.

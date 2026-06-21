@@ -9,7 +9,7 @@
  */
 import "server-only";
 import { z } from "zod";
-import { db } from "@/db/client";
+import { getDb } from "@/db/client";
 import * as schema from "@/db/schema";
 import type { Person, MediaItem, Dataset } from "./family-data";
 import { buildUnits } from "./units";
@@ -27,11 +27,12 @@ function parseJson<T>(raw: string, schema: z.ZodType<T>): T {
   }
 }
 
-export function getDataset(): Dataset {
-  const personRows = db.select().from(schema.person).all();
-  const relationshipRows = db.select().from(schema.relationship).all();
-  const mediaRows = db.select().from(schema.media).all();
-  const links = db.select().from(schema.personMedia).all();
+export async function getDataset(): Promise<Dataset> {
+  const db = await getDb();
+  const personRows = await db.select().from(schema.person);
+  const relationshipRows = await db.select().from(schema.relationship);
+  const mediaRows = await db.select().from(schema.media);
+  const links = await db.select().from(schema.personMedia);
 
   const people: Record<string, Person> = {};
   for (const r of personRows) {

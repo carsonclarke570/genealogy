@@ -12,7 +12,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { db } from "@/db/client";
+import { getDb } from "@/db/client";
 import { person } from "@/db/schema";
 import { provStatuses } from "./prov";
 
@@ -107,23 +107,22 @@ export async function createPerson(formData: FormData): Promise<CreatePersonResu
   }
 
   const id = randomUUID();
-  db.insert(person)
-    .values({
-      id,
-      given: parsed.data.given,
-      surname: parsed.data.surname,
-      maiden: parsed.data.maiden,
-      sex: parsed.data.sex,
-      bornYear: parsed.data.bornYear,
-      bornPlace: parsed.data.bornPlace,
-      diedYear: parsed.data.diedYear,
-      diedPlace: parsed.data.diedPlace,
-      living: parsed.data.living,
-      notes: parsed.data.notes,
-      docs: "{}",
-      prov: remapProv(formData.get("prov")),
-    })
-    .run();
+  const db = await getDb();
+  await db.insert(person).values({
+    id,
+    given: parsed.data.given,
+    surname: parsed.data.surname,
+    maiden: parsed.data.maiden,
+    sex: parsed.data.sex,
+    bornYear: parsed.data.bornYear,
+    bornPlace: parsed.data.bornPlace,
+    diedYear: parsed.data.diedYear,
+    diedPlace: parsed.data.diedPlace,
+    living: parsed.data.living,
+    notes: parsed.data.notes,
+    docs: "{}",
+    prov: remapProv(formData.get("prov")),
+  });
 
   revalidatePath("/");
   return { ok: true, id };

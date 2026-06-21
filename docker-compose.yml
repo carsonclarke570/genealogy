@@ -1,0 +1,28 @@
+# Local Postgres for development. Production uses a managed Railway Postgres
+# (see CLAUDE.md "Deployment"); this just gives `npm run dev` a database to talk
+# to. Start it with `docker compose up -d`, then run the app from `app/`.
+#
+# The app reads DATABASE_URL (app/.env.local defaults to this instance):
+#   postgresql://postgres:postgres@localhost:5432/genealogy
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: genealogy-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: genealogy
+    ports:
+      - "5432:5432"
+    volumes:
+      - genealogy-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d genealogy"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  genealogy-pgdata:

@@ -10,9 +10,7 @@
 FROM node:20-alpine AS base
 WORKDIR /repo
 
-# better-sqlite3 is a native addon; ensure node-gyp can build it if no musl
-# prebuilt binary is available for this Node/Alpine combination.
-RUN apk add --no-cache python3 make g++
+# (The DB driver is `pg` — pure JS, no native build toolchain needed.)
 
 # --- 1. Build the design-system library (root package -> dist/) ---
 COPY package.json package-lock.json tsconfig.json tsconfig.build.json ./

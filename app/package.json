@@ -12,17 +12,17 @@
   },
   "dependencies": {
     "@family-archive/ui": "file:..",
-    "better-sqlite3": "^12.11.1",
     "drizzle-orm": "^0.45.2",
     "next": "^14.2.15",
+    "pg": "^8.13.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "server-only": "^0.0.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.14.0",
+    "@types/pg": "^8.11.10",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "drizzle-kit": "^0.31.10",

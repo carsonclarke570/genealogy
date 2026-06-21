@@ -15,14 +15,14 @@
  * document tally and per-fact confidence that the UI already renders; when real
  * media upload lands, `docs` can migrate to a count derived from `person_media`.
  */
-import { sqliteTable, text, integer, primaryKey } from "drizzle-orm/sqlite-core";
+import { pgTable, text, integer, boolean, timestamp, primaryKey } from "drizzle-orm/pg-core";
 
 const timestamps = {
-  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 };
 
-export const person = sqliteTable("person", {
+export const person = pgTable("person", {
   id: text("id").primaryKey(),
   given: text("given").notNull(),
   surname: text("surname").notNull(),
@@ -32,15 +32,15 @@ export const person = sqliteTable("person", {
   bornPlace: text("born_place"),
   diedYear: integer("died_year"),
   diedPlace: text("died_place"),
-  living: integer("living", { mode: "boolean" }).notNull().default(false),
+  living: boolean("living").notNull().default(false),
   notes: text("notes"),
-  // JSON: Partial<Record<DocType, number>> and Partial<Record<field, ProvStatus>>.
+  // JSON held as text: Partial<Record<DocType, number>> and Partial<Record<field, ProvStatus>>.
   docs: text("docs").notNull().default("{}"),
   prov: text("prov").notNull().default("{}"),
   ...timestamps,
 });
 
-export const relationship = sqliteTable("relationship", {
+export const relationship = pgTable("relationship", {
   id: text("id").primaryKey(),
   kind: text("kind", { enum: ["spouse", "parent"] }).notNull(),
   personId: text("person_id")
@@ -53,7 +53,7 @@ export const relationship = sqliteTable("relationship", {
   createdAt: timestamps.createdAt,
 });
 
-export const media = sqliteTable("media", {
+export const media = pgTable("media", {
   id: text("id").primaryKey(),
   type: text("type", {
     enum: ["photo", "certificate", "article", "obituary", "other"],
@@ -68,7 +68,7 @@ export const media = sqliteTable("media", {
   createdAt: timestamps.createdAt,
 });
 
-export const personMedia = sqliteTable(
+export const personMedia = pgTable(
   "person_media",
   {
     personId: text("person_id")
