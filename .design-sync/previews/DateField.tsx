@@ -1,6 +1,32 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { DateField } from "@family-archive/ui";
 import type { PartialDate } from "@family-archive/ui";
+
+/**
+ * The picker open on the day grid — the headline of the redesign. A wrapper
+ * auto-opens the popover (clicking the trigger) and reserves vertical room so the
+ * absolutely-positioned calendar sits inside the card instead of overlapping the
+ * next story.
+ */
+export function PickingADay() {
+  const [value, setValue] = useState<PartialDate | null>({
+    precision: "day",
+    year: 1971,
+    month: 3,
+    day: 12,
+  });
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ref.current
+      ?.querySelector<HTMLButtonElement>(".fa-datefield__trigger")
+      ?.click();
+  }, []);
+  return (
+    <div ref={ref} style={{ minHeight: 400 }}>
+      <DateField label="Died" value={value} onChange={setValue} />
+    </div>
+  );
+}
 
 export function KnownToTheMonth() {
   const [value, setValue] = useState<PartialDate | null>({
