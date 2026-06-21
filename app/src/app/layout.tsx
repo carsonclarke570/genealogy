@@ -23,9 +23,9 @@ const serif = Spectral({
 });
 
 export const metadata: Metadata = {
-  title: "Whitfield Family Archive",
+  title: "Our Family Archive",
   description:
-    "A private archive for recording and exploring the Whitfield family — people, relationships, and the documents that prove them.",
+    "A private archive for recording and exploring our family — people, relationships, and the documents that prove them.",
   robots: { index: false, follow: false },
 };
 

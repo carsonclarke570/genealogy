@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Sign in — Whitfield Family Archive",
+  title: "Sign in — Our Family Archive",
   robots: { index: false, follow: false },
 };
 
@@ -44,7 +44,7 @@ export default function LoginPage({
               lineHeight: 1.2,
             }}
           >
-            Whitfield Family Archive
+            Our Family Archive
           </h1>
           <p
             style={{

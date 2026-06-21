@@ -3,9 +3,10 @@
  *
  * The database file lives under DATA_DIR — a Railway persistent volume in prod
  * (see CLAUDE.md "Deployment"), or ./data locally. Pending migrations are
- * applied on first connection so the schema is always current; the first boot
- * of an empty database is also auto-seeded with the Whitfield family so the app
- * is never staring at a blank tree. Both steps are idempotent.
+ * applied on first connection so the schema is always current. Outside
+ * production, the first boot of an empty database is also auto-seeded with a demo
+ * family so dev is never staring at a blank tree; production stays empty so the
+ * real family can be entered by hand. Both steps are idempotent.
  */
 import "server-only";
 import { existsSync, mkdirSync } from "node:fs";
@@ -34,7 +35,9 @@ function create(): DB {
   sqlite.pragma("foreign_keys = ON");
   const db = drizzle(sqlite, { schema });
   migrate(db, { migrationsFolder: MIGRATIONS_DIR });
-  seed(db); // no-ops once the family table is populated
+  // Auto-seed demo data outside production only; prod boots empty (see header).
+  // Still idempotent — no-ops once the family table is populated.
+  if (process.env.NODE_ENV !== "production") seed(db);
   return db;
 }
 

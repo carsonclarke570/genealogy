@@ -1,5 +1,5 @@
 /**
- * Seed a database from the Whitfield family literals (db/seed-data.ts).
+ * Seed a database from the demo family literals (db/seed-data.ts).
  *
  * `seed(db)` is idempotent at the table level: it no-ops if `person` already
  * has rows, so it is safe to call on every boot (see db/client.ts) and via the

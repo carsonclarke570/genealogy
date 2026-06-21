@@ -136,7 +136,7 @@ export function AddPerson({
               <div style={{ display: "grid", gap: "var(--space-lg)" }}>
                 <div className="app-field-row">
                   <ProvField label="Given names" placeholder="e.g. Eleanor Margaret" k="given" required />
-                  <ProvField label="Surname" placeholder="e.g. Whitfield" k="surname" required />
+                  <ProvField label="Surname" placeholder="e.g. Clarke" k="surname" required />
                 </div>
                 <div className="app-field-row" style={{ alignItems: "flex-end" }}>
                   <ProvField label="Maiden name (optional)" placeholder="e.g. Hartley" k="maiden" />

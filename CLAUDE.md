@@ -81,9 +81,11 @@ Schema in `app/src/db/schema.ts`; refined from the initial sketch:
 The read model in `app/src/lib/queries.ts` assembles an in-memory `Dataset`
 ({ people, units, media }) — deriving couple-units from `relationship` rows via
 `app/src/lib/units.ts` — which the server hands to the client through a context
-(`app/src/lib/dataset.tsx`). The Whitfield seed lives in
+(`app/src/lib/dataset.tsx`). The demo seed lives in
 `app/src/db/seed-data.ts`. On boot the client (`app/src/db/client.ts`)
-auto-applies migrations and seeds an empty database (both idempotent).
+auto-applies migrations; **outside production** it also seeds an empty database
+with the demo family (both idempotent). Production boots empty so the real
+family is entered by hand.
 
 ## Commands
 
@@ -103,7 +105,7 @@ npm run build        # production build
 npm run start        # run the production build
 npm run db:generate  # generate a Drizzle migration after editing schema.ts
 npm run db:migrate   # apply migrations to the DB (DATA_DIR)
-npm run db:seed      # seed an empty DB with the Whitfield family (idempotent)
+npm run db:seed      # seed an empty DB with the demo family (idempotent)
 ```
 
 ## Deployment (Railway)

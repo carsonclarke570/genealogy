@@ -16,7 +16,7 @@ export function Search({
   onNavigate: (screen: Screen) => void;
 }) {
   const { people, media, units } = useDataset();
-  const [q, setQ] = useState("whitfield");
+  const [q, setQ] = useState("");
   const [scope, setScope] = useState<string>("all");
 
   const matchedPeople = Object.values(people).filter((p) =>

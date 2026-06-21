@@ -4,7 +4,7 @@
  * The data itself (people, couple-units, media) now lives in SQLite and is read
  * on the server via lib/queries.ts, then handed to the client through the
  * Dataset context (lib/dataset.tsx). This module holds only the shared types and
- * the pure, data-free helpers the UI renders with. The Whitfield seed literals
+ * the pure, data-free helpers the UI renders with. The demo seed literals
  * live in db/seed-data.ts.
  */
 import type {
@@ -58,7 +58,7 @@ export function fullName(p: Person): string {
   return `${p.given} ${p.surname}`;
 }
 
-/** "Eleanor Whitfield" → "Eleanor Whitfield"; first given + surname for tree cells. */
+/** "Eleanor Margaret Rivers" → "Eleanor Rivers"; first given + surname for tree cells. */
 export function shortName(p: Person): string {
   return `${p.given.split(" ")[0]} ${p.surname}`;
 }

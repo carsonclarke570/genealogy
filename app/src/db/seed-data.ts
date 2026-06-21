@@ -1,5 +1,5 @@
 /**
- * The Whitfield family — seed data for a fresh database.
+ * Demo family — seed data for a fresh database (dev only; production boots empty).
  *
  * Ported from the design prototype (wf/data.js): five generations, ~16 people,
  * modelled as people + couple "units". The seed script (db/seed.ts) translates
@@ -13,14 +13,14 @@ import type { Person, Unit, MediaItem } from "@/lib/family-data";
 
 export const people: Record<string, Person> = {
   // Gen 0 — great-great-grandparents
-  thomas: { id: "thomas", given: "Thomas Edward", surname: "Whitfield", maiden: null, sex: "m", born: 1888, bornPlace: "Sheffield, England", died: 1971, diedPlace: "Boston, MA", living: false, docs: { photo: 3, certificate: 1, obituary: 1 }, prov: { born: "estimated", bornPlace: "estimated", died: "verified", diedPlace: "verified" } },
-  alice: { id: "alice", given: "Alice Mary", surname: "Whitfield", maiden: "Hartley", sex: "f", born: 1891, bornPlace: "Leeds, England", died: 1975, diedPlace: "Boston, MA", living: false, docs: { photo: 2, certificate: 1 } },
+  thomas: { id: "thomas", given: "Thomas Edward", surname: "Rivers", maiden: null, sex: "m", born: 1888, bornPlace: "Sheffield, England", died: 1971, diedPlace: "Boston, MA", living: false, docs: { photo: 3, certificate: 1, obituary: 1 }, prov: { born: "estimated", bornPlace: "estimated", died: "verified", diedPlace: "verified" } },
+  alice: { id: "alice", given: "Alice Mary", surname: "Rivers", maiden: "Hartley", sex: "f", born: 1891, bornPlace: "Leeds, England", died: 1975, diedPlace: "Boston, MA", living: false, docs: { photo: 2, certificate: 1 } },
 
   // Gen 1 — great-grandparents
-  eleanor: { id: "eleanor", given: "Eleanor Margaret", surname: "Whitfield", maiden: null, sex: "f", born: 1915, bornPlace: "Boston, MA", died: 2001, diedPlace: "Concord, MA", living: false, docs: { photo: 6, certificate: 2, article: 1, obituary: 1 }, prov: { born: "verified", bornPlace: "verified", died: "verified", diedPlace: "verified" } },
+  eleanor: { id: "eleanor", given: "Eleanor Margaret", surname: "Rivers", maiden: null, sex: "f", born: 1915, bornPlace: "Boston, MA", died: 2001, diedPlace: "Concord, MA", living: false, docs: { photo: 6, certificate: 2, article: 1, obituary: 1 }, prov: { born: "verified", bornPlace: "verified", died: "verified", diedPlace: "verified" } },
   frederick: { id: "frederick", given: "Frederick John", surname: "Bain", maiden: null, sex: "m", born: 1912, bornPlace: "Glasgow, Scotland", died: 1989, diedPlace: "Concord, MA", living: false, docs: { photo: 2, article: 1 } },
-  arthur: { id: "arthur", given: "Arthur James", surname: "Whitfield", maiden: null, sex: "m", born: 1918, bornPlace: "Boston, MA", died: 1944, diedPlace: "Normandy, France", living: false, docs: { photo: 1, article: 2, obituary: 1 }, prov: { born: "verified", bornPlace: "verified", died: "disputed", diedPlace: "estimated" } },
-  rose: { id: "rose", given: "Rose Adeline", surname: "Whitfield", maiden: null, sex: "f", born: 1921, bornPlace: "Boston, MA", died: 2010, diedPlace: "Portland, ME", living: false, docs: { photo: 4, certificate: 1 } },
+  arthur: { id: "arthur", given: "Arthur James", surname: "Rivers", maiden: null, sex: "m", born: 1918, bornPlace: "Boston, MA", died: 1944, diedPlace: "Normandy, France", living: false, docs: { photo: 1, article: 2, obituary: 1 }, prov: { born: "verified", bornPlace: "verified", died: "disputed", diedPlace: "estimated" } },
+  rose: { id: "rose", given: "Rose Adeline", surname: "Rivers", maiden: null, sex: "f", born: 1921, bornPlace: "Boston, MA", died: 2010, diedPlace: "Portland, ME", living: false, docs: { photo: 4, certificate: 1 } },
   walter: { id: "walter", given: "Walter Henry", surname: "Cole", maiden: null, sex: "m", born: 1919, bornPlace: "Portland, ME", died: 1998, diedPlace: "Portland, ME", living: false, docs: { photo: 1 } },
 
   // Gen 2 — grandparents
@@ -55,10 +55,10 @@ export const units: Unit[] = [
 ];
 
 export const media: MediaItem[] = [
-  { id: "M-101", type: "photo", title: "Whitfield family at the lake house", year: 1962, people: ["thomas", "alice", "rose"] },
-  { id: "M-102", type: "certificate", title: "Eleanor Whitfield — birth certificate", year: 1915, people: ["eleanor"] },
-  { id: "M-103", type: "obituary", title: "Thomas E. Whitfield, 1888–1971", year: 1971, people: ["thomas"] },
-  { id: "M-104", type: "article", title: "Pvt. Arthur Whitfield, missing in action", year: 1944, people: ["arthur"] },
+  { id: "M-101", type: "photo", title: "Rivers family at the lake house", year: 1962, people: ["thomas", "alice", "rose"] },
+  { id: "M-102", type: "certificate", title: "Eleanor Rivers — birth certificate", year: 1915, people: ["eleanor"] },
+  { id: "M-103", type: "obituary", title: "Thomas E. Rivers, 1888–1971", year: 1971, people: ["thomas"] },
+  { id: "M-104", type: "article", title: "Pvt. Arthur Rivers, missing in action", year: 1944, people: ["arthur"] },
   { id: "M-105", type: "photo", title: "Eleanor & Frederick, wedding day", year: 1938, people: ["eleanor", "frederick"] },
   { id: "M-106", type: "photo", title: "James Bain, graduation", year: 1965, people: ["james"] },
   { id: "M-107", type: "certificate", title: "Sarah & Michael — marriage record", year: 1999, people: ["sarah", "michael"] },
@@ -66,5 +66,5 @@ export const media: MediaItem[] = [
   { id: "M-109", type: "article", title: "Rose Cole opens Portland bakery", year: 1958, people: ["rose"] },
   { id: "M-110", type: "obituary", title: "James F. Bain, 1943–2018", year: 2018, people: ["james"] },
   { id: "M-111", type: "photo", title: "Three generations, Thanksgiving", year: 2008, people: ["patricia", "sarah", "olivia"] },
-  { id: "M-112", type: "other", title: "Whitfield passage manifest, SS Carmania", year: 1911, people: ["thomas", "alice"] },
+  { id: "M-112", type: "other", title: "Rivers passage manifest, SS Carmania", year: 1911, people: ["thomas", "alice"] },
 ];

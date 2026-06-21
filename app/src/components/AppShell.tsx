@@ -66,7 +66,7 @@ export function AppShell({ data }: { data: Dataset }) {
             <Icon name="tree" size={22} />
           </span>
           <div>
-            <div className="app-brand-name">Whitfield</div>
+            <div className="app-brand-name">Our Family</div>
             <div className="app-brand-sub">family archive</div>
           </div>
         </div>

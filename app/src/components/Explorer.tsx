@@ -471,7 +471,7 @@ export function Explorer({
 
       <div className="app-float app-canvas-title" style={{ position: "absolute", top: 16, left: 16, padding: "12px 16px", zIndex: 4 }}>
         <div className="app-display" style={{ fontSize: "var(--text-headline)" }}>
-          Whitfield Family
+          Our Family
         </div>
         <div className="app-muted app-canvas-sub" style={{ fontSize: "var(--text-body-sm)", marginTop: 2 }}>
           5 generations · 16 people · double-click to open a record
