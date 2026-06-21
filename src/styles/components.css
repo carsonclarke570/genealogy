@@ -1446,3 +1446,73 @@ button.fa-chip:hover {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ── DateField ───────────────────────────────────────────────────────────
+ * A precision-aware date entry: the segmented control sets how much is known
+ * (year / month / day) and the fields appear left-to-right, coarse to fine, so
+ * a record never claims more certainty than it has.
+ */
+.fa-datefield {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+}
+.fa-datefield__fields {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+/* Year is free-typed numerals — sized for four digits, tabular so they don't jitter. */
+.fa-datefield__year {
+  width: 5.25rem;
+  font-feature-settings: "tnum" 1;
+}
+/* Month/day are native selects; size them to their content rather than stretch. */
+.fa-datefield__month .fa-select {
+  width: auto;
+  min-width: 8.5rem;
+}
+.fa-datefield__day .fa-select {
+  width: auto;
+  min-width: 5rem;
+  font-feature-settings: "tnum" 1;
+}
+/* A finer field sliding in as precision increases — a quiet state cue, not choreography. */
+.fa-datefield__month,
+.fa-datefield__day {
+  animation: fa-datefield-reveal var(--dur-fast) var(--ease-out-quart);
+}
+.fa-datefield__clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  color: var(--color-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard);
+}
+.fa-datefield__clear:hover {
+  color: var(--color-ink);
+  background-color: var(--color-surface-sunken);
+}
+.fa-datefield__clear:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+@keyframes fa-datefield-reveal {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}

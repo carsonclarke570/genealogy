@@ -90,3 +90,6 @@ export type { ToastViewportProps, ToastViewportPosition } from "./components/Toa
 
 export { DocChip } from "./components/DocChip";
 export type { DocChipProps } from "./components/DocChip";
+
+export { DateField, formatPartialDate } from "./components/DateField";
+export type { DateFieldProps, PartialDate, DatePrecision } from "./components/DateField";

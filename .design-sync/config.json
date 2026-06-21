@@ -26,6 +26,7 @@
     "Menu": { "cardMode": "single", "primaryStory": "Default" },
     "Timeline": { "cardMode": "column", "primaryStory": "LifeEvents" },
     "MultiSelect": { "cardMode": "column", "primaryStory": "FilterByPerson" },
-    "ToastViewport": { "cardMode": "single", "primaryStory": "Stack" }
+    "ToastViewport": { "cardMode": "single", "primaryStory": "Stack" },
+    "DateField": { "cardMode": "column", "primaryStory": "KnownToTheMonth" }
   }
 }
