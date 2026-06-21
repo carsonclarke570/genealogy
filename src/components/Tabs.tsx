@@ -1,5 +1,5 @@
-import { useId, useState } from "react";
-import type { ReactNode } from "react";
+import { useId, useRef, useState } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 
 export interface TabItem {
   /** Stable identifier for this tab. */
@@ -48,18 +48,44 @@ export function Tabs({
   const [internal, setInternal] = useState(defaultValue ?? items[0]?.value);
   const active = value ?? internal;
   const activeItem = items.find((i) => i.value === active);
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const select = (v: string) => {
     if (value === undefined) setInternal(v);
     onValueChange?.(v);
   };
 
+  // Roving-tabindex keyboard nav: arrows move (and activate) the focused tab.
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const keys = ["ArrowRight", "ArrowLeft", "Home", "End"];
+    if (!keys.includes(e.key)) return;
+    const enabled = items.filter((it) => !it.disabled);
+    if (enabled.length === 0) return;
+    e.preventDefault();
+    const idx = enabled.findIndex((it) => it.value === active);
+    const next =
+      e.key === "Home"
+        ? enabled[0]
+        : e.key === "End"
+          ? enabled[enabled.length - 1]
+          : e.key === "ArrowRight"
+            ? enabled[(idx + 1) % enabled.length]
+            : enabled[(idx - 1 + enabled.length) % enabled.length];
+    if (next) {
+      select(next.value);
+      tabRefs.current[next.value]?.focus();
+    }
+  };
+
   return (
     <div className="fa-tabs">
-      <div className="fa-tablist" role="tablist">
+      <div className="fa-tablist" role="tablist" onKeyDown={onKeyDown}>
         {items.map((it) => (
           <button
             key={it.value}
+            ref={(el) => {
+              tabRefs.current[it.value] = el;
+            }}
             type="button"
             role="tab"
             id={`${baseId}-tab-${it.value}`}

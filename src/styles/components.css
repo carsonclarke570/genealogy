@@ -253,7 +253,8 @@ button.fa-chip:hover {
   color: var(--color-ink);
 }
 
-.fa-chip__dot {
+.fa-chip__dot,
+.fa-badge__dot {
   width: 0.5em;
   height: 0.5em;
   flex: none;

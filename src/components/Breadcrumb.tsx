@@ -1,12 +1,16 @@
 import type { ReactNode } from "react";
 
 export interface Crumb {
+  /** Crumb text. */
   label: ReactNode;
+  /** Link target; ignored on the last (current) crumb, which is never a link. */
   href?: string;
+  /** Click handler, e.g. for client-side routing. */
   onClick?: () => void;
 }
 
 export interface BreadcrumbProps {
+  /** The ancestor chain, root → current; the last item renders as the current page. */
   items: Crumb[];
   /** Accessible label for the nav landmark. @default "Breadcrumb" */
   ariaLabel?: string;

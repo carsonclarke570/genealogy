@@ -66,6 +66,7 @@ export function Select({
           className={classes}
           aria-invalid={invalid || undefined}
           aria-describedby={invalid ? errorId : hint ? hintId : undefined}
+          required={required}
           aria-required={required || undefined}
           {...rest}
         >

@@ -7,6 +7,8 @@
   "srcDir": "src",
   "tsconfig": "tsconfig.json",
   "cssEntry": "dist/family-archive.css",
+  "extraFonts": [".design-sync/fonts/brand-fonts.css"],
+  "runtimeFontPrefixes": ["Cascadia"],
   "readmeHeader": ".design-sync/conventions.md",
   "componentSrcMap": {
     "ProvenanceMark": "src/components/Provenance.tsx",

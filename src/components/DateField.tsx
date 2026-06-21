@@ -144,7 +144,10 @@ export function DateField({
 
   const setYear = (raw: string) => {
     const digits = raw.replace(/\D/g, "").slice(0, 4);
-    emit({ ...v, year: digits === "" ? null : Number(digits) });
+    if (digits === "") return emit({ ...v, year: null });
+    const ceiling = maxYear ?? new Date().getFullYear();
+    const year = Math.min(Math.max(Number(digits), minYear), ceiling);
+    emit({ ...v, year });
   };
 
   const setMonth = (raw: string) =>
@@ -193,8 +196,6 @@ export function DateField({
             aria-invalid={invalid || undefined}
             aria-describedby={describedBy}
             disabled={disabled}
-            min={minYear}
-            max={maxYear}
             value={v.year ?? ""}
             onChange={(e) => setYear(e.target.value)}
           />

@@ -109,7 +109,7 @@ export function MultiSelect({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-controls={listId}
-        onClick={() => setInternalOpen((o) => !o)}
+        onClick={() => uncontrolled && setInternalOpen((o) => !o)}
       >
         {icon && <span className="fa-multiselect__trigger-icon">{icon}</span>}
         <span className="fa-multiselect__trigger-label">

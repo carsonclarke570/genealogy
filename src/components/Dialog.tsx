@@ -1,4 +1,4 @@
-import { useEffect, useId } from "react";
+import { useEffect, useId, useRef } from "react";
 import type { ReactNode } from "react";
 
 export interface DialogProps {
@@ -44,14 +44,21 @@ export function Dialog({
   children,
 }: DialogProps) {
   const id = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
+    // Move focus into the dialog on open; restore it to the opener on close.
+    const opener = document.activeElement as HTMLElement | null;
+    panelRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      opener?.focus?.();
+    };
   }, [open, onClose]);
 
   if (!open) return null;
@@ -59,6 +66,8 @@ export function Dialog({
   return (
     <div className="fa-dialog-backdrop" onClick={onClose}>
       <div
+        ref={panelRef}
+        tabIndex={-1}
         className="fa-dialog"
         role="dialog"
         aria-modal="true"

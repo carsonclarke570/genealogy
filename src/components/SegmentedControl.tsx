@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 
 export interface SegmentItem {
@@ -56,6 +56,7 @@ export function SegmentedControl({
 }: SegmentedControlProps) {
   const [internal, setInternal] = useState(defaultValue ?? items[0]?.value);
   const active = value ?? internal;
+  const btnRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const select = (v: string) => {
     if (value === undefined) setInternal(v);
@@ -63,16 +64,24 @@ export function SegmentedControl({
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-    e.preventDefault();
+    const keys = ["ArrowRight", "ArrowLeft", "Home", "End"];
+    if (!keys.includes(e.key)) return;
     const enabled = items.filter((it) => !it.disabled);
+    if (enabled.length === 0) return;
+    e.preventDefault();
     const idx = enabled.findIndex((it) => it.value === active);
-    if (idx < 0) return;
     const next =
-      e.key === "ArrowRight"
-        ? enabled[(idx + 1) % enabled.length]
-        : enabled[(idx - 1 + enabled.length) % enabled.length];
-    if (next) select(next.value);
+      e.key === "Home"
+        ? enabled[0]
+        : e.key === "End"
+          ? enabled[enabled.length - 1]
+          : e.key === "ArrowRight"
+            ? enabled[(idx + 1) % enabled.length]
+            : enabled[(idx - 1 + enabled.length) % enabled.length];
+    if (next) {
+      select(next.value);
+      btnRefs.current[next.value]?.focus();
+    }
   };
 
   const classes = ["fa-seg", size === "sm" && "fa-seg--sm"]
@@ -86,6 +95,9 @@ export function SegmentedControl({
         return (
           <button
             key={it.value}
+            ref={(el) => {
+              btnRefs.current[it.value] = el;
+            }}
             type="button"
             role="radio"
             aria-checked={on}

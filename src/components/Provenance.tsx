@@ -92,8 +92,9 @@ export interface ProvenanceMarkProps {
   /** Confidence of the recorded fact. @default "unverified" */
   status?: ProvenanceStatus;
   /**
-   * The citation shown in the read-only tooltip when `status` is `verified`
-   * (e.g. "birth certificate"). Ignored when editable.
+   * The citation appended to the read-only tooltip and accessible name (e.g.
+   * "birth certificate"); when omitted the state's hint is shown instead.
+   * Ignored when editable.
    */
   source?: string;
   /**
