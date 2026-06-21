@@ -56,9 +56,27 @@ export function PersonRecord({
 }) {
   const { people, media: allMedia, units } = useDataset();
   const p = people[id];
+  const [docFilter, setDocFilter] = useState<string>("all");
+
+  // The person may be absent from the current dataset — most commonly in the
+  // brief window after creating someone, before router.refresh() pulls the new
+  // row into context (also guards against a stale/broken link). Render a light
+  // placeholder rather than dereferencing undefined.
+  if (!p) {
+    return (
+      <div
+        className="app-scroll"
+        style={{ height: "100%", overflow: "auto", padding: "var(--space-xl) var(--space-2xl) var(--space-4xl)" }}
+      >
+        <div style={{ maxWidth: 940, margin: "0 auto" }} className="app-muted">
+          Loading record…
+        </div>
+      </div>
+    );
+  }
+
   const rel = relationsOf(units, id);
   const media = allMedia.filter((m) => m.people.includes(id));
-  const [docFilter, setDocFilter] = useState<string>("all");
 
   const summary = provSummary(p);
 
