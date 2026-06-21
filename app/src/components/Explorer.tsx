@@ -387,17 +387,17 @@ export function Explorer({
     <div style={{ position: "absolute", inset: 0 }}>
       <Tree mode={layout} focusId={focusId} onFocus={setFocusId} controlsRef={controls} />
 
-      <div className="app-float" style={{ position: "absolute", top: 16, left: 16, padding: "12px 16px", zIndex: 4 }}>
+      <div className="app-float app-canvas-title" style={{ position: "absolute", top: 16, left: 16, padding: "12px 16px", zIndex: 4 }}>
         <div className="app-display" style={{ fontSize: "var(--text-headline)" }}>
           Whitfield Family
         </div>
-        <div className="app-muted" style={{ fontSize: "var(--text-body-sm)", marginTop: 2 }}>
+        <div className="app-muted app-canvas-sub" style={{ fontSize: "var(--text-body-sm)", marginTop: 2 }}>
           5 generations · 16 people · double-click to open a record
         </div>
       </div>
 
       <div
-        className="app-float app-seg"
+        className="app-float app-seg app-switch-wrap"
         style={{ ...segWrap, top: 16, right: focusId ? 392 : 16, transition: "right .2s ease" }}
       >
         {opts.map(([k, label]) => (
@@ -407,7 +407,7 @@ export function Explorer({
         ))}
       </div>
 
-      <div className="app-float app-seg" style={{ ...segWrap, bottom: 16, left: 16 }}>
+      <div className="app-float app-seg app-zoomctl" style={{ ...segWrap, bottom: 16, left: 16 }}>
         <button className="app-iconbtn" onClick={() => controls.current?.zoom(0.83)} aria-label="Zoom out">
           <Icon name="zoomOut" />
         </button>

@@ -106,13 +106,23 @@ export function AppShell({ data }: { data: Dataset }) {
       <main className="app-main">
         <header className="app-top">
           <div className="app-top-title">{TITLES[route.screen]}</div>
-          <div className="app-search" style={{ marginLeft: "auto" }} onClick={() => navigate("search")}>
+          <div className="app-search app-hide-mobile" style={{ marginLeft: "auto" }} onClick={() => navigate("search")}>
             <Icon name="search" />
             <span>Search people &amp; docs</span>
           </div>
-          <Button variant="primary" iconStart={<Icon name="plus" size={16} />} onClick={() => navigate("add")}>
-            Add person
-          </Button>
+          <button
+            className="app-iconbtn app-only-mobile"
+            style={{ marginLeft: "auto" }}
+            aria-label={theme === "light" ? "Dark mode" : "Light mode"}
+            onClick={() => setThemeState(toggleTheme())}
+          >
+            <Icon name={theme === "light" ? "moon" : "sun"} size={18} />
+          </button>
+          <span className="app-hide-mobile">
+            <Button variant="primary" iconStart={<Icon name="plus" size={16} />} onClick={() => navigate("add")}>
+              Add person
+            </Button>
+          </span>
         </header>
 
         <div className="app-body">
@@ -133,6 +143,19 @@ export function AppShell({ data }: { data: Dataset }) {
           {route.screen === "add" && <AddPerson onNavigate={navigate} onToast={setToast} />}
         </div>
       </main>
+
+      <nav className="app-mobnav">
+        {NAV.map(([k, label, icon]) => (
+          <button
+            key={k}
+            className={"app-mobnav-item" + (route.screen === k ? " on" : "")}
+            onClick={() => navigate(k)}
+          >
+            <Icon name={icon} />
+            <span>{label === "Media archive" ? "Media" : label === "Add person" ? "Add" : label}</span>
+          </button>
+        ))}
+      </nav>
 
       {toast && (
         <div
