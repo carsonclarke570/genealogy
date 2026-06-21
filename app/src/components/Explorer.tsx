@@ -361,6 +361,76 @@ function Peek({
   );
 }
 
+/**
+ * Holding tray for people who aren't drawn on the canvas — those with no
+ * recorded relationship, so the layout produces no node for them. Rather than
+ * float them as lone "root" nodes (which would imply a generation we don't
+ * know), they live in a quiet, collapsible shelf docked at the bottom of the
+ * canvas. Opening one focuses it (and, once relationships can be edited, this is
+ * where you'd connect them into a tree).
+ */
+function UnplacedShelf({
+  ids,
+  focusId,
+  onFocus,
+}: {
+  ids: string[];
+  focusId: string | null;
+  onFocus: (id: string) => void;
+}) {
+  const { people } = useDataset();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className={"app-float app-shelf" + (open ? " open" : "")}>
+      <button
+        type="button"
+        className="app-shelf-pill"
+        aria-expanded={open}
+        aria-controls="unplaced-shelf-body"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className="app-shelf-dot" aria-hidden="true" />
+        <span className="app-shelf-label">
+          Unplaced<span className="app-muted"> · {ids.length}</span>
+        </span>
+        <span className="app-shelf-chev" aria-hidden="true">
+          <Icon name="chevron" size={16} />
+        </span>
+      </button>
+      <div className="app-shelf-body" id="unplaced-shelf-body">
+        <div>
+          <div className="app-shelf-inner">
+            <p className="app-shelf-hint app-muted">
+              Not yet connected to anyone in the tree. Open one to review it or add relationships.
+            </p>
+            <div className="app-shelf-row app-scroll">
+              {ids.map((id) => {
+                const p = people[id];
+                if (!p) return null;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    className={"app-shelf-card" + (focusId === id ? " active" : "")}
+                    onClick={() => onFocus(id)}
+                  >
+                    <Avatar name={`${p.given} ${p.surname}`} size="sm" />
+                    <span style={{ minWidth: 0 }}>
+                      <span className="nm">{shortName(p)}</span>
+                      <span className="dt tnum">{lifeDates(p)}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const segWrap: CSSProperties = { position: "absolute", padding: "4px", zIndex: 4 };
 
 export function Explorer({
@@ -377,11 +447,23 @@ export function Explorer({
   onOpen: (id: string, mode?: "edit") => void;
 }) {
   const controls = useRef<TreeControls | null>(null);
+  const { people, units } = useDataset();
   const opts: [TreeMode, string][] = [
     ["vertical", "Vertical"],
     ["horizontal", "Horizontal"],
     ["radial", "Radial"],
   ];
+
+  // People the canvas can't draw: those represented by no unit (no recorded
+  // relationship). Mirrors the layout's node membership, mode-independent.
+  const unplaced = useMemo(() => {
+    const placed = new Set<string>();
+    for (const u of units) {
+      placed.add(u.anchor);
+      if (u.partner) placed.add(u.partner);
+    }
+    return Object.keys(people).filter((id) => !placed.has(id));
+  }, [people, units]);
 
   return (
     <div style={{ position: "absolute", inset: 0 }}>
@@ -418,6 +500,10 @@ export function Explorer({
           <Icon name="recenter" />
         </button>
       </div>
+
+      {unplaced.length > 0 && (
+        <UnplacedShelf ids={unplaced} focusId={focusId} onFocus={setFocusId} />
+      )}
 
       {focusId && (
         <Peek
