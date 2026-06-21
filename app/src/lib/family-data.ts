@@ -12,9 +12,16 @@ import type {
   DocType,
   SourceOption,
   BadgeTone,
+  PartialDate,
 } from "@family-archive/ui";
 
 export type Sex = "m" | "f" | "o";
+
+/** A recorded fact's confidence, plus the source cited when it's verified. */
+export interface ProvFact {
+  status: ProvenanceStatus;
+  source?: string | null;
+}
 
 export interface Person {
   id: string;
@@ -22,13 +29,18 @@ export interface Person {
   surname: string;
   maiden: string | null;
   sex: Sex;
+  /** The 4-digit year (derived from `bornDate`); kept for compact display + sort. */
   born: number | null;
+  /** Precision-aware birth date (year / month / day), or null if unknown. */
+  bornDate?: PartialDate | null;
   bornPlace: string | null;
   died: number | null;
+  diedDate?: PartialDate | null;
   diedPlace: string | null;
   living: boolean;
+  notes?: string | null;
   docs: Partial<Record<DocType, number>>;
-  prov?: Partial<Record<string, ProvenanceStatus>>;
+  prov?: Partial<Record<string, ProvFact>>;
 }
 
 export interface Unit {
@@ -76,11 +88,17 @@ export function docCount(p: Person): number {
 
 /** Confidence of a single recorded fact. */
 export function provOf(p: Person, field: string): ProvenanceStatus {
-  if (p.prov && p.prov[field]) return p.prov[field]!;
+  const fact = p.prov?.[field];
+  if (fact) return fact.status;
   if (field === "name") return docCount(p) > 0 ? "verified" : "unverified";
   if ((field === "born" || field === "died") && p.born && p.born < 1900)
     return "estimated";
   return "unverified";
+}
+
+/** The source cited for a recorded fact (when verified), or null. */
+export function provSourceOf(p: Person, field: string): string | null {
+  return p.prov?.[field]?.source ?? null;
 }
 
 export interface Relation {

@@ -13,11 +13,13 @@ import {
   Tabs,
 } from "@family-archive/ui";
 import type { ChipDot } from "@family-archive/ui";
+import { formatPartialDate } from "@family-archive/ui";
 import {
   fullName,
   lifeDates,
   docCount,
   provOf,
+  provSourceOf,
   provSummary,
   relationsOf,
   type Person,
@@ -211,12 +213,14 @@ export function PersonRecord({
     const v = st === "estimated" && /^\d/.test(String(raw)) ? "c. " + raw : String(raw);
     return { v, st };
   };
+  const bornText = formatPartialDate(p.bornDate ?? null) || (p.born != null ? String(p.born) : "?");
+  const diedText = formatPartialDate(p.diedDate ?? null) || (p.died != null ? String(p.died) : "?");
   const facts = [
-    { k: "Born", field: "born", ...fmtFact("born", p.born ?? "?") },
+    { k: "Born", field: "born", ...fmtFact("born", bornText) },
     { k: "Birthplace", field: "bornPlace", ...fmtFact("bornPlace", (p.bornPlace ?? "?").split(",")[0]) },
     p.living
       ? { k: "Status", field: null as string | null, v: "Living", st: provOf(p, "name") }
-      : { k: "Died", field: "died", ...fmtFact("died", p.died ?? "?") },
+      : { k: "Died", field: "died", ...fmtFact("died", diedText) },
     { k: "Documents", field: null as string | null, v: String(docCount(p)), st: provOf(p, "name") },
   ];
 
@@ -307,7 +311,7 @@ export function PersonRecord({
                   {f.field && (
                     <ProvenanceMark
                       status={f.st}
-                      source={f.st === "verified" ? sourceFor(p, f.field) : undefined}
+                      source={provSourceOf(p, f.field) ?? undefined}
                     />
                   )}
                 </div>

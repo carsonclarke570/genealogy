@@ -18,6 +18,8 @@ export type Screen = "explorer" | "person" | "gallery" | "search" | "add";
 interface Route {
   screen: Screen;
   personId: string;
+  /** When on the "add" screen, the person being edited — null means a fresh add. */
+  editId: string | null;
 }
 
 const NAV: [Screen, string, IconName][] = [
@@ -36,7 +38,7 @@ const TITLES: Record<Screen, string> = {
 };
 
 export function AppShell({ data }: { data: Dataset }) {
-  const [route, setRoute] = useState<Route>({ screen: "explorer", personId: "eleanor" });
+  const [route, setRoute] = useState<Route>({ screen: "explorer", personId: "eleanor", editId: null });
   const [focusId, setFocusId] = useState<string | null>(null);
   const [layout, setLayout] = useState<TreeMode>("vertical");
   const [theme, setThemeState] = useState<Theme>("light");
@@ -52,10 +54,13 @@ export function AppShell({ data }: { data: Dataset }) {
     return () => clearTimeout(t);
   }, [toast]);
 
+  // Any ordinary navigation clears edit mode; only openPerson(id, "edit") sets it.
   const navigate = (screen: Screen, personId?: string) =>
-    setRoute((r) => ({ screen, personId: personId ?? r.personId }));
+    setRoute((r) => ({ screen, personId: personId ?? r.personId, editId: null }));
   const openPerson = (personId: string, mode?: "edit") =>
-    mode === "edit" ? navigate("add", personId) : navigate("person", personId);
+    mode === "edit"
+      ? setRoute((r) => ({ screen: "add", personId: r.personId, editId: personId }))
+      : navigate("person", personId);
 
   return (
     <DatasetProvider value={data}>
@@ -106,7 +111,9 @@ export function AppShell({ data }: { data: Dataset }) {
 
       <main className="app-main">
         <header className="app-top">
-          <div className="app-top-title">{TITLES[route.screen]}</div>
+          <div className="app-top-title">
+            {route.screen === "add" && route.editId ? "Edit person" : TITLES[route.screen]}
+          </div>
           <button
             type="button"
             className="app-search app-hide-mobile"
@@ -147,7 +154,14 @@ export function AppShell({ data }: { data: Dataset }) {
           )}
           {route.screen === "gallery" && <Gallery onOpen={openPerson} />}
           {route.screen === "search" && <Search onOpen={openPerson} onNavigate={navigate} />}
-          {route.screen === "add" && <AddPerson onNavigate={navigate} onToast={setToast} />}
+          {route.screen === "add" && (
+            <AddPerson
+              key={route.editId ?? "new"}
+              editId={route.editId}
+              onNavigate={navigate}
+              onToast={setToast}
+            />
+          )}
         </div>
       </main>
 

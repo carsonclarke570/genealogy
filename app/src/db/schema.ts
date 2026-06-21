@@ -29,13 +29,20 @@ export const person = pgTable("person", {
   surname: text("surname").notNull(),
   maiden: text("maiden"),
   sex: text("sex", { enum: ["m", "f", "o"] }).notNull(),
+  // `bornYear`/`diedYear` are the derived 4-digit year (kept for sort, search and
+  // compact display); `bornDate`/`diedDate` hold the precision-aware partial date
+  // as a canonical "YYYY" / "YYYY-MM" / "YYYY-MM-DD" string (see lib/dates.ts).
   bornYear: integer("born_year"),
+  bornDate: text("born_date"),
   bornPlace: text("born_place"),
   diedYear: integer("died_year"),
+  diedDate: text("died_date"),
   diedPlace: text("died_place"),
   living: boolean("living").notNull().default(false),
   notes: text("notes"),
-  // JSON held as text: Partial<Record<DocType, number>> and Partial<Record<field, ProvStatus>>.
+  // JSON held as text. docs: Partial<Record<DocType, number>>. prov: a per-field
+  // confidence map, Partial<Record<field, { status: ProvStatus; source?: string }>>
+  // (legacy rows may hold a bare status string; the read model normalises both).
   docs: text("docs").notNull().default("{}"),
   prov: text("prov").notNull().default("{}"),
   ...timestamps,

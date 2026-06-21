@@ -16,6 +16,7 @@ import { z } from "zod";
 import { getDb } from "@/db/client";
 import { person, relationship } from "@/db/schema";
 import { provStatuses } from "./prov";
+import { parsePartialDate, serializePartialDate } from "./dates";
 import { indexPerson } from "./search/index-doc";
 
 export type CreatePersonResult =
@@ -56,13 +57,10 @@ const optionalText = z
   .nullable()
   .catch(null);
 
-/** "1990-01-01" / "c. 1915" → 1990 / 1915; anything without a 4-digit year → null. */
-const yearFromDate = z
+/** Canonical partial-date string ("YYYY" / "YYYY-MM" / "YYYY-MM-DD") → PartialDate, else null. */
+const partialDateFromString = z
   .string()
-  .transform((v) => {
-    const m = v.match(/\b(\d{4})\b/);
-    return m ? Number(m[1]) : null;
-  })
+  .transform((v) => parsePartialDate(v))
   .catch(null);
 
 const createPersonSchema = z.object({
@@ -70,9 +68,9 @@ const createPersonSchema = z.object({
   surname: z.string().trim().min(1, "A surname is required"),
   maiden: optionalText,
   sex: z.enum(["f", "m", "o"], { message: "Select a sex" }),
-  bornYear: yearFromDate,
+  birthDate: partialDateFromString,
   bornPlace: optionalText,
-  diedYear: yearFromDate,
+  deathDate: partialDateFromString,
   diedPlace: optionalText,
   living: z.boolean(),
   notes: optionalText,
@@ -88,7 +86,21 @@ const PROV_KEY_MAP: Record<string, string> = {
   deathPlace: "diedPlace",
 };
 
-const provInputSchema = z.record(z.string(), z.enum(provStatuses)).catch({});
+// The form serialises each mark as `{ status, source? }` (ProvenanceMark cites a
+// source when verified). Both status and source are persisted. Tolerate a bare
+// status string too, so older/simpler callers still work.
+const provStatusSchema = z.enum(provStatuses);
+const provFactInput = z.union([
+  provStatusSchema.transform((status) => ({ status, source: null as string | null })),
+  z.object({
+    status: provStatusSchema,
+    source: z
+      .string()
+      .nullish()
+      .transform((s) => s ?? null),
+  }),
+]);
+const provInputSchema = z.record(z.string(), provFactInput).catch({});
 
 function remapProv(raw: FormDataEntryValue | null): string {
   let parsed: unknown = {};
@@ -100,10 +112,10 @@ function remapProv(raw: FormDataEntryValue | null): string {
     }
   }
   const validated = provInputSchema.parse(parsed);
-  const out: Record<string, string> = {};
-  for (const [formKey, status] of Object.entries(validated)) {
+  const out: Record<string, { status: string; source: string | null }> = {};
+  for (const [formKey, fact] of Object.entries(validated)) {
     const domainKey = PROV_KEY_MAP[formKey];
-    if (domainKey) out[domainKey] = status;
+    if (domainKey) out[domainKey] = { status: fact.status, source: fact.source };
   }
   return JSON.stringify(out);
 }
@@ -203,47 +215,62 @@ async function persistRelationships(
   if (rows.length > 0) await db.insert(relationship).values(rows);
 }
 
-export async function createPerson(formData: FormData): Promise<CreatePersonResult> {
-  const parsed = createPersonSchema.safeParse({
+/** Pull the person fields out of the (uncontrolled) form, ready for Zod. */
+function personFieldsFromForm(formData: FormData) {
+  return {
     given: formData.get("given") ?? "",
     surname: formData.get("surname") ?? "",
     maiden: formData.get("maiden") ?? "",
     sex: formData.get("sex") ?? "",
-    bornYear: formData.get("birthDate") ?? "",
+    birthDate: formData.get("birthDate") ?? "",
     bornPlace: formData.get("birthPlace") ?? "",
-    diedYear: formData.get("deathDate") ?? "",
+    deathDate: formData.get("deathDate") ?? "",
     diedPlace: formData.get("deathPlace") ?? "",
     living: formData.get("living") === "on",
     notes: formData.get("notes") ?? "",
-  });
+  };
+}
 
-  if (!parsed.success) {
-    const errors: Record<string, string> = {};
-    for (const issue of parsed.error.issues) {
-      const key = String(issue.path[0] ?? "form");
-      // Map domain field names back to the form field they came from.
-      const formKey =
-        key === "bornYear" ? "birthDate" : key === "diedYear" ? "deathDate" : key;
-      if (!errors[formKey]) errors[formKey] = issue.message;
-    }
-    return { ok: false, errors };
+/** Turn a Zod failure into form-field-keyed messages the UI can render. */
+function mapPersonErrors(error: z.ZodError): Record<string, string> {
+  const errors: Record<string, string> = {};
+  for (const issue of error.issues) {
+    // Schema keys already match the form field names (only identity/sex fields
+    // can fail; dates and optional text never throw).
+    const key = String(issue.path[0] ?? "form");
+    if (!errors[key]) errors[key] = issue.message;
   }
+  return errors;
+}
+
+/** Map validated person data onto the `person` table's column shape. */
+function personColumns(data: z.infer<typeof createPersonSchema>) {
+  return {
+    given: data.given,
+    surname: data.surname,
+    maiden: data.maiden,
+    sex: data.sex,
+    bornYear: data.birthDate?.year ?? null,
+    bornDate: serializePartialDate(data.birthDate),
+    bornPlace: data.bornPlace,
+    diedYear: data.deathDate?.year ?? null,
+    diedDate: serializePartialDate(data.deathDate),
+    diedPlace: data.diedPlace,
+    living: data.living,
+    notes: data.notes,
+  };
+}
+
+export async function createPerson(formData: FormData): Promise<CreatePersonResult> {
+  const parsed = createPersonSchema.safeParse(personFieldsFromForm(formData));
+  if (!parsed.success) return { ok: false, errors: mapPersonErrors(parsed.error) };
 
   const id = randomUUID();
   const db = await getDb();
   const relationships = parseRelationships(formData.get("relationships"));
   await db.insert(person).values({
     id,
-    given: parsed.data.given,
-    surname: parsed.data.surname,
-    maiden: parsed.data.maiden,
-    sex: parsed.data.sex,
-    bornYear: parsed.data.bornYear,
-    bornPlace: parsed.data.bornPlace,
-    diedYear: parsed.data.diedYear,
-    diedPlace: parsed.data.diedPlace,
-    living: parsed.data.living,
-    notes: parsed.data.notes,
+    ...personColumns(parsed.data),
     docs: "{}",
     prov: remapProv(formData.get("prov")),
   });
@@ -257,6 +284,46 @@ export async function createPerson(formData: FormData): Promise<CreatePersonResu
     await indexPerson(db, id);
   } catch (err) {
     console.error("Failed to index new person for search:", err);
+  }
+
+  revalidatePath("/");
+  return { ok: true, id };
+}
+
+/**
+ * Update an existing person's own fields (identity, life events, notes,
+ * provenance) from the edit form. Relationships are *not* touched here — they're
+ * connected at create time and edited through their own flow — so this is a
+ * pure column update. `docs` is likewise left alone (it's a separate tally).
+ */
+export async function updatePerson(
+  id: string,
+  formData: FormData,
+): Promise<CreatePersonResult> {
+  if (!id) return { ok: false, errors: { form: "Missing the person to update." } };
+
+  const parsed = createPersonSchema.safeParse(personFieldsFromForm(formData));
+  if (!parsed.success) return { ok: false, errors: mapPersonErrors(parsed.error) };
+
+  const db = await getDb();
+  const updated = await db
+    .update(person)
+    .set({
+      ...personColumns(parsed.data),
+      prov: remapProv(formData.get("prov")),
+    })
+    .where(eq(person.id, id))
+    .returning({ id: person.id });
+
+  if (updated.length === 0) {
+    return { ok: false, errors: { form: "That person no longer exists." } };
+  }
+
+  // Best-effort re-index so edits to names/places/notes surface in search.
+  try {
+    await indexPerson(db, id);
+  } catch (err) {
+    console.error("Failed to re-index updated person for search:", err);
   }
 
   revalidatePath("/");

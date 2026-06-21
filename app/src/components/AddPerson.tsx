@@ -9,6 +9,7 @@ import {
   Card,
   Checkbox,
   Combobox,
+  DateField,
   Input,
   ProvenanceMark,
   RadioGroup,
@@ -16,10 +17,11 @@ import {
   Switch,
   Textarea,
 } from "@family-archive/ui";
-import type { ProvenanceStatus } from "@family-archive/ui";
-import { fullName, lifeDates, sourceOptions } from "@/lib/family-data";
+import type { ProvenanceStatus, PartialDate } from "@family-archive/ui";
+import { fullName, lifeDates, sourceOptions, type Person } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
-import { createPerson, type RelationDraft } from "@/lib/actions";
+import { serializePartialDate } from "@/lib/dates";
+import { createPerson, updatePerson, type RelationDraft } from "@/lib/actions";
 import { Icon } from "./Icon";
 import type { Screen } from "./AppShell";
 
@@ -104,16 +106,43 @@ function RelRow({
   );
 }
 
+// The read model keys provenance by domain field; the form keys it by UI field.
+// Inverse of actions.ts PROV_KEY_MAP — used to seed the marks when editing.
+const PROV_DOMAIN_TO_FORM: Record<string, string> = {
+  born: "birthDate",
+  bornPlace: "birthPlace",
+  died: "deathDate",
+  diedPlace: "deathPlace",
+};
+
+/** Seed the form's provenance state from a stored person's recorded confidences. */
+function initialProv(person: Person | null): Record<string, ProvState> {
+  if (!person?.prov) return {};
+  const out: Record<string, ProvState> = {};
+  for (const [domainKey, fact] of Object.entries(person.prov)) {
+    const formKey = PROV_DOMAIN_TO_FORM[domainKey];
+    if (formKey && fact) out[formKey] = { status: fact.status, source: fact.source ?? undefined };
+  }
+  return out;
+}
+
 export function AddPerson({
+  editId,
   onNavigate,
   onToast,
 }: {
+  /** When set, edit this existing person instead of adding a new one. */
+  editId?: string | null;
   onNavigate: (screen: Screen, personId?: string) => void;
   onToast: (message: string) => void;
 }) {
   const { media, people } = useDataset();
   const router = useRouter();
-  const [prov, setProv] = useState<Record<string, ProvState>>({});
+  const person = editId ? people[editId] ?? null : null;
+  const isEdit = Boolean(editId);
+  const [prov, setProv] = useState<Record<string, ProvState>>(() => initialProv(person));
+  const [bornDate, setBornDate] = useState<PartialDate | null>(person?.bornDate ?? null);
+  const [diedDate, setDiedDate] = useState<PartialDate | null>(person?.diedDate ?? null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [rels, setRels] = useState<RelRowState[]>(() => [
     newRelRow("parent"),
@@ -151,10 +180,13 @@ export function AddPerson({
 
   const handleSubmit = (formData: FormData) =>
     startTransition(async () => {
-      const result = await createPerson(formData);
+      const result =
+        isEdit && person
+          ? await updatePerson(person.id, formData)
+          : await createPerson(formData);
       if (result.ok) {
         setErrors({});
-        onToast("Person saved to the family archive");
+        onToast(isEdit ? "Changes saved to the record" : "Person saved to the family archive");
         router.refresh();
         onNavigate("person", result.id);
       } else {
@@ -162,37 +194,73 @@ export function AddPerson({
       }
     });
 
+  // A field label with its confidence mark inline — shared by the text fields and
+  // the precision-aware date fields so every fact carries its provenance.
+  const provLabel = (label: string, k: string) => (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+      {label}
+      <ProvenanceMark
+        status={stOf(k)}
+        sources={sources}
+        onChange={(status, source) => setP(k, status, source)}
+        size={13}
+      />
+    </span>
+  );
+
   const ProvField = ({
     label,
     placeholder,
     k,
     required,
+    defaultValue,
   }: {
     label: string;
     placeholder: string;
     k: string;
     required?: boolean;
+    defaultValue?: string;
   }) => (
     <div style={{ flex: 1 }}>
       <Input
         name={k}
         placeholder={placeholder}
         required={required}
+        defaultValue={defaultValue}
         error={errors[k]}
-        label={
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-            {label}
-            <ProvenanceMark
-              status={stOf(k)}
-              sources={sources}
-              onChange={(status, source) => setP(k, status, source)}
-              size={13}
-            />
-          </span>
-        }
+        label={provLabel(label, k)}
       />
     </div>
   );
+
+  // Edit was requested for someone who isn't in the current dataset (stale link,
+  // or deleted in another tab). Don't render a blank "add" form under an "edit"
+  // heading — that would silently create a duplicate on save.
+  if (isEdit && !person) {
+    return (
+      <div
+        className="app-scroll"
+        style={{ height: "100%", overflow: "auto", padding: "var(--space-xl) var(--space-2xl) var(--space-4xl)" }}
+      >
+        <div style={{ maxWidth: 1000, margin: "0 auto" }}>
+          <div style={{ marginBottom: "var(--space-md)" }}>
+            <Breadcrumb
+              items={[
+                { label: "Family tree", onClick: () => onNavigate("explorer") },
+                { label: "Edit a person" },
+              ]}
+            />
+          </div>
+          <div className="app-muted" style={{ fontSize: "var(--text-body)" }}>
+            That person’s record could not be found. They may have been removed.{" "}
+            <Button variant="ghost" size="sm" onClick={() => onNavigate("explorer")}>
+              Back to the family tree
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -204,20 +272,45 @@ export function AddPerson({
           <Breadcrumb
             items={[
               { label: "Family tree", onClick: () => onNavigate("explorer") },
-              { label: "Add a person" },
+              { label: isEdit ? "Edit a person" : "Add a person" },
             ]}
           />
         </div>
         <div className="app-display" style={{ fontSize: "var(--text-display)", marginBottom: 4 }}>
-          Add a person
+          {isEdit && person ? `Edit ${fullName(person)}` : "Add a person"}
         </div>
         <div className="app-muted" style={{ fontSize: "var(--text-body)", marginBottom: "var(--space-xl)", maxWidth: "60ch" }}>
-          Records are sacred — fill what you know, leave the rest blank. Nothing is published outside the family.
+          {isEdit
+            ? "Update what the family knows. Tap a confidence mark to record how sure you are; leave blanks where the record is silent."
+            : "Records are sacred — fill what you know, leave the rest blank. Nothing is published outside the family."}
         </div>
 
         <form className="app-form-grid" action={handleSubmit}>
           <input type="hidden" name="prov" value={JSON.stringify(prov)} />
-          <input type="hidden" name="relationships" value={JSON.stringify(relationships)} />
+          <input type="hidden" name="birthDate" value={serializePartialDate(bornDate) ?? ""} />
+          <input type="hidden" name="deathDate" value={serializePartialDate(diedDate) ?? ""} />
+          {!isEdit && (
+            <input type="hidden" name="relationships" value={JSON.stringify(relationships)} />
+          )}
+          {errors.form && (
+            <div
+              role="alert"
+              style={{
+                gridColumn: "1 / -1",
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--space-sm)",
+                padding: "var(--space-md)",
+                borderRadius: "var(--radius-md)",
+                background: "var(--color-danger-tint)",
+                color: "var(--color-danger)",
+                fontSize: "var(--text-body-sm)",
+              }}
+            >
+              <Icon name="alert" size={16} />
+              <span>{errors.form}</span>
+            </div>
+          )}
           <div style={{ display: "grid", gap: "var(--space-xl)" }}>
             <Card title="Identity">
               <div className="app-muted" style={{ fontSize: "var(--text-body-sm)", marginBottom: "var(--space-md)" }}>
@@ -225,13 +318,13 @@ export function AddPerson({
               </div>
               <div style={{ display: "grid", gap: "var(--space-lg)" }}>
                 <div className="app-field-row">
-                  <ProvField label="Given names" placeholder="e.g. Eleanor Margaret" k="given" required />
-                  <ProvField label="Surname" placeholder="e.g. Clarke" k="surname" required />
+                  <ProvField label="Given names" placeholder="e.g. Eleanor Margaret" k="given" required defaultValue={person?.given} />
+                  <ProvField label="Surname" placeholder="e.g. Clarke" k="surname" required defaultValue={person?.surname} />
                 </div>
                 <div className="app-field-row" style={{ alignItems: "flex-end" }}>
-                  <ProvField label="Maiden name (optional)" placeholder="e.g. Hartley" k="maiden" />
+                  <ProvField label="Maiden name (optional)" placeholder="e.g. Hartley" k="maiden" defaultValue={person?.maiden ?? undefined} />
                   <div style={{ width: 160, flex: "none" }}>
-                    <Select label="Sex" name="sex" defaultValue="" required error={errors.sex}>
+                    <Select label="Sex" name="sex" defaultValue={person?.sex ?? ""} required error={errors.sex}>
                       <option value="">—</option>
                       <option value="f">Female</option>
                       <option value="m">Male</option>
@@ -243,6 +336,7 @@ export function AddPerson({
                   name="living"
                   label="Living person"
                   description="Hides sensitive details (certificates, exact dates) from non-curators."
+                  defaultChecked={person?.living ?? false}
                 />
               </div>
             </Card>
@@ -253,54 +347,78 @@ export function AddPerson({
                   <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
                     Birth
                   </div>
-                  <div className="app-field-row">
-                    <ProvField label="Date" placeholder="YYYY-MM-DD" k="birthDate" />
-                    <ProvField label="Place" placeholder="City, country" k="birthPlace" />
+                  <div className="app-field-row" style={{ alignItems: "flex-start" }}>
+                    <div style={{ flex: 1 }}>
+                      <DateField
+                        label={provLabel("Date", "birthDate")}
+                        hint="A year is enough — add the month or day if you know them."
+                        value={bornDate}
+                        onChange={setBornDate}
+                      />
+                    </div>
+                    <ProvField label="Place" placeholder="City, country" k="birthPlace" defaultValue={person?.bornPlace ?? undefined} />
                   </div>
                 </div>
                 <div>
                   <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
                     Death <span style={{ fontWeight: 400 }}>(if applicable)</span>
                   </div>
-                  <div className="app-field-row">
-                    <ProvField label="Date" placeholder="YYYY-MM-DD" k="deathDate" />
-                    <ProvField label="Place" placeholder="City, country" k="deathPlace" />
+                  <div className="app-field-row" style={{ alignItems: "flex-start" }}>
+                    <div style={{ flex: 1 }}>
+                      <DateField
+                        label={provLabel("Date", "deathDate")}
+                        value={diedDate}
+                        onChange={setDiedDate}
+                      />
+                    </div>
+                    <ProvField label="Place" placeholder="City, country" k="deathPlace" defaultValue={person?.diedPlace ?? undefined} />
                   </div>
                 </div>
               </div>
             </Card>
 
-            <Card title="Relationships">
-              <div className="app-muted" style={{ fontSize: "var(--text-body-sm)", marginBottom: "var(--space-md)" }}>
-                Connect this person to others already in the tree. Anyone left
-                unconnected waits in the “Unplaced” shelf until you link them.
-              </div>
-              <div style={{ display: "grid", gap: "var(--space-md)" }}>
-                {rels.map((row) => (
-                  <RelRow
-                    key={row.key}
-                    row={row}
-                    options={personOptions}
-                    onUpdate={(patch) => updateRel(row.key, patch)}
-                    onRemove={() => removeRel(row.key)}
-                  />
-                ))}
-                <div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    iconStart={<Icon name="plus" size={16} />}
-                    onClick={addRel}
-                  >
-                    Add relationship
-                  </Button>
+            {/* Relationships are wired up when first connecting a person. Editing
+                them safely (re-anchoring couples, the sibling→shared-parents
+                rule, removals) needs its own flow, so the edit form leaves them
+                untouched rather than faking an additive-only editor. */}
+            {!isEdit && (
+              <Card title="Relationships">
+                <div className="app-muted" style={{ fontSize: "var(--text-body-sm)", marginBottom: "var(--space-md)" }}>
+                  Connect this person to others already in the tree. Anyone left
+                  unconnected waits in the “Unplaced” shelf until you link them.
                 </div>
-              </div>
-            </Card>
+                <div style={{ display: "grid", gap: "var(--space-md)" }}>
+                  {rels.map((row) => (
+                    <RelRow
+                      key={row.key}
+                      row={row}
+                      options={personOptions}
+                      onUpdate={(patch) => updateRel(row.key, patch)}
+                      onRemove={() => removeRel(row.key)}
+                    />
+                  ))}
+                  <div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      iconStart={<Icon name="plus" size={16} />}
+                      onClick={addRel}
+                    >
+                      Add relationship
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )}
 
             <Card title="Notes">
-              <Textarea name="notes" rows={4} placeholder="Biography, anecdotes, sources to follow up…" />
+              <Textarea
+                name="notes"
+                rows={4}
+                placeholder="Biography, anecdotes, sources to follow up…"
+                defaultValue={person?.notes ?? undefined}
+              />
             </Card>
           </div>
 
@@ -334,7 +452,7 @@ export function AddPerson({
             <Card>
               <div style={{ display: "grid", gap: "var(--space-sm)" }}>
                 <Button type="submit" variant="primary" fullWidth loading={pending}>
-                  Save person
+                  {isEdit ? "Save changes" : "Save person"}
                 </Button>
                 <Button type="button" variant="secondary" fullWidth disabled={pending} onClick={() => onNavigate("explorer")}>
                   Cancel
