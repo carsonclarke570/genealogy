@@ -79,6 +79,9 @@ export type { SegmentedControlProps, SegmentItem } from "./components/SegmentedC
 export { MultiSelect } from "./components/MultiSelect";
 export type { MultiSelectProps, MultiSelectOption } from "./components/MultiSelect";
 
+export { Combobox } from "./components/Combobox";
+export type { ComboboxProps, ComboboxOption } from "./components/Combobox";
+
 export { Timeline, TimelineItem } from "./components/Timeline";
 export type { TimelineProps, TimelineItemProps } from "./components/Timeline";
 

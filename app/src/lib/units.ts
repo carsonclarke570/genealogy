@@ -3,9 +3,15 @@
  *
  * Pure (no DB / no server-only) so it can be unit-tested. A unit is anchored by
  * either a partnered person (a spouse row's personId — the blood-line side, by
- * the seed convention) or a child with no spouse; its `parent` links to the unit
- * anchored by one of the anchor's own parents. Siblings and children fall out of
- * those parent links downstream (see family-data.relationsOf / tree-layout).
+ * the seed convention) or any other person who appears in a relationship but
+ * isn't a couple's partner (a child, or a lone parent). The partner side of a
+ * couple renders inside its anchor's unit, so it gets no unit of its own. A
+ * unit's `parent` links to the unit anchored by one of the anchor's own
+ * parents. Siblings and children fall out of those parent links downstream
+ * (see family-data.relationsOf / tree-layout).
+ *
+ * The "every involved person gets placed" rule is what lets a freshly-connected
+ * person leave the Explorer's "unplaced" shelf no matter how they were linked.
  */
 import type { Unit } from "./family-data";
 
@@ -34,9 +40,24 @@ export function buildUnits(relationships: RelationshipEdge[]): Unit[] {
     partnered.add(r.relatedId);
   }
 
-  const anchors: string[] = [...spouses.map((r) => r.personId)];
-  for (const child of parentsOf.keys()) {
-    if (!partnered.has(child)) anchors.push(child);
+  // Anchors: the personId side of every couple, plus every other person who
+  // appears in any relationship and isn't a couple's partner. The partner side
+  // (a spouse row's relatedId) is drawn inside its anchor's unit, so it never
+  // anchors one of its own.
+  const partnerSide = new Set(spouses.map((r) => r.relatedId));
+  const anchors: string[] = [];
+  const seen = new Set<string>();
+  const consider = (id: string) => {
+    if (seen.has(id)) return;
+    // A partner that doesn't also anchor its own couple renders via that couple.
+    if (partnerSide.has(id) && !partnerOf.has(id)) return;
+    seen.add(id);
+    anchors.push(id);
+  };
+  for (const r of spouses) consider(r.personId);
+  for (const r of parentEdges) {
+    consider(r.personId); // a parent
+    consider(r.relatedId); // their child
   }
   const anchorSet = new Set(anchors);
   const unitId = (anchor: string) => `u_${anchor}`;
