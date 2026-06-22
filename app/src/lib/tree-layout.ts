@@ -222,24 +222,79 @@ function seedOrder(
   return rows;
 }
 
-/** Pull same-gen partners of a union next to each other within a row. */
-function gluePartners(graph: FamilyGraph, row: string[], gen: Record<string, number>): string[] {
+/**
+ * Block id for a person within their row. Full siblings (everyone sharing a
+ * child-union) get the same id, so they form one atomic block; everyone else is
+ * their own singleton block. Keeping a block contiguous is what stops two
+ * sibling sets from interleaving at the same generation.
+ */
+function blockKey(graph: FamilyGraph, p: string): string {
+  const u = graph.childUnion[p];
+  return u ? "u:" + u : "s:" + p;
+}
+
+/**
+ * Order one generation row. Sibling sets stay contiguous — each child-union is
+ * an atomic block, blocks ordered by their mean barycenter — and couples are
+ * pulled to a block boundary so partners sit adjacent without splitting either
+ * sibling set (the old behaviour glued partners individually, which tore a
+ * sibling group apart when one child married into another group).
+ */
+function arrangeRow(
+  graph: FamilyGraph,
+  row: string[],
+  bary: Record<string, number>,
+  members: Set<string>,
+  cmp: (a: string, b: string) => number,
+): string[] {
   const inRow = new Set(row);
-  const out: string[] = [];
-  const placed = new Set<string>();
+  const partnersHere = (p: string) => partnersInRow(graph, p, members).filter((q) => inRow.has(q));
+
+  // partition into blocks (first-seen order), members sorted within a block.
+  const blocks = new Map<string, string[]>();
   for (const p of row) {
-    if (placed.has(p)) continue;
-    out.push(p);
-    placed.add(p);
-    for (const uid of graph.partnerUnions[p] ?? []) {
-      for (const q of graph.unionById[uid].partners) {
-        if (q !== p && inRow.has(q) && !placed.has(q) && gen[q] === gen[p]) {
-          out.push(q);
-          placed.add(q);
-        }
+    const k = blockKey(graph, p);
+    const arr = blocks.get(k);
+    if (arr) arr.push(p);
+    else blocks.set(k, [p]);
+  }
+  for (const arr of blocks.values()) arr.sort((a, b) => bary[a] - bary[b] || cmp(a, b));
+
+  const blockBary = (k: string) => {
+    const m = blocks.get(k)!;
+    return m.reduce((s, p) => s + bary[p], 0) / m.length;
+  };
+  const orderedKeys = [...blocks.keys()].sort((a, b) => blockBary(a) - blockBary(b) || (a < b ? -1 : 1));
+
+  // Walk blocks in barycenter order; after emitting one, pull any block holding
+  // a partner of its members adjacent, oriented so the partners touch.
+  const placed = new Set<string>();
+  const out: string[] = [];
+  const emit = (k: string, leftMember?: string) => {
+    if (placed.has(k)) return;
+    placed.add(k);
+    const hasOpenPartner = (p: string) =>
+      partnersHere(p).some((q) => {
+        const kq = blockKey(graph, q);
+        return kq !== k && !placed.has(kq);
+      });
+    const m = [...blocks.get(k)!].sort((a, b) => {
+      if (a === leftMember) return -1; // adjacent to the previous block → left edge
+      if (b === leftMember) return 1;
+      const pa = hasOpenPartner(a) ? 1 : 0; // partnered-out members → right edge
+      const pb = hasOpenPartner(b) ? 1 : 0;
+      if (pa !== pb) return pa - pb;
+      return bary[a] - bary[b] || cmp(a, b);
+    });
+    out.push(...m);
+    for (let i = m.length - 1; i >= 0; i--) {
+      for (const q of partnersHere(m[i])) {
+        const kq = blockKey(graph, q);
+        if (kq !== k && !placed.has(kq)) emit(kq, q);
       }
     }
-  }
+  };
+  for (const k of orderedKeys) emit(k);
   return out;
 }
 
@@ -343,8 +398,7 @@ export function compute(
           );
           bary[p] = b ?? (rowLen[g] > 1 ? rankOf[p] / (rowLen[g] - 1) : 0.5);
         }
-        rows[g] = [...rows[g]].sort((a, b) => bary[a] - bary[b] || cmp(a, b));
-        rows[g] = gluePartners(graph, rows[g], gen);
+        rows[g] = arrangeRow(graph, rows[g], bary, members, cmp);
         reindex();
       }
     }
