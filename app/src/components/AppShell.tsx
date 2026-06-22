@@ -42,7 +42,14 @@ const TITLES: Record<Screen, string> = {
 
 export function AppShell({ data }: { data: Dataset }) {
   const [route, setRoute] = useState<Route>({ screen: "explorer", personId: "eleanor", editId: null });
-  const [focusId, setFocusId] = useState<string | null>(null);
+  // Explorer focus is a navigation stack so the fog-of-war view has a "back".
+  const [focusStack, setFocusStack] = useState<string[]>([]);
+  const focusId = focusStack.length ? focusStack[focusStack.length - 1] : null;
+  const pushFocus = (id: string | null) =>
+    id === null
+      ? setFocusStack([]) // closing the panel clears the trail
+      : setFocusStack((s) => (s[s.length - 1] === id ? s : [...s, id]));
+  const popFocus = () => setFocusStack((s) => s.slice(0, -1));
   const [layout, setLayout] = useState<TreeMode>("vertical");
   const [theme, setThemeState] = useState<Theme>("light");
   const [toast, setToast] = useState<string | null>(null);
@@ -148,7 +155,9 @@ export function AppShell({ data }: { data: Dataset }) {
               layout={layout}
               setLayout={setLayout}
               focusId={focusId}
-              setFocusId={setFocusId}
+              setFocusId={pushFocus}
+              onBack={popFocus}
+              focusTrail={focusStack}
               onOpen={openPerson}
             />
           )}
