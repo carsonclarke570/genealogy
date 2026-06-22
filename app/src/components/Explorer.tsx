@@ -17,12 +17,12 @@ import {
   provOf,
   provSummary,
   relationsOf,
-  type Unit,
 } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import {
   compute,
   lineage,
+  countGenerations,
   type TreeMode,
   type TreeEdge,
 } from "@/lib/tree-layout";
@@ -51,13 +51,19 @@ function Tree({
   onFocus: (id: string) => void;
   controlsRef: React.MutableRefObject<TreeControls | null>;
 }) {
-  const { people, units } = useDataset();
+  const { people, graph } = useDataset();
   const wrapRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View>({ tx: 0, ty: 0, k: 1 });
   const drag = useRef<{ x: number; y: number; tx: number; ty: number; moved: boolean } | null>(null);
 
-  const layout = useMemo(() => compute(units, mode), [units, mode]);
-  const lin = useMemo(() => (focusId ? lineage(units, focusId) : null), [units, focusId]);
+  // Birth years give siblings a natural left-to-right order in the layout.
+  const bornOf = useMemo(() => {
+    const m: Record<string, number | null> = {};
+    for (const p of Object.values(people)) m[p.id] = p.born;
+    return m;
+  }, [people]);
+  const layout = useMemo(() => compute(graph, mode, bornOf), [graph, mode, bornOf]);
+  const lin = useMemo(() => (focusId ? lineage(graph, focusId) : null), [graph, focusId]);
   const b = layout.bounds;
   const worldW = b.maxX - b.minX;
   const worldH = b.maxY - b.minY;
@@ -133,27 +139,31 @@ function Tree({
     drag.current = null;
   };
 
-  function parentPath(e: Extract<TreeEdge, { kind: "parent" }>) {
-    const fx = e.from.x + ox;
-    const fy = e.from.y + oy;
-    const tx = e.to.x + ox;
-    const ty = e.to.y + oy;
+  // An orthogonal connector between two points (parent-union anchor → child, or
+  // a cross-generation spouse link). Vertical mode steps down; horizontal across.
+  function elbow(from: { x: number; y: number }, to: { x: number; y: number }) {
+    const fx = from.x + ox;
+    const fy = from.y + oy;
+    const tx = to.x + ox;
+    const ty = to.y + oy;
     if (mode === "vertical") {
       const my = (fy + ty) / 2;
       return `M ${fx} ${fy} V ${my} H ${tx} V ${ty}`;
     }
-    if (mode === "horizontal") {
-      const mx = (fx + tx) / 2;
-      return `M ${fx} ${fy} H ${mx} V ${ty} H ${tx}`;
-    }
-    return `M ${fx} ${fy} L ${tx} ${ty}`;
+    const mx = (fx + tx) / 2;
+    return `M ${fx} ${fy} H ${mx} V ${ty} H ${tx}`;
   }
 
   const edgeActive = (e: TreeEdge) => {
     if (!lin) return false;
-    if (e.kind === "spouse") return lin.units.has(e.unitId);
-    return lin.units.has(e.childUnit) && lin.units.has(e.parentUnit);
+    if (e.kind === "spouse") return lin.unions.has(e.union);
+    return lin.unions.has(e.union) && lin.people.has(e.child);
   };
+
+  // A spouse connector is a straight line when partners share a row, and an
+  // elbow when a cross-generation marriage puts them on different rows.
+  const spouseAligned = (e: Extract<TreeEdge, { kind: "spouse" }>) =>
+    mode === "vertical" ? e.a.y === e.b.y : e.a.x === e.b.x;
 
   return (
     <div
@@ -185,24 +195,38 @@ function Tree({
             const sw = active ? 2 : 1.5;
             if (e.kind === "spouse") {
               const dash = e.rel === "divorced" ? "4 3" : undefined;
+              if (spouseAligned(e)) {
+                return (
+                  <line
+                    key={i}
+                    x1={e.a.x + ox}
+                    y1={e.a.y + oy}
+                    x2={e.b.x + ox}
+                    y2={e.b.y + oy}
+                    stroke={stroke}
+                    strokeWidth={sw}
+                    strokeDasharray={dash}
+                    strokeLinecap="round"
+                  />
+                );
+              }
               return (
-                <line
+                <path
                   key={i}
-                  x1={e.a.x + ox}
-                  y1={e.a.y + oy}
-                  x2={e.b.x + ox}
-                  y2={e.b.y + oy}
+                  d={elbow(e.a, e.b)}
+                  fill="none"
                   stroke={stroke}
                   strokeWidth={sw}
                   strokeDasharray={dash}
                   strokeLinecap="round"
+                  strokeLinejoin="round"
                 />
               );
             }
             return (
               <path
                 key={i}
-                d={parentPath(e)}
+                d={elbow(e.from, e.to)}
                 fill="none"
                 stroke={stroke}
                 strokeWidth={sw}
@@ -277,9 +301,9 @@ function Peek({
   onOpen: (id: string, mode?: "edit") => void;
   onFocusRelative: (id: string) => void;
 }) {
-  const { people, units } = useDataset();
+  const { people, graph } = useDataset();
   const p = people[id];
-  const rel = relationsOf(units, id);
+  const rel = relationsOf(graph, id);
   const Section = ({ title, items }: { title: string; items: { id: string; rel?: string }[] }) =>
     items.length ? (
       <div style={{ marginTop: "var(--space-lg)" }}>
@@ -367,8 +391,8 @@ function Peek({
  * recorded relationship, so the layout produces no node for them. Rather than
  * float them as lone "root" nodes (which would imply a generation we don't
  * know), they live in a quiet, collapsible shelf docked at the bottom of the
- * canvas. Opening one focuses it (and, once relationships can be edited, this is
- * where you'd connect them into a tree).
+ * canvas. Opening one focuses it; its Edit form is where you connect it into the
+ * tree (adding any relationship moves it off the shelf onto the canvas).
  */
 function UnplacedShelf({
   ids,
@@ -448,42 +472,20 @@ export function Explorer({
   onOpen: (id: string, mode?: "edit") => void;
 }) {
   const controls = useRef<TreeControls | null>(null);
-  const { people, units } = useDataset();
+  const { people, graph } = useDataset();
   const opts: [TreeMode, string][] = [
     ["vertical", "Vertical"],
     ["horizontal", "Horizontal"],
-    ["radial", "Radial"],
   ];
 
-  // People the canvas can't draw: those represented by no unit (no recorded
-  // relationship). Mirrors the layout's node membership, mode-independent.
+  // People the canvas can't draw: those in no relationship, so the graph never
+  // places them. Mode-independent — mirrors the layout's node membership.
   const unplaced = useMemo(() => {
-    const placed = new Set<string>();
-    for (const u of units) {
-      placed.add(u.anchor);
-      if (u.partner) placed.add(u.partner);
-    }
+    const placed = new Set(graph.placed);
     return Object.keys(people).filter((id) => !placed.has(id));
-  }, [people, units]);
+  }, [people, graph]);
 
-  // Tree depth: each unit's generation is its distance from a parentless root,
-  // so the count is the deepest chain + 1. Mode-independent; mirrors the
-  // layout's `place` recursion.
-  const generations = useMemo(() => {
-    const byId: Record<string, Unit> = {};
-    for (const u of units) byId[u.id] = u;
-    const depthCache: Record<string, number> = {};
-    const depthOf = (id: string): number => {
-      if (id in depthCache) return depthCache[id];
-      const u = byId[id];
-      const d = u && u.parent && byId[u.parent] ? depthOf(u.parent) + 1 : 0;
-      depthCache[id] = d;
-      return d;
-    };
-    let max = -1;
-    for (const u of units) max = Math.max(max, depthOf(u.id));
-    return max + 1;
-  }, [units]);
+  const generations = useMemo(() => countGenerations(graph), [graph]);
 
   const personCount = Object.keys(people).length;
 

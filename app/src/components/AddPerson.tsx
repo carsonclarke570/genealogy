@@ -18,11 +18,12 @@ import {
   Textarea,
 } from "@family-archive/ui";
 import type { ProvenanceStatus, PartialDate } from "@family-archive/ui";
-import { fullName, lifeDates, sourceOptions, type Person } from "@/lib/family-data";
+import { fullName, lifeDates, relationsOf, sourceOptions, type Person } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import { serializePartialDate } from "@/lib/dates";
-import { createPerson, updatePerson, type RelationDraft } from "@/lib/actions";
+import { createPerson, updatePerson, type RelationDraft, type RelationOp } from "@/lib/actions";
 import { Icon } from "./Icon";
+import { MiniNode } from "./shared";
 import type { Screen } from "./AppShell";
 
 interface ProvState {
@@ -136,7 +137,7 @@ export function AddPerson({
   onNavigate: (screen: Screen, personId?: string) => void;
   onToast: (message: string) => void;
 }) {
-  const { media, people } = useDataset();
+  const { media, people, graph, relationships } = useDataset();
   const router = useRouter();
   const person = editId ? people[editId] ?? null : null;
   const isEdit = Boolean(editId);
@@ -144,17 +145,20 @@ export function AddPerson({
   const [bornDate, setBornDate] = useState<PartialDate | null>(person?.bornDate ?? null);
   const [diedDate, setDiedDate] = useState<PartialDate | null>(person?.diedDate ?? null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [rels, setRels] = useState<RelRowState[]>(() => [
-    newRelRow("parent"),
-    newRelRow("spouse"),
-  ]);
+  // Editing starts with a blank slate (you add connections as needed); adding a
+  // brand-new person pre-seeds the two most common links to fill in.
+  const [rels, setRels] = useState<RelRowState[]>(() =>
+    editId ? [] : [newRelRow("parent"), newRelRow("spouse")],
+  );
   const [pending, startTransition] = useTransition();
   const sources = sourceOptions(media);
 
-  // Everyone already in the archive is a candidate to connect to.
+  // Everyone already in the archive is a candidate to connect to — except the
+  // person being edited (you can't relate someone to themselves).
   const personOptions = useMemo(
     () =>
       Object.values(people)
+        .filter((p) => p.id !== editId)
         .map((p) => ({
           value: p.id,
           label: fullName(p),
@@ -162,8 +166,41 @@ export function AddPerson({
           leading: <Avatar name={fullName(p)} size="sm" />,
         }))
         .sort((a, b) => a.label.localeCompare(b.label)),
-    [people],
+    [people, editId],
   );
+
+  // Direct relationship edges this person has, each tied to the raw edge id so it
+  // can be removed. Siblings aren't edges (they're derived from shared parents),
+  // so they're shown separately as read-only context below.
+  const editableRels = useMemo(() => {
+    if (!editId) return [];
+    const out: { edgeId: string; label: string; otherId: string }[] = [];
+    for (const r of relationships) {
+      if (r.kind === "spouse" && (r.personId === editId || r.relatedId === editId)) {
+        out.push({ edgeId: r.id, label: "Spouse", otherId: r.personId === editId ? r.relatedId : r.personId });
+      } else if (r.kind === "parent" && r.relatedId === editId) {
+        out.push({ edgeId: r.id, label: "Parent", otherId: r.personId });
+      } else if (r.kind === "parent" && r.personId === editId) {
+        out.push({ edgeId: r.id, label: "Child", otherId: r.relatedId });
+      }
+    }
+    return out.sort((a, b) => a.label.localeCompare(b.label));
+  }, [relationships, editId]);
+
+  const siblings = useMemo(
+    () => (editId ? relationsOf(graph, editId).siblings : []),
+    [graph, editId],
+  );
+
+  // Edges marked for removal (applied on Save). Toggle with the × / Undo control.
+  const [removedEdges, setRemovedEdges] = useState<Set<string>>(() => new Set());
+  const toggleRemove = (edgeId: string) =>
+    setRemovedEdges((s) => {
+      const next = new Set(s);
+      next.has(edgeId) ? next.delete(edgeId) : next.add(edgeId);
+      return next;
+    });
+  const relationshipOps: RelationOp[] = [...removedEdges].map((id) => ({ op: "remove", id }));
 
   const updateRel = (key: string, patch: Partial<RelRowState>) =>
     setRels((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
@@ -171,7 +208,7 @@ export function AddPerson({
   const addRel = () => setRels((rs) => [...rs, newRelRow("parent")]);
 
   // Only rows with a person chosen are submitted.
-  const relationships: RelationDraft[] = rels
+  const relationDrafts: RelationDraft[] = rels
     .filter((r) => r.personId)
     .map((r) => ({ type: r.type, personId: r.personId! }));
   const stOf = (k: string): ProvenanceStatus => prov[k]?.status ?? "unverified";
@@ -289,9 +326,8 @@ export function AddPerson({
           <input type="hidden" name="prov" value={JSON.stringify(prov)} />
           <input type="hidden" name="birthDate" value={serializePartialDate(bornDate) ?? ""} />
           <input type="hidden" name="deathDate" value={serializePartialDate(diedDate) ?? ""} />
-          {!isEdit && (
-            <input type="hidden" name="relationships" value={JSON.stringify(relationships)} />
-          )}
+          <input type="hidden" name="relationships" value={JSON.stringify(relationDrafts)} />
+          <input type="hidden" name="relationshipOps" value={JSON.stringify(relationshipOps)} />
           {errors.form && (
             <div
               role="alert"
@@ -377,40 +413,88 @@ export function AddPerson({
               </div>
             </Card>
 
-            {/* Relationships are wired up when first connecting a person. Editing
-                them safely (re-anchoring couples, the sibling→shared-parents
-                rule, removals) needs its own flow, so the edit form leaves them
-                untouched rather than faking an additive-only editor. */}
-            {!isEdit && (
-              <Card title="Relationships">
-                <div className="app-muted" style={{ fontSize: "var(--text-body-sm)", marginBottom: "var(--space-md)" }}>
-                  Connect this person to others already in the tree. Anyone left
-                  unconnected waits in the “Unplaced” shelf until you link them.
-                </div>
-                <div style={{ display: "grid", gap: "var(--space-md)" }}>
-                  {rels.map((row) => (
-                    <RelRow
-                      key={row.key}
-                      row={row}
-                      options={personOptions}
-                      onUpdate={(patch) => updateRel(row.key, patch)}
-                      onRemove={() => removeRel(row.key)}
-                    />
-                  ))}
-                  <div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      iconStart={<Icon name="plus" size={16} />}
-                      onClick={addRel}
-                    >
-                      Add relationship
-                    </Button>
+            {/* Editing relationships: remove existing links (the × toggles a
+                mark applied on Save) and/or add new ones. Siblings aren't edges
+                — they fall out of shared parents — so they're shown read-only;
+                remove a parent link to change them. */}
+            <Card title="Relationships">
+              <div className="app-muted" style={{ fontSize: "var(--text-body-sm)", marginBottom: "var(--space-md)" }}>
+                {isEdit
+                  ? "Add or remove connections to others in the tree. Linking someone places them on the canvas; removing their last link returns them to the “Unplaced” shelf."
+                  : "Connect this person to others already in the tree. Anyone left unconnected waits in the “Unplaced” shelf until you link them."}
+              </div>
+              {isEdit && editableRels.length > 0 && (
+                <div style={{ marginBottom: "var(--space-lg)" }}>
+                  <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
+                    Current connections
                   </div>
+                  <div style={{ display: "grid", gap: "var(--space-sm)" }}>
+                    {editableRels.map((r) => {
+                      const marked = removedEdges.has(r.edgeId);
+                      return (
+                        <div
+                          key={r.edgeId}
+                          style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}
+                        >
+                          <div
+                            style={{
+                              flex: 1,
+                              minWidth: 0,
+                              opacity: marked ? 0.45 : 1,
+                              textDecoration: marked ? "line-through" : "none",
+                            }}
+                          >
+                            <MiniNode id={r.otherId} rel={r.label} />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            iconStart={marked ? undefined : <Icon name="close" size={16} />}
+                            aria-label={marked ? "Keep relationship" : "Remove relationship"}
+                            onClick={() => toggleRemove(r.edgeId)}
+                          >
+                            {marked ? "Undo" : ""}
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {siblings.length > 0 && (
+                    <div className="app-muted" style={{ fontSize: "var(--text-label)", marginTop: "var(--space-sm)" }}>
+                      Siblings (via shared parents):{" "}
+                      {siblings.map((s) => people[s.id]?.given.split(" ")[0] ?? s.id).join(", ")}. Remove a
+                      shared parent link to change them.
+                    </div>
+                  )}
                 </div>
-              </Card>
-            )}
+              )}
+              <div style={{ display: "grid", gap: "var(--space-md)" }}>
+                {isEdit && editableRels.length > 0 && (
+                  <div className="app-label">Add a connection</div>
+                )}
+                {rels.map((row) => (
+                  <RelRow
+                    key={row.key}
+                    row={row}
+                    options={personOptions}
+                    onUpdate={(patch) => updateRel(row.key, patch)}
+                    onRemove={() => removeRel(row.key)}
+                  />
+                ))}
+                <div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    iconStart={<Icon name="plus" size={16} />}
+                    onClick={addRel}
+                  >
+                    Add relationship
+                  </Button>
+                </div>
+              </div>
+            </Card>
 
             <Card title="Notes">
               <Textarea

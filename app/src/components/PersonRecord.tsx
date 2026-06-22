@@ -56,7 +56,7 @@ export function PersonRecord({
   onOpen: (id: string, mode?: "edit") => void;
   onNavigate: (screen: Screen) => void;
 }) {
-  const { people, media: allMedia, units } = useDataset();
+  const { people, media: allMedia, graph } = useDataset();
   const p = people[id];
   const [docFilter, setDocFilter] = useState<string>("all");
 
@@ -77,7 +77,7 @@ export function PersonRecord({
     );
   }
 
-  const rel = relationsOf(units, id);
+  const rel = relationsOf(graph, id);
   const media = allMedia.filter((m) => m.people.includes(id));
 
   const summary = provSummary(p);
