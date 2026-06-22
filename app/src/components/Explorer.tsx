@@ -17,6 +17,7 @@ import {
   provOf,
   provSummary,
   relationsOf,
+  placeAndYear,
 } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import {
@@ -251,8 +252,8 @@ function Tree({
             >
               <PersonNode
                 name={shortName(p)}
-                birth={String(p.born)}
-                death={p.living ? undefined : String(p.died)}
+                birth={p.born != null ? String(p.born) : undefined}
+                death={p.living || p.died == null ? undefined : String(p.died)}
                 living={p.living}
                 focused={isFocus}
                 inPath={inPath}
@@ -351,9 +352,7 @@ function Peek({
           <span className="app-muted" style={{ width: 48, flex: "none" }}>
             Born
           </span>
-          <span>
-            {p.born} · {p.bornPlace}
-          </span>
+          <span>{placeAndYear(p.born, p.bornPlace)}</span>
           <ProvenanceMark status={provOf(p, "born")} />
         </div>
         {!p.living && (
@@ -361,9 +360,7 @@ function Peek({
             <span className="app-muted" style={{ width: 48, flex: "none" }}>
               Died
             </span>
-            <span>
-              {p.died} · {p.diedPlace}
-            </span>
+            <span>{placeAndYear(p.died, p.diedPlace)}</span>
             <ProvenanceMark status={provOf(p, "died")} />
           </div>
         )}

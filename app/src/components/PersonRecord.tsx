@@ -35,12 +35,36 @@ import type { Screen } from "./AppShell";
 
 function bioParas(p: Person): string[] {
   const name = p.given.split(" ")[0];
-  const born = `${name} was born in ${p.bornPlace} in ${p.born}`;
-  const end = p.living ? " and is living." : `, and died in ${p.diedPlace} in ${p.died}.`;
+  // Build each clause only from facts that are actually recorded, so a sparse
+  // record never reads "born in null in null".
+  const birthBits = [
+    p.bornPlace ? `in ${p.bornPlace}` : null,
+    p.born != null ? `in ${p.born}` : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const deathBits = [
+    p.diedPlace ? `in ${p.diedPlace}` : null,
+    p.died != null ? `in ${p.died}` : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  let first: string;
+  if (birthBits && (p.living || deathBits)) {
+    first = `${name} was born ${birthBits}, ${p.living ? "and is living" : `and died ${deathBits}`}.`;
+  } else if (birthBits) {
+    first = `${name} was born ${birthBits}.`;
+  } else if (p.living) {
+    first = `${name} is living.`;
+  } else if (deathBits) {
+    first = `${name} died ${deathBits}.`;
+  } else {
+    first = `${name}'s biographical details haven't been recorded yet.`;
+  }
   const second = p.maiden
     ? `Recorded under the family name ${p.surname} (née ${p.maiden}), ${name} appears across several family photographs and certificates in the archive.`
     : `${name}'s record draws on the photographs, certificates and articles attached below.`;
-  return [born + end, second];
+  return [first, second];
 }
 
 function sourceFor(p: Person, field: string): string {

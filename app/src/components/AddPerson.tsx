@@ -17,7 +17,7 @@ import {
   Switch,
   Textarea,
 } from "@family-archive/ui";
-import type { ProvenanceStatus, PartialDate } from "@family-archive/ui";
+import type { ProvenanceStatus, PartialDate, SourceOption } from "@family-archive/ui";
 import { fullName, lifeDates, relationsOf, sourceOptions, type Person } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import { serializePartialDate, parsePartialDate } from "@/lib/dates";
@@ -140,6 +140,78 @@ function initialProv(person: Person | null): Record<string, ProvState> {
     if (formKey && fact) out[formKey] = { status: fact.status, source: fact.source ?? undefined };
   }
   return out;
+}
+
+/**
+ * A field label with its confidence mark inline. Defined at module scope (not
+ * inside AddPerson) so React keeps it mounted across the parent's re-renders —
+ * inlining it would give the component a new identity each render, remounting the
+ * uncontrolled <Input> below it and wiping whatever the user had typed.
+ */
+function ProvLabel({
+  label,
+  status,
+  sources,
+  onChange,
+}: {
+  label: string;
+  status: ProvenanceStatus;
+  sources: SourceOption[];
+  onChange: (status: ProvenanceStatus, source?: string) => void;
+}) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+      {label}
+      <ProvenanceMark status={status} sources={sources} onChange={onChange} size={13} />
+    </span>
+  );
+}
+
+/**
+ * A text field carrying its provenance mark. Module-scoped for the same reason as
+ * ProvLabel: keeping a stable component identity is what stops the uncontrolled
+ * input from resetting to its defaultValue every time sibling form state changes.
+ */
+function ProvField({
+  label,
+  placeholder,
+  fieldKey,
+  required,
+  defaultValue,
+  error,
+  status,
+  sources,
+  onProvChange,
+}: {
+  label: string;
+  placeholder: string;
+  fieldKey: string;
+  required?: boolean;
+  defaultValue?: string;
+  error?: string;
+  status: ProvenanceStatus;
+  sources: SourceOption[];
+  onProvChange: (k: string, status: ProvenanceStatus, source?: string) => void;
+}) {
+  return (
+    <div style={{ flex: 1 }}>
+      <Input
+        name={fieldKey}
+        placeholder={placeholder}
+        required={required}
+        defaultValue={defaultValue}
+        error={error}
+        label={
+          <ProvLabel
+            label={label}
+            status={status}
+            sources={sources}
+            onChange={(s, src) => onProvChange(fieldKey, s, src)}
+          />
+        }
+      />
+    </div>
+  );
 }
 
 export function AddPerson({
@@ -277,7 +349,19 @@ export function AddPerson({
           : await createPerson(formData);
       if (result.ok) {
         setErrors({});
-        onToast(isEdit ? "Changes saved to the record" : "Person saved to the family archive");
+        const unlinked = result.unlinkedSiblings ?? [];
+        if (unlinked.length > 0) {
+          // The sibling link is derived from shared parents; with none recorded
+          // there's nothing to share, so tell the user rather than dropping it.
+          const names = unlinked
+            .map((id) => people[id]?.given.split(" ")[0] ?? "someone")
+            .join(", ");
+          onToast(
+            `Saved, but couldn't link ${names} as a sibling — they have no recorded parents yet. Add a parent to them first, then re-link.`,
+          );
+        } else {
+          onToast(isEdit ? "Changes saved to the record" : "Person saved to the family archive");
+        }
         router.refresh();
         onNavigate("person", result.id);
       } else {
@@ -285,44 +369,13 @@ export function AddPerson({
       }
     });
 
-  // A field label with its confidence mark inline — shared by the text fields and
-  // the precision-aware date fields so every fact carries its provenance.
+  // A field label with its confidence mark inline — wraps the module-scope
+  // ProvLabel with this form's prov state, for the precision-aware date fields.
   const provLabel = (label: string, k: string) => (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-      {label}
-      <ProvenanceMark
-        status={stOf(k)}
-        sources={sources}
-        onChange={(status, source) => setP(k, status, source)}
-        size={13}
-      />
-    </span>
+    <ProvLabel label={label} status={stOf(k)} sources={sources} onChange={(s, src) => setP(k, s, src)} />
   );
-
-  const ProvField = ({
-    label,
-    placeholder,
-    k,
-    required,
-    defaultValue,
-  }: {
-    label: string;
-    placeholder: string;
-    k: string;
-    required?: boolean;
-    defaultValue?: string;
-  }) => (
-    <div style={{ flex: 1 }}>
-      <Input
-        name={k}
-        placeholder={placeholder}
-        required={required}
-        defaultValue={defaultValue}
-        error={errors[k]}
-        label={provLabel(label, k)}
-      />
-    </div>
-  );
+  // The per-field provenance wiring every ProvField needs, keyed by field name.
+  const provProps = (k: string) => ({ fieldKey: k, status: stOf(k), sources, onProvChange: setP, error: errors[k] });
 
   // Edit was requested for someone who isn't in the current dataset (stale link,
   // or deleted in another tab). Don't render a blank "add" form under an "edit"
@@ -408,11 +461,11 @@ export function AddPerson({
               </div>
               <div style={{ display: "grid", gap: "var(--space-lg)" }}>
                 <div className="app-field-row">
-                  <ProvField label="Given names" placeholder="e.g. Eleanor Margaret" k="given" required defaultValue={person?.given} />
-                  <ProvField label="Surname" placeholder="e.g. Clarke" k="surname" required defaultValue={person?.surname} />
+                  <ProvField label="Given names" placeholder="e.g. Eleanor Margaret" required defaultValue={person?.given} {...provProps("given")} />
+                  <ProvField label="Surname" placeholder="e.g. Clarke" required defaultValue={person?.surname} {...provProps("surname")} />
                 </div>
                 <div className="app-field-row" style={{ alignItems: "flex-end" }}>
-                  <ProvField label="Maiden name (optional)" placeholder="e.g. Hartley" k="maiden" defaultValue={person?.maiden ?? undefined} />
+                  <ProvField label="Maiden name (optional)" placeholder="e.g. Hartley" defaultValue={person?.maiden ?? undefined} {...provProps("maiden")} />
                   <div style={{ width: 160, flex: "none" }}>
                     <Select label="Sex" name="sex" defaultValue={person?.sex ?? ""} required error={errors.sex}>
                       <option value="">—</option>
@@ -446,7 +499,7 @@ export function AddPerson({
                         onChange={setBornDate}
                       />
                     </div>
-                    <ProvField label="Place" placeholder="City, country" k="birthPlace" defaultValue={person?.bornPlace ?? undefined} />
+                    <ProvField label="Place" placeholder="City, country" defaultValue={person?.bornPlace ?? undefined} {...provProps("birthPlace")} />
                   </div>
                 </div>
                 <div>
@@ -461,7 +514,7 @@ export function AddPerson({
                         onChange={setDiedDate}
                       />
                     </div>
-                    <ProvField label="Place" placeholder="City, country" k="deathPlace" defaultValue={person?.diedPlace ?? undefined} />
+                    <ProvField label="Place" placeholder="City, country" defaultValue={person?.diedPlace ?? undefined} {...provProps("deathPlace")} />
                   </div>
                 </div>
               </div>
