@@ -20,6 +20,8 @@ import {
   placeAndYear,
 } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
+import { buildFamilyGraph } from "@/lib/family-graph";
+import { scopeFamily, homePerson, edgeWithinScope, type FrontierCount } from "@/lib/family-scope";
 import {
   compute,
   lineage,
@@ -41,8 +43,48 @@ interface TreeControls {
   reset: () => void;
 }
 
+/**
+ * Fog markers on a node that touches hidden kin: a small pill per direction
+ * (ancestors / descendants / spouse-or-siblings) showing how many are out in the
+ * fog. Clicking re-centres the scope on this node, pulling that direction in.
+ * Direction → screen placement flips with the layout axis.
+ */
+function FrontierChips({ fc, mode, onExpand }: { fc: FrontierCount; mode: TreeMode; onExpand: () => void }) {
+  const v = mode === "vertical";
+  const chips: Array<{ key: string; n: number; arrow: string; style: CSSProperties }> = [
+    { key: "up", n: fc.up, arrow: v ? "▲" : "◀",
+      style: v ? { left: "50%", top: 0, transform: "translate(-50%,-128%)" }
+               : { left: 0, top: "50%", transform: "translate(-112%,-50%)" } },
+    { key: "down", n: fc.down, arrow: v ? "▼" : "▶",
+      style: v ? { left: "50%", top: "100%", transform: "translate(-50%,28%)" }
+               : { left: "100%", top: "50%", transform: "translate(12%,-50%)" } },
+    { key: "side", n: fc.side, arrow: v ? "›" : "▾",
+      style: v ? { left: "100%", top: "50%", transform: "translate(10%,-50%)" }
+               : { left: "50%", top: "100%", transform: "translate(-50%,24%)" } },
+  ];
+  const dirName: Record<string, string> = { up: "ancestors", down: "descendants", side: "family" };
+  return (
+    <>
+      {chips.filter((c) => c.n > 0).map((c) => (
+        <button
+          key={c.key}
+          type="button"
+          className="app-fog-chip"
+          style={{ position: "absolute", ...c.style }}
+          title={`${c.n} more ${dirName[c.key]} in the fog — click to explore`}
+          onClick={onExpand}
+        >
+          <span aria-hidden="true">{c.arrow}</span>
+          {c.n}
+        </button>
+      ))}
+    </>
+  );
+}
+
 function Tree({
   mode,
+  overview,
   focusId,
   onFocus,
   onClear,
@@ -50,15 +92,18 @@ function Tree({
   controlsRef,
 }: {
   mode: TreeMode;
+  overview: boolean;
   focusId: string | null;
   onFocus: (id: string) => void;
   onClear: () => void;
   onOpen: (id: string) => void;
   controlsRef: React.MutableRefObject<TreeControls | null>;
 }) {
-  const { people, graph } = useDataset();
+  const { people, graph, relationships } = useDataset();
   const wrapRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View>({ tx: 0, ty: 0, k: 1 });
+  const [animate, setAnimate] = useState(false);
+  const animTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const drag = useRef<{ x: number; y: number; tx: number; ty: number; moved: boolean } | null>(null);
   // Two-finger pinch baseline (distance between touches) for touch zoom.
   const pinch = useRef<{ dist: number } | null>(null);
@@ -72,8 +117,26 @@ function Tree({
     for (const p of Object.values(people)) m[p.id] = p.born;
     return m;
   }, [people]);
-  const layout = useMemo(() => compute(graph, mode, bornOf), [graph, mode, bornOf]);
-  const lin = useMemo(() => (focusId ? lineage(graph, focusId) : null), [graph, focusId]);
+  // Fog-of-war: in focus mode we lay out only a neighbourhood around the focus
+  // (defaulting to a "home" person), so dense conflicts never have to be drawn.
+  // Overview mode falls back to the whole graph with lineage dimming.
+  const placedSet = useMemo(() => new Set(graph.placed), [graph]);
+  const effFocus = useMemo(
+    () => focusId ?? (overview ? null : homePerson(graph)),
+    [focusId, overview, graph],
+  );
+  const scope = useMemo(
+    () => (effFocus && !overview && placedSet.has(effFocus) ? scopeFamily(graph, effFocus, { bornOf }) : null),
+    [effFocus, overview, placedSet, graph, bornOf],
+  );
+  const scopedGraph = useMemo(
+    () => (scope ? buildFamilyGraph(relationships.filter(edgeWithinScope(scope.visible))) : graph),
+    [scope, relationships, graph],
+  );
+  const layout = useMemo(() => compute(scopedGraph, mode, bornOf), [scopedGraph, mode, bornOf]);
+  // Lineage dimming only applies in overview mode; in fog mode off-scope kin are
+  // simply absent, so there is nothing to dim.
+  const lin = useMemo(() => (overview && focusId ? lineage(graph, focusId) : null), [overview, graph, focusId]);
   const b = layout.bounds;
   const worldW = b.maxX - b.minX;
   const worldH = b.maxY - b.minY;
@@ -89,17 +152,33 @@ function Tree({
     setView({ k, tx: (cw - worldW * k) / 2, ty: (ch - worldH * k) / 2 });
   }, [worldW, worldH]);
 
+  // Frame the lit region: fit the (scoped) bounds to the viewport. In fog mode
+  // those bounds are just the focus neighbourhood, so this keeps the whole lit
+  // region on screen and centred; `smooth` animates the transform transition.
+  const reframe = useCallback(
+    (smooth: boolean) => {
+      if (smooth) {
+        setAnimate(true);
+        if (animTimer.current) clearTimeout(animTimer.current);
+        animTimer.current = setTimeout(() => setAnimate(false), 360);
+      }
+      fit();
+    },
+    [fit],
+  );
+
   useEffect(() => {
-    fit();
-  }, [mode, fit]);
+    reframe(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effFocus, overview, mode, layout]);
 
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => fit());
+    const ro = new ResizeObserver(() => reframe(false));
     ro.observe(el);
     return () => ro.disconnect();
-  }, [fit]);
+  }, [reframe]);
 
   useEffect(() => {
     controlsRef.current = {
@@ -113,13 +192,14 @@ function Tree({
           const r = k / v.k;
           return { k, tx: cx - (cx - v.tx) * r, ty: cy - (cy - v.ty) * r };
         }),
-      reset: fit,
+      reset: () => reframe(true),
     };
-  }, [controlsRef, fit]);
+  }, [controlsRef, reframe]);
 
   const onWheel = (e: React.WheelEvent) => {
     const el = wrapRef.current;
     if (!el) return;
+    setAnimate(false); // zoom should track the cursor 1:1, never lag behind a tween
     const rect = el.getBoundingClientRect();
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
@@ -132,6 +212,7 @@ function Tree({
   };
   const onDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
+    setAnimate(false); // dragging is direct manipulation — no tween
     drag.current = { x: e.clientX, y: e.clientY, tx: view.tx, ty: view.ty, moved: false };
   };
   const onMove = (e: React.MouseEvent) => {
@@ -160,6 +241,7 @@ function Tree({
   // Touch: one finger pans, two fingers pinch-zoom around their midpoint. The
   // canvas sets `touch-action: none`, so the browser won't scroll underneath us.
   const onTouchStart = (e: React.TouchEvent) => {
+    setAnimate(false); // direct touch manipulation — no tween
     if (e.touches.length === 1) {
       const t = e.touches[0];
       drag.current = { x: t.clientX, y: t.clientY, tx: view.tx, ty: view.ty, moved: false };
@@ -269,6 +351,7 @@ function Tree({
           height: worldH,
           transformOrigin: "0 0",
           transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.k})`,
+          transition: animate && !drag.current ? "transform 320ms cubic-bezier(.4,0,.2,1)" : "none",
         }}
       >
         <svg
@@ -363,10 +446,11 @@ function Tree({
 
         {Object.values(layout.nodes).map((n) => {
           const p = people[n.id];
-          const isFocus = focusId === n.id;
+          const isFocus = effFocus === n.id;
           const inPath = !!lin && lin.people.has(n.id) && !isFocus;
           const dim = !!lin && !lin.people.has(n.id);
           const summary = provSummary(p);
+          const fc = overview ? undefined : scope?.frontier.get(n.id);
           return (
             <div
               key={n.id}
@@ -407,6 +491,15 @@ function Tree({
               >
                 <Icon name={summary.icon} size={11} />
               </span>
+              {fc && (
+                <FrontierChips
+                  fc={fc}
+                  mode={mode}
+                  onExpand={() => {
+                    if (!drag.current || !drag.current.moved) onFocus(n.id);
+                  }}
+                />
+              )}
             </div>
           );
         })}
@@ -596,16 +689,21 @@ export function Explorer({
   setLayout,
   focusId,
   setFocusId,
+  onBack,
+  focusTrail,
   onOpen,
 }: {
   layout: TreeMode;
   setLayout: (m: TreeMode) => void;
   focusId: string | null;
   setFocusId: (id: string | null) => void;
+  onBack: () => void;
+  focusTrail: string[];
   onOpen: (id: string, mode?: "edit") => void;
 }) {
   const controls = useRef<TreeControls | null>(null);
   const { people, graph } = useDataset();
+  const [overview, setOverview] = useState(false);
   const opts: [TreeMode, string][] = [
     ["vertical", "Vertical"],
     ["horizontal", "Horizontal"],
@@ -626,6 +724,7 @@ export function Explorer({
     <div style={{ position: "absolute", inset: 0 }}>
       <Tree
         mode={layout}
+        overview={overview}
         focusId={focusId}
         onFocus={setFocusId}
         onClear={() => setFocusId(null)}
@@ -643,17 +742,33 @@ export function Explorer({
       </div>
 
       <div
-        className="app-float app-seg app-switch-wrap"
-        style={{ ...segWrap, top: 16, right: focusId ? 392 : 16, transition: "right .2s ease" }}
+        className="app-float app-switch-wrap app-viewbar"
+        style={{ position: "absolute", top: 16, right: focusId ? 392 : 16, zIndex: 4, transition: "right .2s ease" }}
       >
-        {opts.map(([k, label]) => (
-          <button key={k} className={"app-segbtn" + (layout === k ? " on" : "")} onClick={() => setLayout(k)}>
-            {label}
+        <div className="app-seg" role="group" aria-label="Tree orientation">
+          {opts.map(([k, label]) => (
+            <button key={k} className={"app-segbtn" + (layout === k ? " on" : "")} onClick={() => setLayout(k)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <span className="app-view-divider" aria-hidden="true" />
+        <div className="app-seg" role="group" aria-label="What to show">
+          <button className={"app-segbtn" + (!overview ? " on" : "")} onClick={() => setOverview(false)}>
+            Focus
           </button>
-        ))}
+          <button className={"app-segbtn" + (overview ? " on" : "")} onClick={() => setOverview(true)}>
+            Overview
+          </button>
+        </div>
       </div>
 
       <div className="app-float app-seg app-zoomctl" style={{ ...segWrap, bottom: 16, left: 16 }}>
+        {!overview && focusTrail.length > 0 && (
+          <button className="app-iconbtn" onClick={onBack} aria-label="Back" title="Back to previous person">
+            <Icon name="chevron" size={18} style={{ transform: "rotate(180deg)" }} />
+          </button>
+        )}
         <button className="app-iconbtn" onClick={() => controls.current?.zoom(0.83)} aria-label="Zoom out">
           <Icon name="zoomOut" />
         </button>

@@ -138,4 +138,28 @@ describe("compute — layered DAG layout", () => {
       }
     }
   });
+
+  // Two couples on one row, each with their own children, and a marriage that
+  // links one child of each couple (the screenshot case: Carson∈{Carson,Quinn}
+  // married Warren∈{Warren,Marnie}). Naively this interleaves the sibling sets.
+  const twoSiblingSets: RelationshipEdge[] = [
+    spouse("norman", "marjorie"), parent("norman", "warren"), parent("marjorie", "warren"),
+    parent("norman", "marnie"), parent("marjorie", "marnie"),
+    spouse("edward", "christa"), parent("edward", "carson"), parent("christa", "carson"),
+    parent("edward", "quinn"), parent("christa", "quinn"),
+    spouse("carson", "warren"), // the cross-family marriage that tempts interleaving
+  ];
+
+  it("keeps each sibling set contiguous (no interleaving across families)", () => {
+    const g = buildFamilyGraph(twoSiblingSets);
+    const { nodes } = compute(g, "vertical");
+    const kids = ["carson", "quinn", "warren", "marnie"];
+    const order = kids.sort((a, b) => nodes[a].x - nodes[b].x);
+    const idx = (p: string) => order.indexOf(p);
+    // Cutlers form one contiguous run; Magrabs another — neither is split.
+    expect(Math.abs(idx("warren") - idx("marnie"))).toBe(1);
+    expect(Math.abs(idx("carson") - idx("quinn"))).toBe(1);
+    // and the married pair sits at the boundary between the two sets
+    expect(Math.abs(idx("carson") - idx("warren"))).toBe(1);
+  });
 });
