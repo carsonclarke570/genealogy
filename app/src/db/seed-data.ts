@@ -11,6 +11,12 @@
  */
 import type { Person, MediaItem } from "@/lib/family-data";
 
+// Seed-authoring shapes omit fields the read model *derives* at query time
+// (`mediaCount`) or that only exist once a real file is uploaded (`mimeType`,
+// `hasFile`) — the seed leaves the media file columns null.
+type SeedPerson = Omit<Person, "mediaCount">;
+type SeedMedia = Omit<MediaItem, "mimeType" | "hasFile">;
+
 /**
  * Seed-authoring shape only: the demo family is written as couple "units" for
  * convenience, then translated into normalised `relationship` rows by db/seed.ts.
@@ -42,7 +48,7 @@ export interface SeedEvent {
   prov: "verified" | "unverified" | "estimated" | "disputed";
 }
 
-export const people: Record<string, Person> = {
+export const people: Record<string, SeedPerson> = {
   // Gen 0 — great-great-grandparents
   thomas: { id: "thomas", given: "Thomas Edward", surname: "Rivers", maiden: null, sex: "m", born: 1888, bornPlace: "Sheffield, England", died: 1971, diedPlace: "Boston, MA", living: false, docs: { photo: 3, certificate: 1, obituary: 1 }, prov: { born: { status: "estimated" }, bornPlace: { status: "estimated" }, died: { status: "verified" }, diedPlace: { status: "verified" } } },
   alice: { id: "alice", given: "Alice Mary", surname: "Rivers", maiden: "Hartley", sex: "f", born: 1891, bornPlace: "Leeds, England", died: 1975, diedPlace: "Boston, MA", living: false, docs: { photo: 2, certificate: 1 } },
@@ -107,7 +113,7 @@ export const events: SeedEvent[] = [
   { id: "E-res-tr", type: "residence", title: "The Tran family moved to Cambridge", date: "2003", place: "Cambridge, MA", people: ["sarah", "michael", "olivia"], mediaId: null, prov: "unverified" },
 ];
 
-export const media: MediaItem[] = [
+export const media: SeedMedia[] = [
   { id: "M-101", type: "photo", title: "Rivers family at the lake house", year: 1962, people: ["thomas", "alice", "rose"] },
   { id: "M-102", type: "certificate", title: "Eleanor Rivers — birth certificate", year: 1915, people: ["eleanor"] },
   { id: "M-103", type: "obituary", title: "Thomas E. Rivers, 1888–1971", year: 1971, people: ["thomas"] },

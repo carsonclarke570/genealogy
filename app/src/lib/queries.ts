@@ -50,6 +50,12 @@ export async function getDataset(): Promise<Dataset> {
   const eventRows = await db.select().from(schema.event);
   const eventLinks = await db.select().from(schema.eventPerson);
 
+  // Real attached-media count per person, derived from the link table.
+  const mediaCountByPerson = new Map<string, number>();
+  for (const l of links) {
+    mediaCountByPerson.set(l.personId, (mediaCountByPerson.get(l.personId) ?? 0) + 1);
+  }
+
   const people: Record<string, Person> = {};
   for (const r of personRows) {
     const bornDate = parsePartialDate(r.bornDate);
@@ -69,6 +75,7 @@ export async function getDataset(): Promise<Dataset> {
       living: r.living,
       notes: r.notes,
       docs: parseJson(r.docs, docsSchema),
+      mediaCount: mediaCountByPerson.get(r.id) ?? 0,
       prov: parseJson(r.prov, provSchema),
     };
   }
@@ -83,6 +90,8 @@ export async function getDataset(): Promise<Dataset> {
     title: m.title,
     year: m.year ?? 0,
     people: peopleByMedia.get(m.id) ?? [],
+    mimeType: m.mimeType,
+    hasFile: m.filePath != null,
   }));
 
   const relationships: RelationshipEdge[] = relationshipRows.map((r) => ({

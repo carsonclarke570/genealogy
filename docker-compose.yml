@@ -3,9 +3,17 @@
 # `npm run dev` a database + embedding server to talk to. Start with
 # `docker compose up -d`, then run the app from `app/`.
 #
-# The app reads (app/.env.local defaults to these):
+# The app reads (set these in app/.env.local):
 #   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/genealogy
 #   EMBEDDINGS_URL=http://localhost:8080   (omit it to run search lexical-only)
+#   # Media object storage (the MinIO service below). In production these point at
+#   # a Railway managed Bucket instead — same S3 API, see CLAUDE.md "Deployment".
+#   STORAGE_ENDPOINT=localhost
+#   STORAGE_PORT=9000
+#   STORAGE_USE_SSL=false
+#   STORAGE_ACCESS_KEY=minioadmin
+#   STORAGE_SECRET_KEY=minioadmin
+#   STORAGE_BUCKET=family-media   (auto-created on first use)
 
 services:
   db:
@@ -47,6 +55,30 @@ services:
       timeout: 5s
       retries: 10
 
+  # S3-compatible object storage for uploaded media (photos, certificates, PDFs).
+  # The app talks to it via the `minio` client (lib/storage); the `family-media`
+  # bucket is auto-created on first use. Console UI at http://localhost:9001.
+  # Production swaps this for a Railway managed Bucket (same S3 API) — see CLAUDE.md.
+  minio:
+    image: minio/minio
+    container_name: genealogy-minio
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # web console
+    volumes:
+      - genealogy-minio:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
 volumes:
   genealogy-pgdata:
   genealogy-tei-cache:
+  genealogy-minio:

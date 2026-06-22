@@ -153,10 +153,10 @@ export function AppShell({ data }: { data: Dataset }) {
             />
           )}
           {route.screen === "person" && (
-            <PersonRecord id={route.personId} onOpen={openPerson} onNavigate={navigate} />
+            <PersonRecord id={route.personId} onOpen={openPerson} onNavigate={navigate} onToast={setToast} />
           )}
           {route.screen === "timeline" && <Timeline onOpen={openPerson} onNavigate={navigate} />}
-          {route.screen === "gallery" && <Gallery onOpen={openPerson} />}
+          {route.screen === "gallery" && <Gallery onOpen={openPerson} onToast={setToast} />}
           {route.screen === "search" && <Search onOpen={openPerson} onNavigate={navigate} />}
           {route.screen === "add" && (
             <AddPerson

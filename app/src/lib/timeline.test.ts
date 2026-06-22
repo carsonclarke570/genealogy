@@ -26,6 +26,7 @@ const person = (id: string, over: Partial<Person> = {}): Person => ({
   living: over.living ?? false,
   notes: null,
   docs: {},
+  mediaCount: over.mediaCount ?? 0,
   prov: over.prov,
   ...over,
 });
@@ -53,6 +54,8 @@ const media = (id: string, over: Partial<MediaItem> = {}): MediaItem => ({
   title: over.title ?? "A photo",
   year: over.year ?? 1950,
   people: over.people ?? [],
+  mimeType: over.mimeType ?? null,
+  hasFile: over.hasFile ?? false,
 });
 
 const stored = (over: Partial<StoredEvent> = {}): StoredEvent => ({
