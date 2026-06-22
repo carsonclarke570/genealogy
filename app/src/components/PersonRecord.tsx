@@ -8,6 +8,7 @@ import {
   Button,
   Card,
   Chip,
+  IconBadge,
   Menu,
   ProvenanceMark,
   Tabs,
@@ -26,7 +27,9 @@ import {
   type Relation,
 } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
-import { Icon } from "./Icon";
+import { eventsOf, fmtDate, meta } from "@/lib/timeline";
+import { Icon, type IconName } from "./Icon";
+import { PersonTimeline } from "./Timeline";
 import { MiniNode, DocDot } from "./shared";
 import type { Screen } from "./AppShell";
 
@@ -56,9 +59,10 @@ export function PersonRecord({
   onOpen: (id: string, mode?: "edit") => void;
   onNavigate: (screen: Screen) => void;
 }) {
-  const { people, media: allMedia, graph } = useDataset();
+  const { people, media: allMedia, graph, events: allEvents } = useDataset();
   const p = people[id];
   const [docFilter, setDocFilter] = useState<string>("all");
+  const [tab, setTab] = useState<string>("overview");
 
   // The person may be absent from the current dataset — most commonly in the
   // brief window after creating someone, before router.refresh() pulls the new
@@ -79,8 +83,42 @@ export function PersonRecord({
 
   const rel = relationsOf(graph, id);
   const media = allMedia.filter((m) => m.people.includes(id));
+  const events = eventsOf(allEvents, id);
 
   const summary = provSummary(p);
+
+  // A compact, horizontally-scrolling preview of this person's life events; the
+  // full chronology + add/edit lives on the Timeline tab.
+  const EventStrip =
+    events.length > 0 ? (
+      <div>
+        <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
+          Life events
+        </div>
+        <div className="app-evstrip-wrap">
+          <div className="app-evstrip">
+            {events.slice(0, 5).map((ev) => {
+              const m = meta(ev.type);
+              return (
+                <button key={ev.id} className="app-evcard" onClick={() => setTab("timeline")} title={ev.title}>
+                  <div className="app-evcard-top">
+                    <IconBadge icon={<Icon name={m.icon as IconName} />} color={m.color} size={26} />
+                    <span className="app-evcard-date tnum">{fmtDate(ev)}</span>
+                  </div>
+                  <div className="app-evcard-title">{ev.title}</div>
+                </button>
+              );
+            })}
+            {events.length > 5 && (
+              <button className="app-evcard app-evcard-more" onClick={() => setTab("timeline")}>
+                <span className="app-display" style={{ fontSize: "var(--text-headline)" }}>+{events.length - 5}</span>
+                <span className="app-muted" style={{ fontSize: "var(--text-body-sm)" }}>more</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    ) : null;
 
   const RelGroup = ({ title, items }: { title: string; items: Relation[] }) =>
     items.length ? (
@@ -120,6 +158,7 @@ export function PersonRecord({
           ))}
         </div>
       </div>
+      {EventStrip}
       <div className="app-grid-rels">
         <RelGroup title="Parents" items={rel.parents} />
         <RelGroup title="Spouse" items={rel.spouse} />
@@ -322,9 +361,15 @@ export function PersonRecord({
 
         <div style={{ marginTop: "var(--space-xl)" }}>
           <Tabs
-            defaultValue="overview"
+            value={tab}
+            onValueChange={setTab}
             items={[
               { value: "overview", label: "Overview", content: Overview },
+              {
+                value: "timeline",
+                label: `Timeline (${events.length})`,
+                content: <PersonTimeline id={id} onOpen={onOpen} onNavigate={onNavigate} />,
+              },
               { value: "documents", label: `Documents (${media.length})`, content: Documents },
               { value: "notes", label: "Notes (2)", content: Notes },
             ]}

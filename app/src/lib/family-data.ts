@@ -57,6 +57,47 @@ export interface MediaItem {
   people: string[];
 }
 
+/**
+ * A life event on the timeline. Most are *derived* (birth/death from a person,
+ * marriage/divorce from a spouse edge, a `document` from a dated media item);
+ * the rest are stored in the `event` table (immigration, military, …). See
+ * lib/timeline.ts for how they're built and merged.
+ */
+export type EventType =
+  // derived from person / relationship / media
+  | "birth"
+  | "death"
+  | "marriage"
+  | "divorce"
+  | "document"
+  // stored in the `event` table
+  | "immigration"
+  | "military"
+  | "education"
+  | "career"
+  | "residence"
+  | "religious"
+  | "other";
+
+export interface TimelineEvent {
+  /** Deterministic synthetic id (`b-`/`d-`/`m-`/`dv-`/`me-`/`ev-` prefixed). */
+  id: string;
+  type: EventType;
+  /** Precision-aware date, or null when only a bucket is known. */
+  date: PartialDate | null;
+  /** Numeric sort key (year*10000 + month*100 + day), precomputed for cheap client sort. */
+  sortKey: number;
+  title: string;
+  place: string | null;
+  /** Every participant — multi-person events surface on each one's timeline. */
+  people: string[];
+  prov: ProvenanceStatus;
+  /** The cited source document, when one is attached/resolved. */
+  source: { id: string; title: string; type: DocType } | null;
+  /** True for derived events (birth/death/marriage/divorce/document); false for stored ones. */
+  auto: boolean;
+}
+
 /** The full in-memory snapshot the UI renders from (assembled in lib/queries.ts). */
 export interface Dataset {
   people: Record<string, Person>;
@@ -65,6 +106,8 @@ export interface Dataset {
   /** Raw relationship edges (with ids) — the edit form removes specific ones. */
   relationships: RelationshipEdge[];
   media: MediaItem[];
+  /** The merged, chronologically-sorted life-event timeline (derived + stored). */
+  events: TimelineEvent[];
 }
 
 export function fullName(p: Person): string {

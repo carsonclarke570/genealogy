@@ -22,6 +22,13 @@
       "when": 1782084594725,
       "tag": "0002_nebulous_namor",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1782150804396,
+      "tag": "0003_closed_micromax",
+      "breakpoints": true
     }
   ]
 }

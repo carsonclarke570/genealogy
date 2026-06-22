@@ -11,7 +11,8 @@
 import { count } from "drizzle-orm";
 import { type NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "./schema";
-import { people, units, media } from "./seed-data";
+import { people, units, media, events } from "./seed-data";
+import { parsePartialDate } from "../lib/dates";
 
 type DB = NodePgDatabase<typeof schema>;
 
@@ -49,6 +50,8 @@ export async function seed(db: DB): Promise<{ seeded: boolean }> {
           personId: u.anchor, // anchor side, by convention
           relatedId: u.partner,
           status: u.rel,
+          marriedDate: u.married ?? null,
+          divorcedDate: u.divorced ?? null,
         });
       }
       if (u.parent) {
@@ -70,6 +73,22 @@ export async function seed(db: DB): Promise<{ seeded: boolean }> {
       await tx.insert(schema.media).values({ id: m.id, type: m.type, title: m.title, year: m.year });
       for (const pid of m.people) {
         await tx.insert(schema.personMedia).values({ personId: pid, mediaId: m.id });
+      }
+    }
+
+    for (const e of events) {
+      await tx.insert(schema.event).values({
+        id: e.id,
+        type: e.type,
+        title: e.title,
+        date: e.date,
+        year: parsePartialDate(e.date)?.year ?? null,
+        place: e.place,
+        prov: e.prov,
+        mediaId: e.mediaId,
+      });
+      for (const pid of e.people) {
+        await tx.insert(schema.eventPerson).values({ eventId: e.id, personId: pid });
       }
     }
   });

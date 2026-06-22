@@ -22,6 +22,9 @@ export interface RelationshipEdge {
   personId: string;
   relatedId: string;
   status?: "married" | "divorced" | null;
+  /** Spouse edges only: canonical partial-date strings the timeline reads. */
+  marriedDate?: string | null;
+  divorcedDate?: string | null;
 }
 
 export type UnionStatus = "married" | "divorced" | null;

@@ -11,9 +11,10 @@ import "server-only";
 import { z } from "zod";
 import { getDb } from "@/db/client";
 import * as schema from "@/db/schema";
-import type { Person, MediaItem, Dataset } from "./family-data";
+import type { Person, MediaItem, Dataset, EventType } from "./family-data";
 import { buildFamilyGraph, type RelationshipEdge } from "./family-graph";
-import { provStatuses } from "./prov";
+import { buildTimeline, type StoredEvent } from "./timeline";
+import { provStatuses, type ProvStatus } from "./prov";
 import { parsePartialDate } from "./dates";
 
 // Keys are validated structurally (string); values carry the real constraints.
@@ -46,6 +47,8 @@ export async function getDataset(): Promise<Dataset> {
   const relationshipRows = await db.select().from(schema.relationship);
   const mediaRows = await db.select().from(schema.media);
   const links = await db.select().from(schema.personMedia);
+  const eventRows = await db.select().from(schema.event);
+  const eventLinks = await db.select().from(schema.eventPerson);
 
   const people: Record<string, Person> = {};
   for (const r of personRows) {
@@ -88,7 +91,33 @@ export async function getDataset(): Promise<Dataset> {
     personId: r.personId,
     relatedId: r.relatedId,
     status: r.status,
+    marriedDate: r.marriedDate,
+    divorcedDate: r.divorcedDate,
   }));
 
-  return { people, graph: buildFamilyGraph(relationships), relationships, media };
+  // Stored custom events + their linked people, for the timeline read model.
+  const peopleByEvent = new Map<string, string[]>();
+  for (const l of eventLinks) {
+    (peopleByEvent.get(l.eventId) ?? peopleByEvent.set(l.eventId, []).get(l.eventId)!).push(l.personId);
+  }
+  const events: StoredEvent[] = eventRows.map((e) => ({
+    id: e.id,
+    type: e.type as EventType,
+    title: e.title,
+    date: e.date,
+    place: e.place,
+    prov: ((provStatuses as readonly string[]).includes(e.prov ?? "")
+      ? (e.prov as ProvStatus)
+      : "unverified"),
+    mediaId: e.mediaId,
+    people: peopleByEvent.get(e.id) ?? [],
+  }));
+
+  return {
+    people,
+    graph: buildFamilyGraph(relationships),
+    relationships,
+    media,
+    events: buildTimeline({ people, relationships, media, events }),
+  };
 }
