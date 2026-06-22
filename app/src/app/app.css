@@ -957,10 +957,13 @@ body {
   background: var(--color-muted);
   opacity: 0.3;
 }
-.app-lanedot {
+.app-lanedot-wrap {
   position: absolute;
   top: 50%;
   transform: translate(-50%, -50%);
+}
+.app-lanedot {
+  display: block;
   width: 13px;
   height: 13px;
   border-radius: 50%;

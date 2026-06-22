@@ -247,14 +247,16 @@ function LanesView({
                   const y = yearOf(ev);
                   if (y == null) return null;
                   return (
-                    <Tooltip key={ev.id} label={`${fmtDate(ev)} · ${ev.title}`}>
-                      <button
-                        className="app-lanedot"
-                        style={{ left: `${x(y)}%`, background: eventColor(ev) }}
-                        onClick={() => onOpen(id)}
-                        aria-label={ev.title}
-                      />
-                    </Tooltip>
+                    <span key={ev.id} className="app-lanedot-wrap" style={{ left: `${x(y)}%` }}>
+                      <Tooltip label={`${fmtDate(ev)} · ${ev.title}`}>
+                        <button
+                          className="app-lanedot"
+                          style={{ background: eventColor(ev) }}
+                          onClick={() => onOpen(id)}
+                          aria-label={ev.title}
+                        />
+                      </Tooltip>
+                    </span>
                   );
                 })}
               </div>
