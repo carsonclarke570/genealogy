@@ -72,18 +72,27 @@ Schema in `app/src/db/schema.ts`; refined from the initial sketch:
   and `prov` (per-fact confidence). They are Zod-validated on read; `docs` will
   migrate to a count derived from `person_media` once real upload lands.
 - **relationship** — one table, two kinds of edge: `spouse` (the two partners,
-  with married/divorced status) and `parent` (parent → child). By convention a
-  spouse row's `personId` is the blood-line ("anchor") side, so the couple-unit
-  tree the Explorer draws can be reconstructed deterministically.
+  with married/divorced status) and `parent` (parent → child). Both edges are
+  treated symmetrically — a spouse edge is undirected, and a child carries one
+  `parent` row per recorded parent — so the family graph below reconstructs
+  deterministically regardless of how an edge was entered.
 - **media** — id, type (photo | certificate | article | obituary | other), title,
   year, plus file fields (path, mime, original filename, description) left null
   until upload exists.
 - **person_media** — links media to one or more people.
 
 The read model in `app/src/lib/queries.ts` assembles an in-memory `Dataset`
-({ people, units, media }) — deriving couple-units from `relationship` rows via
-`app/src/lib/units.ts` — which the server hands to the client through a context
-(`app/src/lib/dataset.tsx`). The demo seed lives in `app/src/db/seed-data.ts`.
+({ people, graph, relationships, media }) — deriving a **family-graph DAG** from
+`relationship` rows via `app/src/lib/buildFamilyGraph` (`app/src/lib/family-graph.ts`)
+— which the server hands to the client through a context (`app/src/lib/dataset.tsx`).
+The graph models **unions** (couples / co-parent groups); every partner keeps
+their own link upward to their own parents, so the Explorer draws **both**
+ancestral lines of a couple (not just one "blood-line" side). The layered layout
+that positions it lives in `app/src/lib/tree-layout.ts` (generation layering →
+crossing-reduced ordering → coordinate assignment), and `relationsOf` /
+`lineageOf` read straight off the raw edges so the side panels don't depend on
+the layout. Both are pure + unit-tested (`*.test.ts`, run with `npm test`). The
+demo seed lives in `app/src/db/seed-data.ts`.
 
 DB access goes through `getDb()` (`app/src/db/client.ts`) — a memoized
 `Promise<DB>` over a `pg` pool (Postgres queries are async). On first use it
@@ -115,6 +124,7 @@ npm run db:generate  # generate a Drizzle migration after editing schema.ts
 npm run db:migrate   # apply migrations to the DB (uses DATABASE_URL)
 npm run db:seed      # seed an empty DB with the demo family (idempotent)
 npm run db:reindex   # rebuild the search index from the tables (idempotent)
+npm test             # vitest — unit tests for the pure family-graph + layout code
 ```
 
 The app reads `DATABASE_URL` (and `AUTH_SECRET` / `SITE_PASSWORD`) from
@@ -178,7 +188,10 @@ rely on it for data).
 
 Design system + Next.js app scaffolded; the UI runs off a real **Postgres +
 Drizzle** data layer (schema, migrations, seed, async server read model + write
-path wired into the app). Add person persists. **Hybrid semantic search** is live
+path wired into the app). Add/edit person persists, including **adding and
+removing relationships** from the edit form. The Explorer draws a **family-graph
+DAG** — both ancestral lines of every couple, laid out in generation layers
+(`lib/family-graph.ts` + `lib/tree-layout.ts`, unit-tested). **Hybrid semantic search** is live
 (pgvector + full-text, RRF) over a `search_doc` index, powered by a self-hosted
 open-source embedding server, with a lexical-only fallback. Production runs on a
 managed Railway Postgres and boots empty; local dev uses Docker Postgres seeded

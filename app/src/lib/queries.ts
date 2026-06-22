@@ -12,7 +12,7 @@ import { z } from "zod";
 import { getDb } from "@/db/client";
 import * as schema from "@/db/schema";
 import type { Person, MediaItem, Dataset } from "./family-data";
-import { buildUnits } from "./units";
+import { buildFamilyGraph, type RelationshipEdge } from "./family-graph";
 import { provStatuses } from "./prov";
 import { parsePartialDate } from "./dates";
 
@@ -82,5 +82,13 @@ export async function getDataset(): Promise<Dataset> {
     people: peopleByMedia.get(m.id) ?? [],
   }));
 
-  return { people, units: buildUnits(relationshipRows), media };
+  const relationships: RelationshipEdge[] = relationshipRows.map((r) => ({
+    id: r.id,
+    kind: r.kind,
+    personId: r.personId,
+    relatedId: r.relatedId,
+    status: r.status,
+  }));
+
+  return { people, graph: buildFamilyGraph(relationships), relationships, media };
 }

@@ -11,7 +11,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/db/client";
 import { person, relationship } from "@/db/schema";
@@ -44,6 +44,22 @@ function parseRelationships(raw: FormDataEntryValue | null): RelationDraft[] {
   if (typeof raw !== "string" || !raw.length) return [];
   try {
     return relationDraftSchema.parse(JSON.parse(raw));
+  } catch {
+    return [];
+  }
+}
+
+/** An edit to an existing relationship edge. Currently only removal. */
+export type RelationOp = { op: "remove"; id: string };
+
+const relationOpSchema = z
+  .array(z.object({ op: z.literal("remove"), id: z.string().min(1) }))
+  .catch([]);
+
+function parseRelationOps(raw: FormDataEntryValue | null): RelationOp[] {
+  if (typeof raw !== "string" || !raw.length) return [];
+  try {
+    return relationOpSchema.parse(JSON.parse(raw));
   } catch {
     return [];
   }
@@ -130,24 +146,30 @@ interface RelEdge {
 }
 
 /**
- * Translate the form's person-relative relationship drafts into `relationship`
- * rows, then insert them. Edges follow the schema convention (see schema.ts):
- *   - parent  → the chosen person is the new person's parent
- *   - child   → the chosen person is the new person's child
+ * Translate a person's relationship drafts into `relationship` rows, then insert
+ * them. Edges follow the schema convention (see schema.ts):
+ *   - parent  → the chosen person is `subjectId`'s parent
+ *   - child   → the chosen person is `subjectId`'s child
  *   - spouse  → a partnership; the existing person anchors the couple-unit
- *   - sibling → no sibling edge exists; instead the new person inherits the
+ *   - sibling → no sibling edge exists; instead the subject inherits the
  *               chosen sibling's recorded parents (a shared-parents link). With
  *               no recorded parents there's nothing to share, so it's skipped.
+ *
+ * Additive only: it inserts the drafted edges and never removes or re-anchors
+ * existing ones, so it's safe both at create time (a brand-new person) and from
+ * the edit form (connecting an existing/unplaced person). Edges that already
+ * exist are skipped, so re-saving never duplicates a relationship.
  *
  * Drafts pointing at a person that doesn't exist are dropped (the picker only
  * offers real people, but validate at the boundary anyway).
  */
 async function persistRelationships(
   db: DB,
-  newId: string,
+  subjectId: string,
   drafts: RelationDraft[],
 ): Promise<void> {
   if (drafts.length === 0) return;
+  const newId = subjectId;
 
   const targetIds = [...new Set(drafts.map((d) => d.personId))].filter((pid) => pid !== newId);
   if (targetIds.length === 0) return;
@@ -195,9 +217,9 @@ async function persistRelationships(
     }
   }
 
-  // Drop duplicate edges (e.g. two siblings sharing a parent).
+  // Drop duplicate edges within this batch (e.g. two siblings sharing a parent).
   const seen = new Set<string>();
-  const rows = edges
+  let rows = edges
     .filter((e) => {
       const k = `${e.kind}:${e.personId}:${e.relatedId}`;
       if (seen.has(k)) return false;
@@ -212,7 +234,48 @@ async function persistRelationships(
       status: e.status ?? null,
     }));
 
+  if (rows.length === 0) return;
+
+  // Skip edges that already exist, so editing an already-connected person (or
+  // re-saving) never duplicates a relationship. A `parent` edge is directional
+  // (parent→child); a `spouse` edge is undirected, so normalise its key on the
+  // sorted pair to catch the same couple recorded with the anchor swapped.
+  const edgeKey = (e: { kind: string; personId: string; relatedId: string }) =>
+    e.kind === "spouse"
+      ? `spouse:${[e.personId, e.relatedId].sort().join("|")}`
+      : `${e.kind}:${e.personId}:${e.relatedId}`;
+  const ids = [...new Set(rows.flatMap((r) => [r.personId, r.relatedId]))];
+  const current = await db
+    .select({
+      kind: relationship.kind,
+      personId: relationship.personId,
+      relatedId: relationship.relatedId,
+    })
+    .from(relationship)
+    .where(or(inArray(relationship.personId, ids), inArray(relationship.relatedId, ids)));
+  const have = new Set(current.map(edgeKey));
+  rows = rows.filter((r) => !have.has(edgeKey(r)));
+
   if (rows.length > 0) await db.insert(relationship).values(rows);
+}
+
+/**
+ * Apply edits to a person's existing relationship edges (currently removal
+ * only). Deletes the given edge rows — but only those that actually involve
+ * `subjectId`, so a tampered payload can't delete unrelated relationships.
+ * Siblings aren't edges (they're derived from shared parents), so they're never
+ * removed here; the parent links are what you remove to change them.
+ */
+async function applyRelationshipOps(db: DB, subjectId: string, ops: RelationOp[]): Promise<void> {
+  const removeIds = [...new Set(ops.filter((o) => o.op === "remove").map((o) => o.id))];
+  if (removeIds.length === 0) return;
+
+  const rows = await db
+    .select({ id: relationship.id, personId: relationship.personId, relatedId: relationship.relatedId })
+    .from(relationship)
+    .where(inArray(relationship.id, removeIds));
+  const owned = rows.filter((r) => r.personId === subjectId || r.relatedId === subjectId).map((r) => r.id);
+  if (owned.length > 0) await db.delete(relationship).where(inArray(relationship.id, owned));
 }
 
 /** Pull the person fields out of the (uncontrolled) form, ready for Zod. */
@@ -292,9 +355,11 @@ export async function createPerson(formData: FormData): Promise<CreatePersonResu
 
 /**
  * Update an existing person's own fields (identity, life events, notes,
- * provenance) from the edit form. Relationships are *not* touched here — they're
- * connected at create time and edited through their own flow — so this is a
- * pure column update. `docs` is likewise left alone (it's a separate tally).
+ * provenance) from the edit form, then reconcile their relationships: remove any
+ * edges the user struck out (applyRelationshipOps) and add any newly drafted
+ * ones (persistRelationships). Linking is how someone leaves the Explorer's
+ * "unplaced" shelf; removal returns a now-isolated person to it. `docs` is left
+ * alone (it's a separate tally).
  */
 export async function updatePerson(
   id: string,
@@ -318,6 +383,10 @@ export async function updatePerson(
   if (updated.length === 0) {
     return { ok: false, errors: { form: "That person no longer exists." } };
   }
+
+  // Remove any edges the user struck out, then add any newly drafted ones.
+  await applyRelationshipOps(db, id, parseRelationOps(formData.get("relationshipOps")));
+  await persistRelationships(db, id, parseRelationships(formData.get("relationships")));
 
   // Best-effort re-index so edits to names/places/notes surface in search.
   try {

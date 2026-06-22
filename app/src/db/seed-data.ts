@@ -9,7 +9,22 @@
  * This is the *only* place the literal family lives — the running app reads
  * everything from SQLite.
  */
-import type { Person, Unit, MediaItem } from "@/lib/family-data";
+import type { Person, MediaItem } from "@/lib/family-data";
+
+/**
+ * Seed-authoring shape only: the demo family is written as couple "units" for
+ * convenience, then translated into normalised `relationship` rows by db/seed.ts.
+ * The running app no longer uses this couple-unit model (it derives a family
+ * graph from the raw edges — see lib/family-graph.ts); this type stays local to
+ * the seed so the literal below keeps reading naturally.
+ */
+interface SeedUnit {
+  id: string;
+  parent: string | null;
+  anchor: string;
+  partner: string | null;
+  rel: "married" | "divorced" | null;
+}
 
 export const people: Record<string, Person> = {
   // Gen 0 — great-great-grandparents
@@ -41,7 +56,7 @@ export const people: Record<string, Person> = {
 
 // Couple units (the spine of the layout). parent = the unit this couple descends
 // from; anchor = which partner is the blood descendant of that parent unit.
-export const units: Unit[] = [
+export const units: SeedUnit[] = [
   { id: "U0", parent: null, anchor: "thomas", partner: "alice", rel: "married" },
   { id: "U1", parent: "U0", anchor: "eleanor", partner: "frederick", rel: "married" },
   { id: "U2", parent: "U0", anchor: "arthur", partner: null, rel: null },

@@ -4,11 +4,13 @@
  * Refines the sketch in CLAUDE.md. Partnerships and parentage are both modelled
  * as rows in a single `relationship` table (the normalised, flexible model):
  *   - kind = "spouse":  personId + relatedId are the two partners, `status`
- *                       records married/divorced. By convention personId is the
- *                       blood-line ("anchor") side so the couple-unit tree can be
- *                       reconstructed deterministically (see lib/queries.ts).
+ *                       records married/divorced. The pair is undirected — the
+ *                       family graph keys a union on the sorted partner set, so
+ *                       which side is personId doesn't matter (see
+ *                       lib/family-graph.ts).
  *   - kind = "parent":  personId is a parent, relatedId is their child. A child
- *                       gets one row per recorded parent.
+ *                       gets one row per recorded parent; both parents' rows let
+ *                       the graph draw both ancestral lines.
  *
  * `docs` and `prov` are small, sparse, person-scoped maps kept as JSON columns
  * and validated with Zod on read (lib/queries.ts). They carry the recorded

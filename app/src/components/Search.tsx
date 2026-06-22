@@ -43,7 +43,7 @@ export function Search({
   onOpen: (id: string) => void;
   onNavigate: (screen: Screen) => void;
 }) {
-  const { people, media, units } = useDataset();
+  const { people, media, graph } = useDataset();
   const [q, setQ] = useState("");
   const [scope, setScope] = useState<Scope>("all");
   const [hits, setHits] = useState<Hit[]>([]);
@@ -203,7 +203,7 @@ export function Search({
                 <div style={{ display: "grid", gap: "var(--space-sm)" }}>
                   {peopleHits.map((hit) => {
                     const p = people[hit.id];
-                    const rel = relationsOf(units, p.id);
+                    const rel = relationsOf(graph, p.id);
                     const hint = rel.spouse[0]
                       ? "Spouse of " + people[rel.spouse[0].id].given.split(" ")[0]
                       : rel.children.length

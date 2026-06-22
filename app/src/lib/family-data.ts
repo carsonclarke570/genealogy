@@ -14,6 +14,12 @@ import type {
   BadgeTone,
   PartialDate,
 } from "@family-archive/ui";
+import type { FamilyGraph, RelationshipEdge } from "./family-graph";
+
+export type { FamilyGraph, RelationshipEdge } from "./family-graph";
+// relationsOf is derived straight from the raw edges; it lives with the graph
+// model but is re-exported here so the UI keeps importing it from one place.
+export { relationsOf } from "./family-graph";
 
 export type Sex = "m" | "f" | "o";
 
@@ -43,14 +49,6 @@ export interface Person {
   prov?: Partial<Record<string, ProvFact>>;
 }
 
-export interface Unit {
-  id: string;
-  parent: string | null;
-  anchor: string;
-  partner: string | null;
-  rel: "married" | "divorced" | null;
-}
-
 export interface MediaItem {
   id: string;
   type: DocType;
@@ -62,7 +60,10 @@ export interface MediaItem {
 /** The full in-memory snapshot the UI renders from (assembled in lib/queries.ts). */
 export interface Dataset {
   people: Record<string, Person>;
-  units: Unit[];
+  /** The derived family-graph DAG that drives the Explorer layout + relations. */
+  graph: FamilyGraph;
+  /** Raw relationship edges (with ids) — the edit form removes specific ones. */
+  relationships: RelationshipEdge[];
   media: MediaItem[];
 }
 
@@ -112,35 +113,7 @@ export interface Relations {
   siblings: Relation[];
 }
 
-export function relationsOf(units: Unit[], pid: string): Relations {
-  const uOf: Record<string, Unit> = {};
-  units.forEach((u) => {
-    uOf[u.anchor] = u;
-    if (u.partner) uOf[u.partner] = u;
-  });
-  const myUnit = uOf[pid];
-  const out: Relations = { spouse: [], parents: [], children: [], siblings: [] };
-  if (!myUnit) return out;
-  const isAnchor = myUnit.anchor === pid;
-  if (myUnit.partner) {
-    const other = isAnchor ? myUnit.partner : myUnit.anchor;
-    out.spouse.push({ id: other, rel: myUnit.rel ?? undefined });
-  }
-  if (isAnchor && myUnit.parent) {
-    const pu = units.find((u) => u.id === myUnit.parent);
-    if (pu) {
-      out.parents.push({ id: pu.anchor });
-      if (pu.partner) out.parents.push({ id: pu.partner });
-      units
-        .filter((u) => u.parent === myUnit.parent && u.id !== myUnit.id)
-        .forEach((u) => out.siblings.push({ id: u.anchor }));
-    }
-  }
-  units
-    .filter((u) => u.parent === myUnit.id)
-    .forEach((u) => out.children.push({ id: u.anchor }));
-  return out;
-}
+// `relationsOf` is re-exported from ./family-graph (see the top of this file).
 
 export interface ProvSummary {
   key: "disputed" | "sourced" | "needs";
