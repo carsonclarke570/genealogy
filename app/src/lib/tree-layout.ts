@@ -37,6 +37,7 @@ const ROWU = NODE_H + 30; // packing pitch within a column (horizontal)
 const COMPONENT_GAP = 2; // extra slots between disconnected clusters
 const ORDER_SWEEPS = 4;
 const COORD_SWEEPS = 4;
+const UNION_DROP = 22; // how far the marriage knot sits below/right of a couple
 
 export { NODE_W, NODE_H };
 
@@ -60,6 +61,22 @@ export type TreeEdge =
   | { kind: "spouse"; rel: UnionStatus; a: Point; b: Point; union: string }
   | { kind: "child"; from: Point; to: Point; union: string; child: string };
 
+/**
+ * A drawn marriage/co-parent bond for a same-row couple: a bracket dropping from
+ * each partner to a shared "knot" that the children descend from. Rendering this
+ * (rather than a faint line between node centres) is what stops a couple reading
+ * as two siblings sitting side by side.
+ */
+export interface Junction {
+  union: string;
+  /** Where the bracket leaves each partner (their bottom-/right-centre). */
+  aDrop: Point;
+  bDrop: Point;
+  /** The knot the bracket meets at and children hang from. */
+  knot: Point;
+  rel: UnionStatus;
+}
+
 export interface Bounds {
   minX: number;
   minY: number;
@@ -70,6 +87,7 @@ export interface Bounds {
 export interface Layout {
   nodes: Record<string, TreeNode>;
   edges: TreeEdge[];
+  junctions: Junction[];
   bounds: Bounds;
   mode: TreeMode;
   generations: number;
@@ -262,6 +280,7 @@ export function compute(
   const empty: Layout = {
     nodes: {},
     edges: [],
+    junctions: [],
     bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
     mode,
     generations: 0,
@@ -362,25 +381,54 @@ export function compute(
   const centre = (p: string): Point => ({ x: nodes[p].x + NODE_W / 2, y: nodes[p].y + NODE_H / 2 });
   const childTo = (p: string): Point =>
     mode === "vertical" ? { x: centre(p).x, y: nodes[p].y } : { x: nodes[p].x, y: centre(p).y };
-  const childAnchor = (partners: string[]): Point => {
+  // The point on a partner where the marriage bracket leaves it.
+  const dropOf = (p: string): Point =>
+    mode === "vertical"
+      ? { x: centre(p).x, y: nodes[p].y + NODE_H }
+      : { x: nodes[p].x + NODE_W, y: centre(p).y };
+  const childAnchor = (partners: string[], drop = 0): Point => {
     if (mode === "vertical") {
       const x = partners.reduce((s, p) => s + centre(p).x, 0) / partners.length;
-      const y = Math.max(...partners.map((p) => nodes[p].y + NODE_H));
+      const y = Math.max(...partners.map((p) => nodes[p].y + NODE_H)) + drop;
       return { x, y };
     }
     const y = partners.reduce((s, p) => s + centre(p).y, 0) / partners.length;
-    const x = Math.max(...partners.map((p) => nodes[p].x + NODE_W));
+    const x = Math.max(...partners.map((p) => nodes[p].x + NODE_W)) + drop;
     return { x, y };
   };
+  // Two partners are "aligned" when they share a generation row — the common
+  // case, drawn as a marriage knot. A cross-generation couple keeps an elbow.
+  const aligned = (partners: string[]): boolean =>
+    partners.length === 2 &&
+    (mode === "vertical"
+      ? nodes[partners[0]].y === nodes[partners[1]].y
+      : nodes[partners[0]].x === nodes[partners[1]].x);
 
   const edges: TreeEdge[] = [];
+  const junctions: Junction[] = [];
   for (const u of graph.unions) {
-    if (u.partners.length === 2) {
-      edges.push({ kind: "spouse", rel: u.status, a: centre(u.partners[0]), b: centre(u.partners[1]), union: u.id });
+    // Where this union's children descend from. A same-row couple gets a knot
+    // (drawn as a bracket joining the partners); otherwise the children hang
+    // from the couple/solo-parent anchor and a cross-gen couple keeps an elbow.
+    let descendFrom: Point;
+    if (aligned(u.partners)) {
+      const knot = childAnchor(u.partners, UNION_DROP);
+      junctions.push({
+        union: u.id,
+        aDrop: dropOf(u.partners[0]),
+        bDrop: dropOf(u.partners[1]),
+        knot,
+        rel: u.status,
+      });
+      descendFrom = knot;
+    } else {
+      if (u.partners.length === 2) {
+        edges.push({ kind: "spouse", rel: u.status, a: centre(u.partners[0]), b: centre(u.partners[1]), union: u.id });
+      }
+      descendFrom = childAnchor(u.partners);
     }
-    if (u.children.length > 0) {
-      const from = childAnchor(u.partners);
-      for (const c of u.children) edges.push({ kind: "child", from, to: childTo(c), union: u.id, child: c });
+    for (const c of u.children) {
+      edges.push({ kind: "child", from: descendFrom, to: childTo(c), union: u.id, child: c });
     }
   }
 
@@ -394,7 +442,7 @@ export function compute(
   const pad = 80;
   const bounds: Bounds = { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad };
   const generations = Math.max(...graph.placed.map((p) => gen[p])) + 1;
-  return { nodes, edges, bounds, mode, generations };
+  return { nodes, edges, junctions, bounds, mode, generations };
 }
 
 /** A person's co-partners that currently share their generation row. */

@@ -324,19 +324,28 @@ export function AddPerson({
   const removeRel = (key: string) => setRels((rs) => rs.filter((r) => r.key !== key));
   const addRel = () => setRels((rs) => [...rs, newRelRow("parent")]);
 
-  // Only rows with a person chosen are submitted.
-  const relationDrafts: RelationDraft[] = rels
-    .filter((r) => r.personId)
-    .map((r) =>
-      r.type === "spouse"
-        ? {
-            type: r.type,
-            personId: r.personId!,
-            marriedDate: serializePartialDate(r.marriedDate ?? null),
-            divorcedDate: serializePartialDate(r.divorcedDate ?? null),
-          }
-        : { type: r.type, personId: r.personId! },
-    );
+  // Only rows with a person chosen are submitted, and at most one relationship
+  // per person — picking the same person in two rows (e.g. parent *and* child)
+  // would write contradictory edges, so the first row wins.
+  const relationDrafts: RelationDraft[] = (() => {
+    const seen = new Set<string>();
+    const out: RelationDraft[] = [];
+    for (const r of rels) {
+      if (!r.personId || seen.has(r.personId)) continue;
+      seen.add(r.personId);
+      out.push(
+        r.type === "spouse"
+          ? {
+              type: r.type,
+              personId: r.personId,
+              marriedDate: serializePartialDate(r.marriedDate ?? null),
+              divorcedDate: serializePartialDate(r.divorcedDate ?? null),
+            }
+          : { type: r.type, personId: r.personId },
+      );
+    }
+    return out;
+  })();
   const stOf = (k: string): ProvenanceStatus => prov[k]?.status ?? "unverified";
   const setP = (k: string, status: ProvenanceStatus, source?: string) =>
     setProv((s) => ({ ...s, [k]: { status, source } }));

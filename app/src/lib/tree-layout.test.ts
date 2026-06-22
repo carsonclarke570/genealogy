@@ -95,4 +95,47 @@ describe("compute — layered DAG layout", () => {
     expect(nodes["kid"].x).toBeGreaterThan(nodes["mom"].x);
     expect(nodes["mom"].x).toBeGreaterThan(nodes["grandpa"].x);
   });
+
+  it("draws a same-row couple as a marriage junction (not a faint spouse line)", () => {
+    const g = buildFamilyGraph(twoSidedEdges);
+    const { junctions, edges } = compute(g, "vertical");
+    const unions = junctions.map((j) => j.union);
+    expect(unions).toContain("un_grandma__grandpa");
+    expect(unions).toContain("un_dad__mom");
+    // same-row couples no longer emit a flat spouse line that reads as siblings
+    expect(edges.some((e) => e.kind === "spouse")).toBe(false);
+  });
+
+  it("hangs a couple's children from the marriage knot", () => {
+    const g = buildFamilyGraph(twoSidedEdges);
+    const { junctions, edges } = compute(g, "vertical");
+    const j = junctions.find((j) => j.union === "un_dad__mom")!;
+    const kidEdge = edges.find((e) => e.kind === "child" && e.child === "kid") as
+      | { from: { x: number; y: number } }
+      | undefined;
+    expect(kidEdge?.from.x).toBe(j.knot.x);
+    expect(kidEdge?.from.y).toBe(j.knot.y);
+  });
+
+  it("carries divorced status onto the junction", () => {
+    const g = buildFamilyGraph([
+      spouse("h", "w", "divorced"),
+      parent("h", "c"),
+      parent("w", "c"),
+    ]);
+    const { junctions } = compute(g, "vertical");
+    expect(junctions).toHaveLength(1);
+    expect(junctions[0].rel).toBe("divorced");
+  });
+
+  it("produces only finite junction coordinates", () => {
+    const g = buildFamilyGraph(twoSidedEdges);
+    const { junctions } = compute(g, "vertical");
+    expect(junctions.length).toBeGreaterThan(0);
+    for (const j of junctions) {
+      for (const pt of [j.aDrop, j.bDrop, j.knot]) {
+        expect(finite(pt.x) && finite(pt.y)).toBe(true);
+      }
+    }
+  });
 });

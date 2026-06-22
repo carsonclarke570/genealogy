@@ -45,17 +45,26 @@ function Tree({
   mode,
   focusId,
   onFocus,
+  onClear,
+  onOpen,
   controlsRef,
 }: {
   mode: TreeMode;
   focusId: string | null;
   onFocus: (id: string) => void;
+  onClear: () => void;
+  onOpen: (id: string) => void;
   controlsRef: React.MutableRefObject<TreeControls | null>;
 }) {
   const { people, graph } = useDataset();
   const wrapRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View>({ tx: 0, ty: 0, k: 1 });
   const drag = useRef<{ x: number; y: number; tx: number; ty: number; moved: boolean } | null>(null);
+  // Two-finger pinch baseline (distance between touches) for touch zoom.
+  const pinch = useRef<{ dist: number } | null>(null);
+  // Whether the last pointer interaction was a pan (so the click that follows
+  // mouseup doesn't get treated as a background "deselect" click).
+  const moved = useRef(false);
 
   // Birth years give siblings a natural left-to-right order in the layout.
   const bornOf = useMemo(() => {
@@ -137,20 +146,92 @@ function Tree({
     setView((v) => ({ ...v, tx: d.tx + dx, ty: d.ty + dy }));
   };
   const endDrag = () => {
+    moved.current = drag.current?.moved ?? false;
     drag.current = null;
   };
+  // A click on empty canvas (not on a node, and not the tail of a pan) clears
+  // the selected lineage — the natural "deselect" gesture.
+  const onClick = (e: React.MouseEvent) => {
+    if (moved.current) return;
+    if ((e.target as HTMLElement).closest(".app-node")) return;
+    if (focusId) onClear();
+  };
+
+  // Touch: one finger pans, two fingers pinch-zoom around their midpoint. The
+  // canvas sets `touch-action: none`, so the browser won't scroll underneath us.
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      drag.current = { x: t.clientX, y: t.clientY, tx: view.tx, ty: view.ty, moved: false };
+      pinch.current = null;
+    } else if (e.touches.length === 2) {
+      const [a, b] = [e.touches[0], e.touches[1]];
+      pinch.current = { dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) };
+      drag.current = null;
+    }
+  };
+  const onTouchMove = (e: React.TouchEvent) => {
+    const el = wrapRef.current;
+    if (!el) return;
+    if (e.touches.length === 2 && pinch.current) {
+      const [a, b] = [e.touches[0], e.touches[1]];
+      const rect = el.getBoundingClientRect();
+      const cx = (a.clientX + b.clientX) / 2 - rect.left;
+      const cy = (a.clientY + b.clientY) / 2 - rect.top;
+      const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      const base = pinch.current.dist || dist;
+      pinch.current = { dist };
+      setView((v) => {
+        const k = Math.max(0.3, Math.min(2.2, v.k * (dist / base)));
+        const r = k / v.k;
+        return { k, tx: cx - (cx - v.tx) * r, ty: cy - (cy - v.ty) * r };
+      });
+    } else if (e.touches.length === 1 && drag.current) {
+      const d = drag.current;
+      const t = e.touches[0];
+      const dx = t.clientX - d.x;
+      const dy = t.clientY - d.y;
+      if (Math.abs(dx) + Math.abs(dy) > 3) d.moved = true;
+      setView((v) => ({ ...v, tx: d.tx + dx, ty: d.ty + dy }));
+    }
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length === 0) {
+      moved.current = drag.current?.moved ?? false;
+      drag.current = null;
+      pinch.current = null;
+    }
+  };
+
+  // Escape clears the selection / closes the peek panel.
+  useEffect(() => {
+    if (!focusId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClear();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [focusId, onClear]);
 
   // An orthogonal connector between two points (parent-union anchor → child, or
   // a cross-generation spouse link). Vertical mode steps down; horizontal across.
+  //
+  // When the two ends are nearly aligned on the cross axis, the mid-point elbow
+  // would draw a tiny jog that reads as a line failing to be straight. Below a
+  // threshold we draw a single straight segment instead; above it the elbow's
+  // jog is always at least MIN_JOG wide, so a real bend looks deliberate.
+  const MIN_JOG = 12;
   function elbow(from: { x: number; y: number }, to: { x: number; y: number }) {
     const fx = from.x + ox;
     const fy = from.y + oy;
     const tx = to.x + ox;
     const ty = to.y + oy;
     if (mode === "vertical") {
+      if (Math.abs(tx - fx) < MIN_JOG) return `M ${fx} ${fy} L ${tx} ${ty}`;
       const my = (fy + ty) / 2;
       return `M ${fx} ${fy} V ${my} H ${tx} V ${ty}`;
     }
+    if (Math.abs(ty - fy) < MIN_JOG) return `M ${fx} ${fy} L ${tx} ${ty}`;
     const mx = (fx + tx) / 2;
     return `M ${fx} ${fy} H ${mx} V ${ty} H ${tx}`;
   }
@@ -175,6 +256,11 @@ function Tree({
       onMouseMove={onMove}
       onMouseUp={endDrag}
       onMouseLeave={endDrag}
+      onClick={onClick}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onTouchCancel={onTouchEnd}
     >
       <div
         style={{
@@ -236,6 +322,43 @@ function Tree({
               />
             );
           })}
+
+          {layout.junctions.map((j, i) => {
+            const active = !!lin && lin.unions.has(j.union);
+            const stroke = active ? "var(--edge-active)" : "var(--edge)";
+            const sw = active ? 2 : 1.5;
+            const divorced = j.rel === "divorced";
+            const ax = j.aDrop.x + ox, ay = j.aDrop.y + oy;
+            const bx = j.bDrop.x + ox, by = j.bDrop.y + oy;
+            const kx = j.knot.x + ox, ky = j.knot.y + oy;
+            // A bracket dropping from both partners to the shared knot, with the
+            // knot drawn as a marriage marker (filled = married, ring = divorced).
+            const d =
+              mode === "vertical"
+                ? `M ${ax} ${ay} V ${ky} H ${bx} V ${by}`
+                : `M ${ax} ${ay} H ${kx} V ${by} H ${bx}`;
+            return (
+              <g key={`j${i}`}>
+                <path
+                  d={d}
+                  fill="none"
+                  stroke={stroke}
+                  strokeWidth={sw}
+                  strokeDasharray={divorced ? "4 3" : undefined}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <circle
+                  cx={kx}
+                  cy={ky}
+                  r={4}
+                  fill={divorced ? "var(--color-bg)" : stroke}
+                  stroke={stroke}
+                  strokeWidth={1.5}
+                />
+              </g>
+            );
+          })}
         </svg>
 
         {Object.values(layout.nodes).map((n) => {
@@ -262,6 +385,7 @@ function Tree({
                 onClick={() => {
                   if (!drag.current || !drag.current.moved) onFocus(n.id);
                 }}
+                onDoubleClick={() => onOpen(n.id)}
               />
               <span
                 title={`${summary.label} — ${docCount(p)} documents`}
@@ -291,6 +415,31 @@ function Tree({
   );
 }
 
+/** A titled list of related people in the peek panel; hidden when empty. */
+function PeekSection({
+  title,
+  items,
+  onOpen,
+}: {
+  title: string;
+  items: { id: string; rel?: string }[];
+  onOpen: (id: string) => void;
+}) {
+  if (!items.length) return null;
+  return (
+    <div style={{ marginTop: "var(--space-lg)" }}>
+      <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
+        {title}
+      </div>
+      <div style={{ display: "grid", gap: "var(--space-sm)" }}>
+        {items.map((r) => (
+          <MiniNode key={r.id} id={r.id} rel={r.rel} onOpen={onOpen} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Peek({
   id,
   onClose,
@@ -305,19 +454,6 @@ function Peek({
   const { people, graph } = useDataset();
   const p = people[id];
   const rel = relationsOf(graph, id);
-  const Section = ({ title, items }: { title: string; items: { id: string; rel?: string }[] }) =>
-    items.length ? (
-      <div style={{ marginTop: "var(--space-lg)" }}>
-        <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
-          {title}
-        </div>
-        <div style={{ display: "grid", gap: "var(--space-sm)" }}>
-          {items.map((r) => (
-            <MiniNode key={r.id} id={r.id} rel={r.rel} onOpen={onFocusRelative} />
-          ))}
-        </div>
-      </div>
-    ) : null;
 
   return (
     <div className="app-peek app-scroll">
@@ -365,9 +501,9 @@ function Peek({
           </div>
         )}
       </div>
-      <Section title="Parents" items={rel.parents} />
-      <Section title="Spouse" items={rel.spouse} />
-      <Section title="Children" items={rel.children} />
+      <PeekSection title="Parents" items={rel.parents} onOpen={onFocusRelative} />
+      <PeekSection title="Spouse" items={rel.spouse} onOpen={onFocusRelative} />
+      <PeekSection title="Children" items={rel.children} onOpen={onFocusRelative} />
       <div style={{ display: "flex", gap: "var(--space-sm)", marginTop: "var(--space-xl)" }}>
         <Button variant="primary" fullWidth onClick={() => onOpen(id)}>
           View full record
@@ -488,7 +624,14 @@ export function Explorer({
 
   return (
     <div style={{ position: "absolute", inset: 0 }}>
-      <Tree mode={layout} focusId={focusId} onFocus={setFocusId} controlsRef={controls} />
+      <Tree
+        mode={layout}
+        focusId={focusId}
+        onFocus={setFocusId}
+        onClear={() => setFocusId(null)}
+        onOpen={(id) => onOpen(id)}
+        controlsRef={controls}
+      />
 
       <div className="app-float app-canvas-title" style={{ position: "absolute", top: 16, left: 16, padding: "12px 16px", zIndex: 4 }}>
         <div className="app-display" style={{ fontSize: "var(--text-headline)" }}>
