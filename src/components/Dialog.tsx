@@ -46,20 +46,30 @@ export function Dialog({
   const id = useId();
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // Hold the latest onClose in a ref so the focus effect below can depend on
+  // `open` alone. Consumers almost always pass an inline onClose (a new identity
+  // each render); if it were an effect dependency, every parent re-render would
+  // re-run the effect and snap focus back to the panel — making a field inside
+  // the dialog lose focus on every keystroke.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     if (!open) return;
     // Move focus into the dialog on open; restore it to the opener on close.
     const opener = document.activeElement as HTMLElement | null;
     panelRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
     };
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
       opener?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
