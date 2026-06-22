@@ -126,6 +126,17 @@ export function lifeDates(p: Person): string {
   return `${b} – ${d}`;
 }
 
+/**
+ * A "year · place" line for a birth/death fact, degrading gracefully when either
+ * (or both) is missing — so a sparse record never renders the literal "null".
+ */
+export function placeAndYear(year: number | null, place: string | null): string {
+  if (year != null && place) return `${year} · ${place}`;
+  if (year != null) return String(year);
+  if (place) return place;
+  return "Not recorded";
+}
+
 export function docCount(p: Person): number {
   return Object.values(p.docs || {}).reduce<number>((a, b) => a + (b ?? 0), 0);
 }

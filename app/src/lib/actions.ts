@@ -31,7 +31,17 @@ const STORED_EVENT_TYPE_VALUES = [
 ] as const;
 
 export type CreatePersonResult =
-  | { ok: true; id: string }
+  | {
+      ok: true;
+      id: string;
+      /**
+       * Sibling links the save couldn't make because the chosen person has no
+       * recorded parents yet (siblings are derived from shared parents, so there
+       * was nothing to share). The UI surfaces these so the link never silently
+       * vanishes. Person ids — the client maps them to names.
+       */
+      unlinkedSiblings?: string[];
+    }
   | { ok: false; errors: Record<string, string> };
 
 /** A relationship the Add-person form drafts, relative to the new person. */
@@ -192,17 +202,21 @@ interface RelEdge {
  *
  * Drafts pointing at a person that doesn't exist are dropped (the picker only
  * offers real people, but validate at the boundary anyway).
+ *
+ * Returns the ids of any chosen siblings that couldn't be linked because they
+ * have no recorded parents to share — the caller surfaces these so the user
+ * knows the link didn't take (rather than it vanishing silently).
  */
 async function persistRelationships(
   db: DB,
   subjectId: string,
   drafts: RelationDraft[],
-): Promise<void> {
-  if (drafts.length === 0) return;
+): Promise<{ unlinkedSiblings: string[] }> {
+  if (drafts.length === 0) return { unlinkedSiblings: [] };
   const newId = subjectId;
 
   const targetIds = [...new Set(drafts.map((d) => d.personId))].filter((pid) => pid !== newId);
-  if (targetIds.length === 0) return;
+  if (targetIds.length === 0) return { unlinkedSiblings: [] };
   const existing = await db
     .select({ id: person.id })
     .from(person)
@@ -227,6 +241,7 @@ async function persistRelationships(
   }
 
   const edges: RelEdge[] = [];
+  const unlinkedSiblings: string[] = [];
   for (const d of drafts) {
     if (!valid.has(d.personId)) continue;
     switch (d.type) {
@@ -246,11 +261,19 @@ async function persistRelationships(
           divorcedDate: d.divorcedDate ?? null,
         });
         break;
-      case "sibling":
-        for (const parentId of parentsBySibling.get(d.personId) ?? []) {
+      case "sibling": {
+        const sharedParents = parentsBySibling.get(d.personId) ?? [];
+        if (sharedParents.length === 0) {
+          // No parents on the chosen sibling means no shared-parent link to make.
+          // Record it so the caller can tell the user instead of dropping it.
+          unlinkedSiblings.push(d.personId);
+          break;
+        }
+        for (const parentId of sharedParents) {
           edges.push({ kind: "parent", personId: parentId, relatedId: newId });
         }
         break;
+      }
     }
   }
 
@@ -273,7 +296,8 @@ async function persistRelationships(
       divorcedDate: e.divorcedDate ?? null,
     }));
 
-  if (rows.length === 0) return;
+  const unlinked = [...new Set(unlinkedSiblings)];
+  if (rows.length === 0) return { unlinkedSiblings: unlinked };
 
   // Skip edges that already exist, so editing an already-connected person (or
   // re-saving) never duplicates a relationship. A `parent` edge is directional
@@ -296,6 +320,7 @@ async function persistRelationships(
   rows = rows.filter((r) => !have.has(edgeKey(r)));
 
   if (rows.length > 0) await db.insert(relationship).values(rows);
+  return { unlinkedSiblings: unlinked };
 }
 
 /**
@@ -404,7 +429,7 @@ export async function createPerson(formData: FormData): Promise<CreatePersonResu
     prov: remapProv(formData.get("prov")),
   });
 
-  await persistRelationships(db, id, relationships);
+  const { unlinkedSiblings } = await persistRelationships(db, id, relationships);
 
   // Best-effort: index the new person for search. A failure here (embedding
   // server down, etc.) must never fail the create — the boot/`db:reindex`
@@ -416,7 +441,7 @@ export async function createPerson(formData: FormData): Promise<CreatePersonResu
   }
 
   revalidatePath("/");
-  return { ok: true, id };
+  return { ok: true, id, unlinkedSiblings };
 }
 
 // ── Life events ─────────────────────────────────────────────────────────────
@@ -572,7 +597,11 @@ export async function updatePerson(
 
   // Remove any edges the user struck out, then add any newly drafted ones.
   await applyRelationshipOps(db, id, parseRelationOps(formData.get("relationshipOps")));
-  await persistRelationships(db, id, parseRelationships(formData.get("relationships")));
+  const { unlinkedSiblings } = await persistRelationships(
+    db,
+    id,
+    parseRelationships(formData.get("relationships")),
+  );
 
   // Best-effort re-index so edits to names/places/notes surface in search.
   try {
@@ -582,5 +611,5 @@ export async function updatePerson(
   }
 
   revalidatePath("/");
-  return { ok: true, id };
+  return { ok: true, id, unlinkedSiblings };
 }

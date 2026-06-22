@@ -180,12 +180,26 @@ body {
   cursor: grabbing;
 }
 
-/* node wrapper: fixes the PersonNode to the layout cell so edge math lines up */
+/* node wrapper: fixes the PersonNode to the layout cell so edge math lines up.
+   z-index keeps every node above the edge <svg> (its earlier DOM sibling) so a
+   connector routed past a node is hidden behind it, never drawn across it. */
 .app-node {
   position: absolute;
+  z-index: 1;
 }
-.app-node.dim {
-  opacity: 0.34;
+/* De-emphasise off-lineage nodes with an opaque scrim rather than wrapper
+   opacity: fading the wrapper made the card translucent, so edges behind it bled
+   through (looking like lines drawn over the node). The card stays opaque; the
+   scrim just lightens it toward the canvas. */
+.app-node.dim::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  opacity: 0.62;
+  pointer-events: none;
+  z-index: 3;
   transition: opacity 0.15s;
 }
 
