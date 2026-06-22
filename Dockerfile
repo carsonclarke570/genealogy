@@ -10,6 +10,12 @@
 FROM node:20-alpine AS base
 WORKDIR /repo
 
+# Upgrade npm to 11.x. node:20-alpine ships npm 10.8, whose `npm ci` mishandles
+# esbuild's optional platform packages (EBADPLATFORM on @esbuild/*-* for foreign
+# arches). npm 11 fixes that and matches the npm that generates our lockfiles, so
+# `npm ci` stays in lockstep. (npm 11 supports node ^20.17.)
+RUN npm install -g npm@11.13.0
+
 # (The DB driver is `pg` — pure JS, no native build toolchain needed.)
 
 # --- 1. Build the design-system library (root package -> dist/) ---
