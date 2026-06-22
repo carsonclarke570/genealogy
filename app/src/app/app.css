@@ -702,3 +702,273 @@ body {
     bottom: calc(112px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* ===== Timeline / life events ==========================================
+   The event rows themselves come from the design system (fa-timeline__*);
+   these are the page-level pieces (year dividers, filters, lanes, strips)
+   ported from the hi-fi prototype. Every value is a token so themes flip. */
+.app-timeline {
+  position: relative;
+}
+
+/* the event "meta" row bits inside a DS TimelineItem */
+.app-evplace {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+}
+.app-evplace svg {
+  flex: none;
+}
+.app-evwith {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-body-sm);
+}
+.app-avstack {
+  display: inline-flex;
+}
+.app-evsource {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+/* river: year dividers */
+.app-yeardiv {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin: var(--space-sm) 0;
+}
+.app-yeardiv span {
+  font-family: var(--font-serif);
+  font-size: var(--text-title);
+  color: var(--color-ink);
+  font-feature-settings: "tnum" 1;
+}
+.app-yeardiv::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+.app-timeline-river > .app-yeardiv:first-child {
+  margin-top: 0;
+}
+
+/* decades */
+.app-decadehead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+.app-decaderule {
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+/* filter bar */
+.app-filterbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  padding: var(--space-md) 0;
+  margin-top: var(--space-lg);
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+.app-period {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.app-periodsel {
+  font: inherit;
+  font-size: var(--text-body-sm);
+  padding: 6px 8px;
+  color: var(--color-ink);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.app-typechip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  font: inherit;
+  font-size: var(--text-label);
+  color: var(--color-ink);
+  cursor: pointer;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  transition: opacity 0.15s;
+}
+.app-typedot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+
+/* compact strip (record overview) */
+.app-evstrip-wrap {
+  overflow-x: auto;
+  margin: 0 calc(-1 * var(--space-xs));
+  padding: 0 var(--space-xs) 6px;
+}
+.app-evstrip {
+  display: flex;
+  gap: var(--space-md);
+}
+.app-evcard {
+  flex: none;
+  width: 172px;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  transition: border-color 0.15s;
+}
+.app-evcard:hover {
+  border-color: var(--color-primary);
+}
+.app-evcard-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.app-evcard-date {
+  font-size: var(--text-label);
+  color: var(--color-muted);
+}
+.app-evcard-title {
+  font-size: var(--text-body-sm);
+  color: var(--color-ink);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.app-evcard-more {
+  width: 110px;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 2px;
+}
+
+/* lanes */
+.app-lanes-scroll {
+  overflow-x: auto;
+  padding-bottom: var(--space-md);
+}
+.app-lane {
+  display: flex;
+  align-items: stretch;
+  min-height: 54px;
+  border-bottom: 1px solid var(--color-border);
+}
+.app-lane-axis {
+  min-height: 36px;
+  position: sticky;
+  top: 0;
+  background: var(--color-bg);
+  z-index: 3;
+}
+.app-lane-name {
+  width: 168px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 7px var(--space-md) 7px 0;
+  position: sticky;
+  left: 0;
+  background: var(--color-bg);
+  z-index: 1;
+}
+.app-lane-namebtn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+.app-lane-namebtn:hover span {
+  color: var(--color-primary);
+}
+.app-lane-track {
+  position: relative;
+  flex: 1;
+  align-self: stretch;
+  background-image: repeating-linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--color-border) 60%, transparent) 0 1px,
+    transparent 1px var(--step, 10%)
+  );
+}
+.app-lane-axis .app-lane-track {
+  background-image: none;
+}
+.app-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+}
+.app-tick span {
+  font-size: var(--text-label);
+  color: var(--color-muted);
+  font-feature-settings: "tnum" 1;
+  white-space: nowrap;
+}
+.app-lifebar {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 5px;
+  border-radius: var(--radius-full);
+  background: var(--color-muted);
+  opacity: 0.3;
+}
+.app-lanedot {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid var(--color-bg);
+  padding: 0;
+  cursor: pointer;
+}
+.app-lanedot:hover {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}

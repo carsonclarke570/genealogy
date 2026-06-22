@@ -20,7 +20,7 @@ import {
 import type { ProvenanceStatus, PartialDate } from "@family-archive/ui";
 import { fullName, lifeDates, relationsOf, sourceOptions, type Person } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
-import { serializePartialDate } from "@/lib/dates";
+import { serializePartialDate, parsePartialDate } from "@/lib/dates";
 import { createPerson, updatePerson, type RelationDraft, type RelationOp } from "@/lib/actions";
 import { Icon } from "./Icon";
 import { MiniNode } from "./shared";
@@ -39,6 +39,9 @@ interface RelRowState {
   type: RelationDraft["type"];
   /** The existing person on the other end, or null until picked. */
   personId: string | null;
+  /** Spouse rows only — when the couple married / divorced. */
+  marriedDate?: PartialDate | null;
+  divorcedDate?: PartialDate | null;
 }
 
 let relKeySeq = 0;
@@ -73,36 +76,48 @@ function RelRow({
   onRemove: () => void;
 }) {
   return (
-    <div className="app-field-row" style={{ alignItems: "flex-end" }}>
-      <div style={{ width: 130, flex: "none" }}>
-        <Select
-          value={row.type}
-          aria-label="Relationship type"
-          onChange={(e) => onUpdate({ type: e.target.value as RelationDraft["type"] })}
-        >
-          <option value="parent">Parent</option>
-          <option value="spouse">Spouse</option>
-          <option value="child">Child</option>
-          <option value="sibling">Sibling</option>
-        </Select>
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <Combobox
-          aria-label="Related person"
-          placeholder="Search people in the tree…"
-          emptyMessage="No one by that name yet"
-          options={options}
-          value={row.personId}
-          onChange={(personId) => onUpdate({ personId })}
+    <div style={{ display: "grid", gap: "var(--space-sm)" }}>
+      <div className="app-field-row" style={{ alignItems: "flex-end" }}>
+        <div style={{ width: 130, flex: "none" }}>
+          <Select
+            value={row.type}
+            aria-label="Relationship type"
+            onChange={(e) => onUpdate({ type: e.target.value as RelationDraft["type"] })}
+          >
+            <option value="parent">Parent</option>
+            <option value="spouse">Spouse</option>
+            <option value="child">Child</option>
+            <option value="sibling">Sibling</option>
+          </Select>
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Combobox
+            aria-label="Related person"
+            placeholder="Search people in the tree…"
+            emptyMessage="No one by that name yet"
+            options={options}
+            value={row.personId}
+            onChange={(personId) => onUpdate({ personId })}
+          />
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          iconStart={<Icon name="close" size={16} />}
+          aria-label="Remove relationship"
+          onClick={onRemove}
         />
       </div>
-      <Button
-        variant="ghost"
-        size="sm"
-        iconStart={<Icon name="close" size={16} />}
-        aria-label="Remove relationship"
-        onClick={onRemove}
-      />
+      {row.type === "spouse" && (
+        <div className="app-field-row" style={{ paddingLeft: 130 + 16 }}>
+          <div style={{ flex: 1 }}>
+            <DateField label="Married" value={row.marriedDate ?? null} onChange={(d) => onUpdate({ marriedDate: d })} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <DateField label="Divorced (if applicable)" value={row.divorcedDate ?? null} onChange={(d) => onUpdate({ divorcedDate: d })} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -174,18 +189,37 @@ export function AddPerson({
   // so they're shown separately as read-only context below.
   const editableRels = useMemo(() => {
     if (!editId) return [];
-    const out: { edgeId: string; label: string; otherId: string }[] = [];
+    const out: { edgeId: string; label: string; otherId: string; kind: "spouse" | "parent" }[] = [];
     for (const r of relationships) {
       if (r.kind === "spouse" && (r.personId === editId || r.relatedId === editId)) {
-        out.push({ edgeId: r.id, label: "Spouse", otherId: r.personId === editId ? r.relatedId : r.personId });
+        out.push({ edgeId: r.id, label: "Spouse", otherId: r.personId === editId ? r.relatedId : r.personId, kind: "spouse" });
       } else if (r.kind === "parent" && r.relatedId === editId) {
-        out.push({ edgeId: r.id, label: "Parent", otherId: r.personId });
+        out.push({ edgeId: r.id, label: "Parent", otherId: r.personId, kind: "parent" });
       } else if (r.kind === "parent" && r.personId === editId) {
-        out.push({ edgeId: r.id, label: "Child", otherId: r.relatedId });
+        out.push({ edgeId: r.id, label: "Child", otherId: r.relatedId, kind: "parent" });
       }
     }
     return out.sort((a, b) => a.label.localeCompare(b.label));
   }, [relationships, editId]);
+
+  // Editable married/divorced dates for each existing spouse edge, seeded from
+  // the stored partial-date strings. Keyed by edge id; emitted as setDates ops.
+  const [spouseDates, setSpouseDates] = useState<
+    Record<string, { married: PartialDate | null; divorced: PartialDate | null }>
+  >(() => {
+    const out: Record<string, { married: PartialDate | null; divorced: PartialDate | null }> = {};
+    for (const r of relationships) {
+      if (r.kind === "spouse" && (r.personId === editId || r.relatedId === editId)) {
+        out[r.id] = { married: parsePartialDate(r.marriedDate), divorced: parsePartialDate(r.divorcedDate) };
+      }
+    }
+    return out;
+  });
+  const setSpouseDate = (edgeId: string, patch: Partial<{ married: PartialDate | null; divorced: PartialDate | null }>) =>
+    setSpouseDates((s) => {
+      const cur = s[edgeId] ?? { married: null, divorced: null };
+      return { ...s, [edgeId]: { ...cur, ...patch } };
+    });
 
   const siblings = useMemo(
     () => (editId ? relationsOf(graph, editId).siblings : []),
@@ -200,7 +234,18 @@ export function AddPerson({
       next.has(edgeId) ? next.delete(edgeId) : next.add(edgeId);
       return next;
     });
-  const relationshipOps: RelationOp[] = [...removedEdges].map((id) => ({ op: "remove", id }));
+  const relationshipOps: RelationOp[] = [
+    ...[...removedEdges].map((id): RelationOp => ({ op: "remove", id })),
+    // Persist dates for every spouse edge that's staying (idempotent re-write).
+    ...editableRels
+      .filter((r) => r.kind === "spouse" && !removedEdges.has(r.edgeId))
+      .map((r): RelationOp => ({
+        op: "setDates",
+        id: r.edgeId,
+        marriedDate: serializePartialDate(spouseDates[r.edgeId]?.married ?? null),
+        divorcedDate: serializePartialDate(spouseDates[r.edgeId]?.divorced ?? null),
+      })),
+  ];
 
   const updateRel = (key: string, patch: Partial<RelRowState>) =>
     setRels((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
@@ -210,7 +255,16 @@ export function AddPerson({
   // Only rows with a person chosen are submitted.
   const relationDrafts: RelationDraft[] = rels
     .filter((r) => r.personId)
-    .map((r) => ({ type: r.type, personId: r.personId! }));
+    .map((r) =>
+      r.type === "spouse"
+        ? {
+            type: r.type,
+            personId: r.personId!,
+            marriedDate: serializePartialDate(r.marriedDate ?? null),
+            divorcedDate: serializePartialDate(r.divorcedDate ?? null),
+          }
+        : { type: r.type, personId: r.personId! },
+    );
   const stOf = (k: string): ProvenanceStatus => prov[k]?.status ?? "unverified";
   const setP = (k: string, status: ProvenanceStatus, source?: string) =>
     setProv((s) => ({ ...s, [k]: { status, source } }));
@@ -432,30 +486,47 @@ export function AddPerson({
                     {editableRels.map((r) => {
                       const marked = removedEdges.has(r.edgeId);
                       return (
-                        <div
-                          key={r.edgeId}
-                          style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}
-                        >
-                          <div
-                            style={{
-                              flex: 1,
-                              minWidth: 0,
-                              opacity: marked ? 0.45 : 1,
-                              textDecoration: marked ? "line-through" : "none",
-                            }}
-                          >
-                            <MiniNode id={r.otherId} rel={r.label} />
+                        <div key={r.edgeId} style={{ display: "grid", gap: "var(--space-sm)" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
+                            <div
+                              style={{
+                                flex: 1,
+                                minWidth: 0,
+                                opacity: marked ? 0.45 : 1,
+                                textDecoration: marked ? "line-through" : "none",
+                              }}
+                            >
+                              <MiniNode id={r.otherId} rel={r.label} />
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              iconStart={marked ? undefined : <Icon name="close" size={16} />}
+                              aria-label={marked ? "Keep relationship" : "Remove relationship"}
+                              onClick={() => toggleRemove(r.edgeId)}
+                            >
+                              {marked ? "Undo" : ""}
+                            </Button>
                           </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            iconStart={marked ? undefined : <Icon name="close" size={16} />}
-                            aria-label={marked ? "Keep relationship" : "Remove relationship"}
-                            onClick={() => toggleRemove(r.edgeId)}
-                          >
-                            {marked ? "Undo" : ""}
-                          </Button>
+                          {r.kind === "spouse" && !marked && (
+                            <div className="app-field-row" style={{ paddingLeft: "var(--space-lg)" }}>
+                              <div style={{ flex: 1 }}>
+                                <DateField
+                                  label="Married"
+                                  value={spouseDates[r.edgeId]?.married ?? null}
+                                  onChange={(d) => setSpouseDate(r.edgeId, { married: d })}
+                                />
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <DateField
+                                  label="Divorced (if applicable)"
+                                  value={spouseDates[r.edgeId]?.divorced ?? null}
+                                  onChange={(d) => setSpouseDate(r.edgeId, { divorced: d })}
+                                />
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })}

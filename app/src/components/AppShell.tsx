@@ -11,9 +11,10 @@ import { PersonRecord } from "./PersonRecord";
 import { Gallery } from "./Gallery";
 import { Search } from "./Search";
 import { AddPerson } from "./AddPerson";
+import { Timeline } from "./Timeline";
 import type { TreeMode } from "@/lib/tree-layout";
 
-export type Screen = "explorer" | "person" | "gallery" | "search" | "add";
+export type Screen = "explorer" | "person" | "gallery" | "search" | "add" | "timeline";
 
 interface Route {
   screen: Screen;
@@ -24,6 +25,7 @@ interface Route {
 
 const NAV: [Screen, string, IconName][] = [
   ["explorer", "Explorer", "tree"],
+  ["timeline", "Timeline", "clock"],
   ["search", "Search", "search"],
   ["gallery", "Media archive", "gallery"],
   ["add", "Add person", "plus"],
@@ -35,6 +37,7 @@ const TITLES: Record<Screen, string> = {
   gallery: "Media archive",
   search: "Search the archive",
   add: "Add a person",
+  timeline: "Family timeline",
 };
 
 export function AppShell({ data }: { data: Dataset }) {
@@ -152,6 +155,7 @@ export function AppShell({ data }: { data: Dataset }) {
           {route.screen === "person" && (
             <PersonRecord id={route.personId} onOpen={openPerson} onNavigate={navigate} />
           )}
+          {route.screen === "timeline" && <Timeline onOpen={openPerson} onNavigate={navigate} />}
           {route.screen === "gallery" && <Gallery onOpen={openPerson} />}
           {route.screen === "search" && <Search onOpen={openPerson} onNavigate={navigate} />}
           {route.screen === "add" && (

@@ -72,14 +72,20 @@ Schema in `app/src/db/schema.ts`; refined from the initial sketch:
   and `prov` (per-fact confidence). They are Zod-validated on read; `docs` will
   migrate to a count derived from `person_media` once real upload lands.
 - **relationship** — one table, two kinds of edge: `spouse` (the two partners,
-  with married/divorced status) and `parent` (parent → child). Both edges are
-  treated symmetrically — a spouse edge is undirected, and a child carries one
-  `parent` row per recorded parent — so the family graph below reconstructs
-  deterministically regardless of how an edge was entered.
+  with married/divorced status, plus `marriedDate`/`divorcedDate` partial dates)
+  and `parent` (parent → child). Both edges are treated symmetrically — a spouse
+  edge is undirected, and a child carries one `parent` row per recorded parent —
+  so the family graph below reconstructs deterministically regardless of how an
+  edge was entered.
 - **media** — id, type (photo | certificate | article | obituary | other), title,
   year, plus file fields (path, mime, original filename, description) left null
   until upload exists.
 - **person_media** — links media to one or more people.
+- **event** + **event_person** — stored *custom* life events (immigration,
+  military, education, career, residence, religious, other), each linkable to one
+  or more people and an optional source document. Births, deaths, marriages and
+  divorces are **never stored** — they're derived on read (see below), so editing
+  a date updates the timeline with no sync.
 
 The read model in `app/src/lib/queries.ts` assembles an in-memory `Dataset`
 ({ people, graph, relationships, media }) — deriving a **family-graph DAG** from
@@ -93,6 +99,18 @@ crossing-reduced ordering → coordinate assignment), and `relationsOf` /
 `lineageOf` read straight off the raw edges so the side panels don't depend on
 the layout. Both are pure + unit-tested (`*.test.ts`, run with `npm test`). The
 demo seed lives in `app/src/db/seed-data.ts`.
+
+The **timeline** is another pure derivation off the same `Dataset`:
+`app/src/lib/timeline.ts` (`buildTimeline`, unit-tested in `timeline.test.ts`)
+merges *derived* events (birth/death from `person`, marriage/divorce from spouse
+`relationship` dates, a `document` per dated `media`) with *stored* `event` rows
+into one chronologically-sorted `events: TimelineEvent[]` on the `Dataset`.
+Birth-certificate / obituary / cited media are attached as an event's *source*
+and deduped out of the standalone document events. The Timeline screen
+(`app/src/components/Timeline.tsx`) draws it three ways (River / Lanes / Decades)
+with type/person/period filters; the person record gets a Timeline tab + event
+strip, and `AddEventDialog` persists new events via the `createEvent` /
+`updateEvent` / `deleteEvent` server actions.
 
 DB access goes through `getDb()` (`app/src/db/client.ts`) — a memoized
 `Promise<DB>` over a `pg` pool (Postgres queries are async). On first use it
@@ -193,8 +211,12 @@ removing relationships** from the edit form. The Explorer draws a **family-graph
 DAG** — both ancestral lines of every couple, laid out in generation layers
 (`lib/family-graph.ts` + `lib/tree-layout.ts`, unit-tested). **Hybrid semantic search** is live
 (pgvector + full-text, RRF) over a `search_doc` index, powered by a self-hosted
-open-source embedding server, with a lexical-only fallback. Production runs on a
+open-source embedding server, with a lexical-only fallback. A **first-class
+Family Timeline** is live: birth/death/marriage/divorce and dated media derive
+into events automatically (editing a person/relationship updates the timeline
+with no sync), custom life events are stored + add/edit/deletable and linkable to
+people, drawn as River / Lanes / Decades with filters. Production runs on a
 managed Railway Postgres and boots empty; local dev uses Docker Postgres seeded
 with the demo family. Still stubbed: real media upload + protected serving (needs
-object storage), and Auth.js (a shared password gate stands in). Next up: media
-upload.
+object storage), and Auth.js (a shared password gate stands in). Not yet wired:
+indexing events into hybrid search. Next up: media upload.

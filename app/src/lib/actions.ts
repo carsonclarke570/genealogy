@@ -14,10 +14,21 @@ import { revalidatePath } from "next/cache";
 import { and, eq, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/db/client";
-import { person, relationship } from "@/db/schema";
+import { person, relationship, event, eventPerson } from "@/db/schema";
 import { provStatuses } from "./prov";
 import { parsePartialDate, serializePartialDate } from "./dates";
 import { indexPerson } from "./search/index-doc";
+
+/** The event types a user can add by hand (births/deaths/etc. are derived). */
+const STORED_EVENT_TYPE_VALUES = [
+  "immigration",
+  "military",
+  "education",
+  "career",
+  "residence",
+  "religious",
+  "other",
+] as const;
 
 export type CreatePersonResult =
   | { ok: true; id: string }
@@ -29,6 +40,9 @@ export type RelationDraft = {
   type: "parent" | "spouse" | "child" | "sibling";
   /** The existing person on the other end. */
   personId: string;
+  /** Spouse rows only: canonical partial-date strings for the timeline. */
+  marriedDate?: string | null;
+  divorcedDate?: string | null;
 };
 
 const relationDraftSchema = z
@@ -36,6 +50,8 @@ const relationDraftSchema = z
     z.object({
       type: z.enum(["parent", "spouse", "child", "sibling"]),
       personId: z.string().min(1),
+      marriedDate: z.string().nullish(),
+      divorcedDate: z.string().nullish(),
     }),
   )
   .catch([]);
@@ -49,11 +65,23 @@ function parseRelationships(raw: FormDataEntryValue | null): RelationDraft[] {
   }
 }
 
-/** An edit to an existing relationship edge. Currently only removal. */
-export type RelationOp = { op: "remove"; id: string };
+/** An edit to an existing relationship edge: remove it, or set a spouse edge's dates. */
+export type RelationOp =
+  | { op: "remove"; id: string }
+  | { op: "setDates"; id: string; marriedDate: string | null; divorcedDate: string | null };
 
 const relationOpSchema = z
-  .array(z.object({ op: z.literal("remove"), id: z.string().min(1) }))
+  .array(
+    z.union([
+      z.object({ op: z.literal("remove"), id: z.string().min(1) }),
+      z.object({
+        op: z.literal("setDates"),
+        id: z.string().min(1),
+        marriedDate: z.string().nullable(),
+        divorcedDate: z.string().nullable(),
+      }),
+    ]),
+  )
   .catch([]);
 
 function parseRelationOps(raw: FormDataEntryValue | null): RelationOp[] {
@@ -143,6 +171,8 @@ interface RelEdge {
   personId: string;
   relatedId: string;
   status?: "married" | "divorced";
+  marriedDate?: string | null;
+  divorcedDate?: string | null;
 }
 
 /**
@@ -207,7 +237,14 @@ async function persistRelationships(
         edges.push({ kind: "parent", personId: newId, relatedId: d.personId });
         break;
       case "spouse":
-        edges.push({ kind: "spouse", personId: d.personId, relatedId: newId, status: "married" });
+        edges.push({
+          kind: "spouse",
+          personId: d.personId,
+          relatedId: newId,
+          status: d.divorcedDate ? "divorced" : "married",
+          marriedDate: d.marriedDate ?? null,
+          divorcedDate: d.divorcedDate ?? null,
+        });
         break;
       case "sibling":
         for (const parentId of parentsBySibling.get(d.personId) ?? []) {
@@ -232,6 +269,8 @@ async function persistRelationships(
       personId: e.personId,
       relatedId: e.relatedId,
       status: e.status ?? null,
+      marriedDate: e.marriedDate ?? null,
+      divorcedDate: e.divorcedDate ?? null,
     }));
 
   if (rows.length === 0) return;
@@ -260,22 +299,49 @@ async function persistRelationships(
 }
 
 /**
- * Apply edits to a person's existing relationship edges (currently removal
- * only). Deletes the given edge rows — but only those that actually involve
- * `subjectId`, so a tampered payload can't delete unrelated relationships.
- * Siblings aren't edges (they're derived from shared parents), so they're never
- * removed here; the parent links are what you remove to change them.
+ * Apply edits to a person's existing relationship edges: remove an edge, or set
+ * a spouse edge's married/divorced dates. Every op is checked against the rows
+ * that actually involve `subjectId`, so a tampered payload can't touch unrelated
+ * relationships. Siblings aren't edges (they're derived from shared parents), so
+ * they're never removed here; the parent links are what you remove to change them.
  */
 async function applyRelationshipOps(db: DB, subjectId: string, ops: RelationOp[]): Promise<void> {
   const removeIds = [...new Set(ops.filter((o) => o.op === "remove").map((o) => o.id))];
-  if (removeIds.length === 0) return;
+  const dateOps = ops.filter(
+    (o): o is Extract<RelationOp, { op: "setDates" }> => o.op === "setDates",
+  );
+  const allIds = [...new Set([...removeIds, ...dateOps.map((o) => o.id)])];
+  if (allIds.length === 0) return;
 
   const rows = await db
-    .select({ id: relationship.id, personId: relationship.personId, relatedId: relationship.relatedId })
+    .select({
+      id: relationship.id,
+      kind: relationship.kind,
+      personId: relationship.personId,
+      relatedId: relationship.relatedId,
+    })
     .from(relationship)
-    .where(inArray(relationship.id, removeIds));
-  const owned = rows.filter((r) => r.personId === subjectId || r.relatedId === subjectId).map((r) => r.id);
-  if (owned.length > 0) await db.delete(relationship).where(inArray(relationship.id, owned));
+    .where(inArray(relationship.id, allIds));
+  const owned = new Set(
+    rows.filter((r) => r.personId === subjectId || r.relatedId === subjectId).map((r) => r.id),
+  );
+  const kindById = new Map(rows.map((r) => [r.id, r.kind]));
+
+  const toRemove = removeIds.filter((id) => owned.has(id));
+  if (toRemove.length > 0) await db.delete(relationship).where(inArray(relationship.id, toRemove));
+
+  // Dates only apply to spouse edges; status follows whether a divorce was recorded.
+  for (const o of dateOps) {
+    if (!owned.has(o.id) || kindById.get(o.id) !== "spouse") continue;
+    await db
+      .update(relationship)
+      .set({
+        marriedDate: o.marriedDate,
+        divorcedDate: o.divorcedDate,
+        status: o.divorcedDate ? "divorced" : "married",
+      })
+      .where(eq(relationship.id, o.id));
+  }
 }
 
 /** Pull the person fields out of the (uncontrolled) form, ready for Zod. */
@@ -351,6 +417,126 @@ export async function createPerson(formData: FormData): Promise<CreatePersonResu
 
   revalidatePath("/");
   return { ok: true, id };
+}
+
+// ── Life events ─────────────────────────────────────────────────────────────
+// Custom events (immigration, military, education…) are the only events that are
+// *stored*: births, deaths, marriages and divorces are derived from person /
+// relationship rows on read (lib/timeline.ts), so they're edited through the
+// person form, not here.
+
+export type EventResult =
+  | { ok: true; id: string }
+  | { ok: false; errors: Record<string, string> };
+
+/** The shape the Add/Edit-event dialog submits (controlled client state, not FormData). */
+export interface EventInput {
+  type: string;
+  title: string;
+  /** Canonical partial-date string ("YYYY" / "YYYY-MM" / "YYYY-MM-DD"), or null. */
+  date: string | null;
+  place?: string | null;
+  prov?: string;
+  /** A cited source document id, or null. */
+  mediaId?: string | null;
+  /** People this event involves (it appears on each of their timelines). */
+  people: string[];
+}
+
+const eventInputSchema = z.object({
+  type: z.enum(STORED_EVENT_TYPE_VALUES, { message: "Pick an event type" }),
+  title: z.string().trim().min(1, "Describe what happened"),
+  date: z
+    .string()
+    .nullish()
+    .transform((v) => serializePartialDate(parsePartialDate(v ?? null))),
+  place: optionalText,
+  prov: z.enum(provStatuses).catch("unverified"),
+  mediaId: z
+    .string()
+    .nullish()
+    .transform((v) => (v && v.length ? v : null)),
+  people: z.array(z.string().min(1)).catch([]),
+});
+
+/** Replace an event's participant set with the validated, existing people given. */
+async function syncEventPeople(db: DB, eventId: string, peopleIds: string[]): Promise<void> {
+  await db.delete(eventPerson).where(eq(eventPerson.eventId, eventId));
+  const ids = [...new Set(peopleIds)];
+  if (ids.length === 0) return;
+  const existing = await db.select({ id: person.id }).from(person).where(inArray(person.id, ids));
+  const rows = existing.map((p) => ({ eventId, personId: p.id }));
+  if (rows.length > 0) await db.insert(eventPerson).values(rows);
+}
+
+export async function createEvent(input: EventInput): Promise<EventResult> {
+  const parsed = eventInputSchema.safeParse(input);
+  if (!parsed.success) {
+    const errors: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      const key = String(issue.path[0] ?? "form");
+      if (!errors[key]) errors[key] = issue.message;
+    }
+    return { ok: false, errors };
+  }
+  const data = parsed.data;
+  const id = randomUUID();
+  const db = await getDb();
+  await db.insert(event).values({
+    id,
+    type: data.type,
+    title: data.title,
+    date: data.date,
+    year: parsePartialDate(data.date)?.year ?? null,
+    place: data.place,
+    prov: data.prov,
+    mediaId: data.mediaId,
+  });
+  await syncEventPeople(db, id, data.people);
+  revalidatePath("/");
+  return { ok: true, id };
+}
+
+export async function updateEvent(id: string, input: EventInput): Promise<EventResult> {
+  if (!id) return { ok: false, errors: { form: "Missing the event to update." } };
+  const parsed = eventInputSchema.safeParse(input);
+  if (!parsed.success) {
+    const errors: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      const key = String(issue.path[0] ?? "form");
+      if (!errors[key]) errors[key] = issue.message;
+    }
+    return { ok: false, errors };
+  }
+  const data = parsed.data;
+  const db = await getDb();
+  const updated = await db
+    .update(event)
+    .set({
+      type: data.type,
+      title: data.title,
+      date: data.date,
+      year: parsePartialDate(data.date)?.year ?? null,
+      place: data.place,
+      prov: data.prov,
+      mediaId: data.mediaId,
+      updatedAt: new Date(),
+    })
+    .where(eq(event.id, id))
+    .returning({ id: event.id });
+  if (updated.length === 0) return { ok: false, errors: { form: "That event no longer exists." } };
+  await syncEventPeople(db, id, data.people);
+  revalidatePath("/");
+  return { ok: true, id };
+}
+
+export async function deleteEvent(id: string): Promise<{ ok: boolean }> {
+  if (!id) return { ok: false };
+  const db = await getDb();
+  // event_person rows cascade on the FK.
+  await db.delete(event).where(eq(event.id, id));
+  revalidatePath("/");
+  return { ok: true };
 }
 
 /**

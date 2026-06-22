@@ -19,6 +19,7 @@
  */
 import { pgTable, text, integer, boolean, timestamp, primaryKey, vector, index } from "drizzle-orm/pg-core";
 import { EMBEDDING_DIM } from "../lib/search/config";
+import { provStatuses } from "../lib/prov";
 
 const timestamps = {
   createdAt: timestamp("created_at").defaultNow(),
@@ -60,6 +61,12 @@ export const relationship = pgTable("relationship", {
     .notNull()
     .references(() => person.id, { onDelete: "cascade" }),
   status: text("status", { enum: ["married", "divorced"] }),
+  // Precision-aware partial dates ("YYYY" / "YYYY-MM" / "YYYY-MM-DD", see
+  // lib/dates.ts) for the spouse edge — when the couple married / divorced.
+  // Null until recorded; only meaningful on spouse rows. The timeline derives a
+  // marriage (and, when status="divorced", a divorce) event from these.
+  marriedDate: text("married_date"),
+  divorcedDate: text("divorced_date"),
   createdAt: timestamps.createdAt,
 });
 
@@ -89,6 +96,46 @@ export const personMedia = pgTable(
       .references(() => media.id, { onDelete: "cascade" }),
   },
   (t) => ({ pk: primaryKey({ columns: [t.personId, t.mediaId] }) }),
+);
+
+/**
+ * Life events the timeline shows but that aren't derivable from another table.
+ *
+ * Births, deaths, marriages and divorces are *derived* on read (from `person`
+ * and `relationship`) so editing a fact updates the timeline with no sync —
+ * they are never stored here. This table holds only the genuinely new events
+ * (immigration, military service, a graduation, a move…). An event can link to
+ * one or more people (`event_person`) and optionally cite a source document
+ * (`mediaId`). See lib/timeline.ts for how stored + derived events are merged.
+ */
+export const event = pgTable("event", {
+  id: text("id").primaryKey(),
+  type: text("type", {
+    enum: ["immigration", "military", "education", "career", "residence", "religious", "other"],
+  }).notNull(),
+  title: text("title").notNull(),
+  // Canonical partial-date string (precision implied), plus the derived 4-digit
+  // year kept alongside for sort/search — mirrors `person.bornDate`/`bornYear`.
+  date: text("date"),
+  year: integer("year"),
+  place: text("place"),
+  prov: text("prov", { enum: [...provStatuses] }).notNull().default("unverified"),
+  // Optional cited source document; cleared (not deleted) if the media is removed.
+  mediaId: text("media_id").references(() => media.id, { onDelete: "set null" }),
+  ...timestamps,
+});
+
+export const eventPerson = pgTable(
+  "event_person",
+  {
+    eventId: text("event_id")
+      .notNull()
+      .references(() => event.id, { onDelete: "cascade" }),
+    personId: text("person_id")
+      .notNull()
+      .references(() => person.id, { onDelete: "cascade" }),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.eventId, t.personId] }) }),
 );
 
 /**
@@ -123,4 +170,6 @@ export type PersonRow = typeof person.$inferSelect;
 export type RelationshipRow = typeof relationship.$inferSelect;
 export type MediaRow = typeof media.$inferSelect;
 export type PersonMediaRow = typeof personMedia.$inferSelect;
+export type EventRow = typeof event.$inferSelect;
+export type EventPersonRow = typeof eventPerson.$inferSelect;
 export type SearchDocRow = typeof searchDoc.$inferSelect;
