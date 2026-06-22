@@ -78,9 +78,12 @@ Schema in `app/src/db/schema.ts`; refined from the initial sketch:
   so the family graph below reconstructs deterministically regardless of how an
   edge was entered.
 - **media** — id, type (photo | certificate | article | obituary | other), title,
-  year, plus file fields (path, mime, original filename, description) left null
-  until upload exists.
-- **person_media** — links media to one or more people.
+  year, plus file fields (path, mime, original filename, description). Real upload
+  populates the file fields; legacy/seed rows leave them null (the read model
+  exposes `hasFile`/`mimeType` so the UI shows a real preview or a placeholder).
+- **person_media** — links media to one or more people. The read model derives a
+  real per-person `mediaCount` from these rows (which `docCount` now prefers over
+  the legacy `docs` JSON tally).
 - **event** + **event_person** — stored *custom* life events (immigration,
   military, education, career, residence, religious, other), each linkable to one
   or more people and an optional source document. Births, deaths, marriages and
@@ -134,7 +137,8 @@ npm run build        # build dist/ (needed before the app compiles)
 
 # Local services (repo root) — dev needs a database (and, for semantic search,
 # an embedding server) to talk to. docker-compose starts both:
-docker compose up -d # Postgres (pgvector/pgvector:pg16) at :5432 + TEI at :8080
+docker compose up -d # Postgres (pgvector/pgvector:pg16) :5432 + TEI :8080
+                     # + MinIO (S3-compatible media storage) :9000, console :9001
 
 # App (cd app/)
 npm install          # install app deps
@@ -195,9 +199,18 @@ rely on it for data).
   runs on infra you own — no data leaves the project. Omit the service (and the
   var) to run search lexical-only. The managed Postgres supports pgvector; the
   migration enables the extension on first boot.
-- **Media uploads** (not built yet) can't go on the ephemeral container disk either;
-  they'll need object storage (a Railway bucket or S3), streamed through an
-  authenticated route handler.
+- **Media storage**: uploaded files live in S3-compatible object storage (never the
+  ephemeral container disk). Production uses a **Railway managed Bucket** (create it
+  in the project; wire its credentials into the app service). Local dev uses the
+  MinIO docker-compose service. The app speaks the S3 API through the `minio` client
+  (`app/src/lib/storage`), reading these env vars (point them at the bucket in prod,
+  MinIO in dev): `STORAGE_ENDPOINT`, `STORAGE_PORT`, `STORAGE_USE_SSL`,
+  `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY`, `STORAGE_BUCKET` (default
+  `family-media`, auto-created on first use), `STORAGE_REGION`. Bytes are never on a
+  public path — they stream through the authenticated route `GET /api/media/[id]/file`
+  (session-gated by middleware, with Range support + `?download=1`). Upload is
+  `POST /api/media` (multipart; magic-byte sniffed, 25 MB cap, allow-listed
+  image/PDF — SVG/HTML rejected); delete is `DELETE /api/media/[id]`.
 
 ## Working agreement
 
@@ -220,6 +233,10 @@ into events automatically (editing a person/relationship updates the timeline
 with no sync), custom life events are stored + add/edit/deletable and linkable to
 people, drawn as River / Lanes / Decades with filters. Production runs on a
 managed Railway Postgres and boots empty; local dev uses Docker Postgres seeded
-with the demo family. Still stubbed: real media upload + protected serving (needs
-object storage), and Auth.js (a shared password gate stands in). Not yet wired:
-indexing events into hybrid search. Next up: media upload.
+with the demo family. **Media upload + archive is live**: files go to S3-compatible
+object storage (Railway Bucket in prod, MinIO in dev) via the `minio` client, are
+served through an authenticated, Range-capable route, and surface as real previews
+in the Gallery + person Documents tab (upload, view-detail, download, delete).
+Still stubbed: Auth.js (a shared password gate stands in) and image thumbnails
+(originals are served, lazy-loaded). Not yet wired: indexing events into hybrid
+search. Next up: thumbnail generation + Auth.js.

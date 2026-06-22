@@ -25,12 +25,15 @@ import {
   relationsOf,
   type Person,
   type Relation,
+  type MediaItem,
 } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import { eventsOf, fmtDate, meta } from "@/lib/timeline";
 import { Icon, type IconName } from "./Icon";
 import { PersonTimeline } from "./Timeline";
-import { MiniNode, DocDot } from "./shared";
+import { MiniNode, DocDot, MediaThumb, ClickableCard } from "./shared";
+import { MediaUpload } from "./MediaUpload";
+import { MediaDetail } from "./MediaDetail";
 import type { Screen } from "./AppShell";
 
 function bioParas(p: Person): string[] {
@@ -78,15 +81,19 @@ export function PersonRecord({
   id,
   onOpen,
   onNavigate,
+  onToast,
 }: {
   id: string;
   onOpen: (id: string, mode?: "edit") => void;
   onNavigate: (screen: Screen) => void;
+  onToast: (msg: string) => void;
 }) {
   const { people, media: allMedia, graph, events: allEvents } = useDataset();
   const p = people[id];
   const [docFilter, setDocFilter] = useState<string>("all");
   const [tab, setTab] = useState<string>("overview");
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [openMedia, setOpenMedia] = useState<MediaItem | null>(null);
 
   // The person may be absent from the current dataset — most commonly in the
   // brief window after creating someone, before router.refresh() pulls the new
@@ -202,19 +209,22 @@ export function PersonRecord({
   const shownDocs = media.filter((m) => docFilter === "all" || m.type === docFilter);
   const Documents = (
     <div style={{ paddingTop: "var(--space-lg)" }}>
-      <div style={{ display: "flex", gap: "var(--space-sm)", flexWrap: "wrap", marginBottom: "var(--space-lg)" }}>
+      <div style={{ display: "flex", gap: "var(--space-sm)", flexWrap: "wrap", marginBottom: "var(--space-lg)", alignItems: "center" }}>
         {docTypes.map(([k, label, dot]) => (
           <Chip key={k} selected={docFilter === k} dot={dot} onClick={() => setDocFilter(k)}>
             {label}
           </Chip>
         ))}
+        <span style={{ marginLeft: "auto" }}>
+          <Button variant="secondary" size="sm" iconStart={<Icon name="upload" size={16} />} onClick={() => setUploadOpen(true)}>
+            Add document
+          </Button>
+        </span>
       </div>
       <div className="app-grid-docs">
         {shownDocs.map((m) => (
-          <Card key={m.id} style={{ padding: 0, overflow: "hidden" }}>
-            <div className="app-ph" style={{ height: 130, borderRadius: 0, borderWidth: "0 0 1px 0" }}>
-              {m.type === "photo" ? "photo" : "document scan"}
-            </div>
+          <ClickableCard key={m.id} ariaLabel={`Open ${m.title}`} onOpen={() => setOpenMedia(m)}>
+            <MediaThumb media={m} style={{ height: 130, borderRadius: 0, borderBottom: "1px solid var(--color-border)" }} />
             <div style={{ padding: "var(--space-md)" }}>
               <div
                 style={{
@@ -233,7 +243,7 @@ export function PersonRecord({
               </div>
               <div style={{ fontSize: "var(--text-body-sm)", lineHeight: 1.3 }}>{m.title}</div>
             </div>
-          </Card>
+          </ClickableCard>
         ))}
       </div>
     </div>
@@ -400,6 +410,14 @@ export function PersonRecord({
           />
         </div>
       </div>
+
+      <MediaUpload
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        onToast={onToast}
+        preselectPersonId={id}
+      />
+      <MediaDetail media={openMedia} onClose={() => setOpenMedia(null)} onOpen={onOpen} onToast={onToast} />
     </div>
   );
 }

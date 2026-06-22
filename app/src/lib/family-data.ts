@@ -46,6 +46,8 @@ export interface Person {
   living: boolean;
   notes?: string | null;
   docs: Partial<Record<DocType, number>>;
+  /** Real count of attached media (derived from person_media in queries.ts). */
+  mediaCount: number;
   prov?: Partial<Record<string, ProvFact>>;
 }
 
@@ -55,6 +57,24 @@ export interface MediaItem {
   title: string;
   year: number;
   people: string[];
+  /** Stored MIME type once a file is attached; null for fileless (legacy) rows. */
+  mimeType: string | null;
+  /** Whether an actual file is stored for this item (filePath is set). */
+  hasFile: boolean;
+}
+
+/** The authenticated route that streams a media item's bytes. */
+export function mediaFileUrl(id: string): string {
+  return `/api/media/${encodeURIComponent(id)}/file`;
+}
+
+/** The same route with `?download=1` so the browser saves rather than renders. */
+export function mediaDownloadUrl(id: string): string {
+  return `${mediaFileUrl(id)}?download=1`;
+}
+
+export function isImageMime(mime: string | null | undefined): boolean {
+  return !!mime && mime.startsWith("image/");
 }
 
 /**
@@ -138,6 +158,9 @@ export function placeAndYear(year: number | null, place: string | null): string 
 }
 
 export function docCount(p: Person): number {
+  // Prefer the real count of attached media; fall back to the legacy `docs`
+  // tally for rows seeded before real upload existed.
+  if (p.mediaCount > 0) return p.mediaCount;
   return Object.values(p.docs || {}).reduce<number>((a, b) => a + (b ?? 0), 0);
 }
 

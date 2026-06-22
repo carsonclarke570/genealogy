@@ -1,0 +1,222 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Avatar, Button, Dialog, DocChip, ProvenanceMark } from "@family-archive/ui";
+import {
+  fullName,
+  lifeDates,
+  mediaFileUrl,
+  mediaDownloadUrl,
+  isImageMime,
+  type MediaItem,
+} from "@/lib/family-data";
+import { useDataset } from "@/lib/dataset";
+import { deleteMedia } from "@/lib/media-client";
+import { Icon } from "./Icon";
+
+/** A label/value row in the detail metadata list. */
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", gap: "var(--space-md)", alignItems: "baseline", fontSize: "var(--text-body-sm)" }}>
+      <span className="app-muted" style={{ width: 76, flex: "none" }}>
+        {label}
+      </span>
+      <span style={{ color: "var(--color-ink)" }}>{children}</span>
+    </div>
+  );
+}
+
+/** The file preview area — a real image, an embedded PDF, or a placeholder. */
+function Preview({ media }: { media: MediaItem }) {
+  if (media.hasFile && isImageMime(media.mimeType)) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={mediaFileUrl(media.id)}
+        alt={media.title}
+        // min-height reserves space so the centered dialog doesn't jump as the image loads.
+        style={{ width: "100%", minHeight: 160, maxHeight: 360, objectFit: "contain", borderRadius: "var(--radius-sm)", background: "var(--color-surface-sunken)" }}
+      />
+    );
+  }
+  if (media.hasFile && media.mimeType === "application/pdf") {
+    return (
+      <object data={mediaFileUrl(media.id)} type="application/pdf" style={{ width: "100%", height: 360, borderRadius: "var(--radius-sm)" }}>
+        <div className="app-ph" style={{ height: 200 }}>
+          <a href={mediaFileUrl(media.id)} target="_blank" rel="noreferrer">
+            Open PDF
+          </a>
+        </div>
+      </object>
+    );
+  }
+  return (
+    <div className="app-ph" style={{ height: 240 }}>
+      {media.type === "photo" ? "photo" : "scanned " + media.type}
+    </div>
+  );
+}
+
+export function MediaDetail({
+  media,
+  onClose,
+  onOpen,
+  onToast,
+}: {
+  media: MediaItem | null;
+  onClose: () => void;
+  onOpen: (personId: string) => void;
+  onToast: (msg: string) => void;
+}) {
+  const router = useRouter();
+  const { people } = useDataset();
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!media) return null;
+  const status = media.type === "photo" ? "unverified" : "verified";
+
+  const close = () => {
+    if (busy) return;
+    setConfirming(false);
+    setError(null);
+    onClose();
+  };
+
+  const startConfirm = (on: boolean) => {
+    setConfirming(on);
+    setError(null);
+  };
+
+  const remove = async () => {
+    setBusy(true);
+    setError(null);
+    const result = await deleteMedia(media.id);
+    setBusy(false);
+    if (result.ok) {
+      onToast("Media deleted");
+      setConfirming(false);
+      onClose();
+      router.refresh();
+    } else {
+      // Keep the dialog open on the confirm step so the user can retry; the
+      // app's toast is success-only, so the failure is surfaced inline here.
+      setError(result.errors.form ?? "Couldn’t delete this record. Check your connection and try again.");
+    }
+  };
+
+  return (
+    <Dialog
+      open={!!media}
+      onClose={close}
+      title={media.title}
+      description={
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <DocChip type={media.type} /> · <span className="tnum">{media.year}</span>
+        </span>
+      }
+      footer={
+        confirming ? (
+          <>
+            <span
+              role={error ? "alert" : undefined}
+              style={{
+                marginRight: "auto",
+                fontSize: "var(--text-body-sm)",
+                color: error ? "var(--color-danger)" : "var(--color-muted)",
+              }}
+            >
+              {error ?? "Delete permanently? This can’t be undone."}
+            </span>
+            <Button variant="ghost" onClick={() => startConfirm(false)} disabled={busy}>
+              {error ? "Cancel" : "Keep"}
+            </Button>
+            <Button variant="danger" onClick={remove} loading={busy} iconStart={<Icon name="trash" size={16} />}>
+              {error ? "Try again" : "Delete"}
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="ghost" onClick={() => startConfirm(true)} iconStart={<Icon name="trash" size={16} />}>
+              Delete
+            </Button>
+            <Button variant="ghost" onClick={close}>
+              Close
+            </Button>
+            {media.hasFile && (
+              <Button
+                variant="primary"
+                iconStart={<Icon name="download" size={16} />}
+                onClick={() => {
+                  // The serve route sets Content-Disposition: attachment for
+                  // ?download=1, so the browser downloads without navigating away.
+                  window.location.href = mediaDownloadUrl(media.id);
+                }}
+              >
+                Download
+              </Button>
+            )}
+          </>
+        )
+      }
+    >
+      <div style={{ marginBottom: "var(--space-lg)" }}>
+        <Preview media={media} />
+      </div>
+
+      <div style={{ display: "grid", gap: "var(--space-sm)", marginBottom: "var(--space-lg)" }}>
+        <Row label="Record ID">
+          <span className="text-mono">{media.id}</span>
+        </Row>
+        <Row label="Type">
+          <span style={{ textTransform: "capitalize" }}>{media.type}</span>
+        </Row>
+        <Row label="Date">
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }} className="tnum">
+            {media.year}
+            <ProvenanceMark status={status} />
+          </span>
+        </Row>
+      </div>
+
+      {media.people.length > 0 && (
+        <>
+          <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
+            People in this record
+          </div>
+          <div style={{ display: "grid", gap: "var(--space-xs)" }}>
+            {media.people.map((pid) => {
+              const p = people[pid];
+              if (!p) return null;
+              return (
+                <button
+                  key={pid}
+                  className="app-mediaperson"
+                  onClick={() => {
+                    close();
+                    onOpen(pid);
+                  }}
+                >
+                  <Avatar name={fullName(p)} size="sm" />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: "var(--font-serif)", fontSize: "var(--text-body)", color: "var(--color-ink)" }}>
+                      {fullName(p)}
+                    </div>
+                    <div className="app-muted tnum" style={{ fontSize: "var(--text-label)" }}>
+                      {lifeDates(p)}
+                    </div>
+                  </div>
+                  <span style={{ color: "var(--color-muted)", display: "inline-flex" }}>
+                    <Icon name="chevron" />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </Dialog>
+  );
+}
