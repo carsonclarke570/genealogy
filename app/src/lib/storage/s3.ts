@@ -36,16 +36,31 @@ let clientPromise: Client | null = null;
 
 function getClient(): Client {
   if (clientPromise) return clientPromise;
-  const endPoint = env("STORAGE_ENDPOINT");
+  const rawEndpoint = env("STORAGE_ENDPOINT");
   const accessKey = env("STORAGE_ACCESS_KEY");
   const secretKey = env("STORAGE_SECRET_KEY");
-  if (!endPoint) throw new Error("STORAGE_ENDPOINT is not set");
+  if (!rawEndpoint) throw new Error("STORAGE_ENDPOINT is not set");
   if (!accessKey || !secretKey) throw new Error("STORAGE_ACCESS_KEY / STORAGE_SECRET_KEY are not set");
+
+  // STORAGE_ENDPOINT is either a bare host ("localhost", with STORAGE_PORT /
+  // STORAGE_USE_SSL set alongside — the docker-compose MinIO case) or a full S3
+  // endpoint URL ("https://host[:port]" — what a Railway Bucket exposes). When
+  // it's a URL, the scheme/host/port drive the client directly; otherwise fall
+  // back to the discrete STORAGE_PORT / STORAGE_USE_SSL vars.
+  let endPoint = rawEndpoint;
+  let useSSL = env("STORAGE_USE_SSL") === "true";
+  let port = env("STORAGE_PORT") ? Number(env("STORAGE_PORT")) : undefined;
+  if (/^https?:\/\//i.test(rawEndpoint)) {
+    const u = new URL(rawEndpoint);
+    endPoint = u.hostname;
+    useSSL = u.protocol === "https:";
+    port = u.port ? Number(u.port) : useSSL ? 443 : 80;
+  }
 
   clientPromise = new Client({
     endPoint,
-    port: Number(env("STORAGE_PORT") ?? 9000),
-    useSSL: env("STORAGE_USE_SSL") === "true",
+    port: port ?? 9000,
+    useSSL,
     accessKey,
     secretKey,
     region: env("STORAGE_REGION") ?? "us-east-1",
