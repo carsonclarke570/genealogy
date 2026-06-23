@@ -17,7 +17,17 @@
  * document tally and per-fact confidence that the UI already renders; when real
  * media upload lands, `docs` can migrate to a count derived from `person_media`.
  */
-import { pgTable, text, integer, boolean, timestamp, primaryKey, vector, index } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  integer,
+  boolean,
+  timestamp,
+  primaryKey,
+  vector,
+  index,
+  doublePrecision,
+} from "drizzle-orm/pg-core";
 import { EMBEDDING_DIM } from "../lib/search/config";
 import { provStatuses } from "../lib/prov";
 
@@ -67,6 +77,12 @@ export const relationship = pgTable("relationship", {
   // marriage (and, when status="divorced", a divorce) event from these.
   marriedDate: text("married_date"),
   divorcedDate: text("divorced_date"),
+  // Provenance for the marriage / divorce dates — the unified model used across
+  // the app: a confidence status plus an optional linked source document.
+  marriedProv: text("married_prov", { enum: [...provStatuses] }).notNull().default("unverified"),
+  marriedMediaId: text("married_media_id").references(() => media.id, { onDelete: "set null" }),
+  divorcedProv: text("divorced_prov", { enum: [...provStatuses] }).notNull().default("unverified"),
+  divorcedMediaId: text("divorced_media_id").references(() => media.id, { onDelete: "set null" }),
   createdAt: timestamps.createdAt,
 });
 
@@ -82,6 +98,9 @@ export const media = pgTable("media", {
   mimeType: text("mime_type"),
   originalFilename: text("original_filename"),
   description: text("description"),
+  // How confident we are this item is what it claims to be (the unified
+  // provenance status); the document itself is the source, so no mediaId here.
+  prov: text("prov", { enum: [...provStatuses] }).notNull().default("unverified"),
   createdAt: timestamps.createdAt,
 });
 
@@ -183,6 +202,43 @@ export const personName = pgTable(
 );
 
 /**
+ * Where a person lived, and for what span — a first-class record (not an `event`,
+ * which is point-in-time). A residence has a start and an optional end date
+ * (precision-aware partial-date strings, like births), a structured location
+ * (country → address, with optional coordinates) plus a display label, and the
+ * unified provenance (status + optional linked source document + note). The
+ * timeline derives a span event from each row (see lib/timeline.ts).
+ */
+export const residence = pgTable(
+  "residence",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id")
+      .notNull()
+      .references(() => person.id, { onDelete: "cascade" }),
+    // Structured location parts (any may be null) + the human display string.
+    country: text("country"),
+    region: text("region"),
+    locality: text("locality"),
+    address: text("address"),
+    placeLabel: text("place_label").notNull(),
+    lat: doublePrecision("lat"),
+    lng: doublePrecision("lng"),
+    placeId: text("place_id"),
+    // Canonical partial-date strings + derived 4-digit years (mirrors person dates).
+    startDate: text("start_date"),
+    startYear: integer("start_year"),
+    endDate: text("end_date"),
+    endYear: integer("end_year"),
+    prov: text("prov", { enum: [...provStatuses] }).notNull().default("unverified"),
+    mediaId: text("media_id").references(() => media.id, { onDelete: "set null" }),
+    note: text("note"),
+    ...timestamps,
+  },
+  (t) => ({ personIdx: index("residence_person_idx").on(t.personId) }),
+);
+
+/**
  * Search index — a decoupled, denormalised view of the searchable corpus
  * (people + media), one row per indexed entity, kept in sync by the indexing
  * pipeline (lib/search/index-doc.ts). Hybrid search (lib/search/query.ts) ranks
@@ -217,4 +273,5 @@ export type MediaRow = typeof media.$inferSelect;
 export type PersonMediaRow = typeof personMedia.$inferSelect;
 export type EventRow = typeof event.$inferSelect;
 export type EventPersonRow = typeof eventPerson.$inferSelect;
+export type ResidenceRow = typeof residence.$inferSelect;
 export type SearchDocRow = typeof searchDoc.$inferSelect;

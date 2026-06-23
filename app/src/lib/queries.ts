@@ -11,27 +11,40 @@ import "server-only";
 import { z } from "zod";
 import { getDb } from "@/db/client";
 import * as schema from "@/db/schema";
-import type { Person, MediaItem, Dataset, EventType, NameReason } from "./family-data";
+import type { Person, MediaItem, Dataset, EventType, NameReason, Residence, ProvFact } from "./family-data";
 import { assemblePersonNames } from "./family-data";
 import { buildFamilyGraph, type RelationshipEdge } from "./family-graph";
 import { buildTimeline, type StoredEvent } from "./timeline";
 import { provStatuses, type ProvStatus } from "./prov";
 import { parsePartialDate } from "./dates";
+import { locationFromColumns } from "./locations";
 
 // Keys are validated structurally (string); values carry the real constraints.
 const docsSchema = z.record(z.string(), z.number()).catch({});
-// A fact is stored as `{ status, source? }`; legacy rows hold a bare status
-// string. Accept both and normalise to the object shape on the way out.
-const provFactSchema = z.union([
-  z.enum(provStatuses).transform((status) => ({ status, source: null })),
-  z.object({
-    status: z.enum(provStatuses),
-    source: z
-      .string()
-      .nullish()
-      .transform((s) => s ?? null),
-  }),
-]);
+// The unified fact shape is `{ status, mediaId?, note? }`. Legacy rows hold either
+// a bare status string or `{ status, source: <free-text> }`; accept all three and
+// normalise. The free-text legacy `source` is preserved (shown until a real
+// document is linked); `source` is otherwise resolved from `mediaId` on read.
+const provFactSchema = z
+  .union([
+    z.enum(provStatuses).transform((status) => ({ status, mediaId: null, note: null, source: null })),
+    z.object({
+      status: z.enum(provStatuses),
+      mediaId: z
+        .string()
+        .nullish()
+        .transform((s) => s ?? null),
+      note: z
+        .string()
+        .nullish()
+        .transform((s) => s ?? null),
+      source: z
+        .string()
+        .nullish()
+        .transform((s) => s ?? null),
+    }),
+  ])
+  .transform((f) => ({ status: f.status, mediaId: f.mediaId ?? null, note: f.note ?? null, source: f.source ?? null }));
 const provSchema = z.record(z.string(), provFactSchema).catch({});
 
 function parseJson<T>(raw: string, schema: z.ZodType<T>): T {
@@ -45,7 +58,7 @@ function parseJson<T>(raw: string, schema: z.ZodType<T>): T {
 export async function getDataset(): Promise<Dataset> {
   const db = await getDb();
   // Independent table reads — fetch concurrently rather than round-trip by round-trip.
-  const [personRows, relationshipRows, mediaRows, links, eventRows, eventLinks, nameRows] =
+  const [personRows, relationshipRows, mediaRows, links, eventRows, eventLinks, nameRows, residenceRows] =
     await Promise.all([
       db.select().from(schema.person),
       db.select().from(schema.relationship),
@@ -54,6 +67,7 @@ export async function getDataset(): Promise<Dataset> {
       db.select().from(schema.event),
       db.select().from(schema.eventPerson),
       db.select().from(schema.personName),
+      db.select().from(schema.residence),
     ]);
 
   // Real attached-media count per person, derived from the link table.
@@ -64,6 +78,23 @@ export async function getDataset(): Promise<Dataset> {
 
   // Names: the per-person history, with cited sources resolved from media rows.
   const mediaById = new Map(mediaRows.map((m) => [m.id, { id: m.id, title: m.title, type: m.type }]));
+
+  /** Resolve a parsed prov map's linked-doc ids to display source titles. */
+  const resolveProv = (
+    raw: Record<string, { status: ProvStatus; mediaId: string | null; note: string | null; source: string | null }>,
+  ): Partial<Record<string, ProvFact>> => {
+    const out: Partial<Record<string, ProvFact>> = {};
+    for (const [field, fact] of Object.entries(raw)) {
+      const doc = fact.mediaId ? mediaById.get(fact.mediaId) : null;
+      out[field] = {
+        status: fact.status,
+        mediaId: fact.mediaId,
+        note: fact.note,
+        source: doc ? doc.title : fact.source,
+      };
+    }
+    return out;
+  };
   const namesByPerson = assemblePersonNames(
     nameRows.map((r) => ({
       id: r.id,
@@ -107,7 +138,7 @@ export async function getDataset(): Promise<Dataset> {
       notes: r.notes,
       docs: parseJson(r.docs, docsSchema),
       mediaCount: mediaCountByPerson.get(r.id) ?? 0,
-      prov: parseJson(r.prov, provSchema),
+      prov: resolveProv(parseJson(r.prov, provSchema)),
     };
   }
 
@@ -115,6 +146,9 @@ export async function getDataset(): Promise<Dataset> {
   for (const l of links) {
     (peopleByMedia.get(l.mediaId) ?? peopleByMedia.set(l.mediaId, []).get(l.mediaId)!).push(l.personId);
   }
+  const normProv = (raw: string | null | undefined): ProvStatus =>
+    ((provStatuses as readonly string[]).includes(raw ?? "") ? raw : "unverified") as ProvStatus;
+
   const media: MediaItem[] = mediaRows.map((m) => ({
     id: m.id,
     type: m.type,
@@ -122,6 +156,7 @@ export async function getDataset(): Promise<Dataset> {
     year: m.year ?? 0,
     people: peopleByMedia.get(m.id) ?? [],
     description: m.description ?? null,
+    prov: normProv(m.prov),
     mimeType: m.mimeType,
     hasFile: m.filePath != null,
   }));
@@ -134,7 +169,31 @@ export async function getDataset(): Promise<Dataset> {
     status: r.status,
     marriedDate: r.marriedDate,
     divorcedDate: r.divorcedDate,
+    marriedProv: normProv(r.marriedProv),
+    marriedMediaId: r.marriedMediaId,
+    marriedSource: r.marriedMediaId ? mediaById.get(r.marriedMediaId) ?? null : null,
+    divorcedProv: normProv(r.divorcedProv),
+    divorcedMediaId: r.divorcedMediaId,
+    divorcedSource: r.divorcedMediaId ? mediaById.get(r.divorcedMediaId) ?? null : null,
   }));
+
+  const residences: Residence[] = residenceRows.map((r) => {
+    const start = parsePartialDate(r.startDate);
+    const end = parsePartialDate(r.endDate);
+    return {
+      id: r.id,
+      personId: r.personId,
+      location: locationFromColumns(r),
+      place: r.placeLabel,
+      start,
+      end,
+      startYear: start?.year ?? r.startYear ?? null,
+      endYear: end?.year ?? r.endYear ?? null,
+      prov: normProv(r.prov),
+      source: r.mediaId ? mediaById.get(r.mediaId) ?? null : null,
+      note: r.note,
+    };
+  });
 
   // Stored custom events + their linked people, for the timeline read model.
   const peopleByEvent = new Map<string, string[]>();
@@ -159,6 +218,7 @@ export async function getDataset(): Promise<Dataset> {
     graph: buildFamilyGraph(relationships),
     relationships,
     media,
-    events: buildTimeline({ people, relationships, media, events }),
+    residences,
+    events: buildTimeline({ people, relationships, media, residences, events }),
   };
 }

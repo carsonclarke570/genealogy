@@ -14,19 +14,23 @@ import { revalidatePath } from "next/cache";
 import { and, eq, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/db/client";
-import { person, personName, relationship, event, eventPerson, media } from "@/db/schema";
+import { person, personName, relationship, event, eventPerson, media, residence } from "@/db/schema";
 import { provStatuses, type ProvStatus } from "./prov";
 import { dateSortKey, type NameReason } from "./family-data";
 import { parsePartialDate, serializePartialDate } from "./dates";
+import { locationToColumns } from "./locations";
+import type { LocationValue } from "@family-archive/ui";
 import { indexPerson } from "./search/index-doc";
 
-/** The event types a user can add by hand (births/deaths/etc. are derived). */
+/**
+ * The event types a user can add by hand (births/deaths/etc. are derived;
+ * residence is a first-class span persisted via createResidence, not here).
+ */
 const STORED_EVENT_TYPE_VALUES = [
   "immigration",
   "military",
   "education",
   "career",
-  "residence",
   "religious",
   "other",
 ] as const;
@@ -76,10 +80,24 @@ function parseRelationships(raw: FormDataEntryValue | null): RelationDraft[] {
   }
 }
 
-/** An edit to an existing relationship edge: remove it, or set a spouse edge's dates. */
+/** An edit to an existing relationship edge: remove it, or set a spouse edge's dates + provenance. */
 export type RelationOp =
   | { op: "remove"; id: string }
-  | { op: "setDates"; id: string; marriedDate: string | null; divorcedDate: string | null };
+  | {
+      op: "setDates";
+      id: string;
+      marriedDate: string | null;
+      divorcedDate: string | null;
+      marriedProv?: string;
+      marriedMediaId?: string | null;
+      divorcedProv?: string;
+      divorcedMediaId?: string | null;
+    };
+
+const optionalMediaId = z
+  .string()
+  .nullish()
+  .transform((v) => (v && v.length && v !== "__new" ? v : null));
 
 const relationOpSchema = z
   .array(
@@ -90,6 +108,10 @@ const relationOpSchema = z
         id: z.string().min(1),
         marriedDate: z.string().nullable(),
         divorcedDate: z.string().nullable(),
+        marriedProv: z.enum(provStatuses).catch("unverified"),
+        marriedMediaId: optionalMediaId,
+        divorcedProv: z.enum(provStatuses).catch("unverified"),
+        divorcedMediaId: optionalMediaId,
       }),
     ]),
   )
@@ -143,18 +165,26 @@ const PROV_KEY_MAP: Record<string, string> = {
   deathPlace: "diedPlace",
 };
 
-// The form serialises each mark as `{ status, source? }` (ProvenanceMark cites a
-// source when verified). Both status and source are persisted. Tolerate a bare
-// status string too, so older/simpler callers still work.
+// The form serialises each mark under the unified model `{ status, mediaId?, note? }`
+// (ProvenanceMark cites a *document* when verified). Tolerate a bare status string,
+// and a legacy `{ status, source }` free-text label, so older callers still work.
 const provStatusSchema = z.enum(provStatuses);
 const provFactInput = z.union([
-  provStatusSchema.transform((status) => ({ status, source: null as string | null })),
+  provStatusSchema.transform((status) => ({ status, mediaId: null as string | null, note: null as string | null, source: null as string | null })),
   z.object({
     status: provStatusSchema,
+    mediaId: z
+      .string()
+      .nullish()
+      .transform((s) => (s && s.length && s !== "__new" ? s : null)),
+    note: z
+      .string()
+      .nullish()
+      .transform((s) => (s && s.length ? s : null)),
     source: z
       .string()
       .nullish()
-      .transform((s) => s ?? null),
+      .transform((s) => (s && s.length ? s : null)),
   }),
 ]);
 const provInputSchema = z.record(z.string(), provFactInput).catch({});
@@ -169,10 +199,10 @@ function remapProv(raw: FormDataEntryValue | null): string {
     }
   }
   const validated = provInputSchema.parse(parsed);
-  const out: Record<string, { status: string; source: string | null }> = {};
+  const out: Record<string, { status: string; mediaId: string | null; note: string | null; source: string | null }> = {};
   for (const [formKey, fact] of Object.entries(validated)) {
     const domainKey = PROV_KEY_MAP[formKey];
-    if (domainKey) out[domainKey] = { status: fact.status, source: fact.source };
+    if (domainKey) out[domainKey] = { status: fact.status, mediaId: fact.mediaId, note: fact.note, source: fact.source };
   }
   return JSON.stringify(out);
 }
@@ -358,7 +388,18 @@ async function applyRelationshipOps(db: DB, subjectId: string, ops: RelationOp[]
   const toRemove = removeIds.filter((id) => owned.has(id));
   if (toRemove.length > 0) await db.delete(relationship).where(inArray(relationship.id, toRemove));
 
-  // Dates only apply to spouse edges; status follows whether a divorce was recorded.
+  // Validate any cited source documents up front (FK would otherwise reject them).
+  const citedIds = [
+    ...new Set(
+      dateOps.flatMap((o) => [o.marriedMediaId, o.divorcedMediaId]).filter((x): x is string => !!x),
+    ),
+  ];
+  const validMedia = citedIds.length
+    ? new Set((await db.select({ id: media.id }).from(media).where(inArray(media.id, citedIds))).map((m) => m.id))
+    : new Set<string>();
+  const okMedia = (id: string | null | undefined) => (id && validMedia.has(id) ? id : null);
+
+  // Dates + provenance only apply to spouse edges; status follows whether a divorce was recorded.
   for (const o of dateOps) {
     if (!owned.has(o.id) || kindById.get(o.id) !== "spouse") continue;
     await db
@@ -367,6 +408,10 @@ async function applyRelationshipOps(db: DB, subjectId: string, ops: RelationOp[]
         marriedDate: o.marriedDate,
         divorcedDate: o.divorcedDate,
         status: o.divorcedDate ? "divorced" : "married",
+        marriedProv: ((provStatuses as readonly string[]).includes(o.marriedProv ?? "") ? o.marriedProv : "unverified") as ProvStatus,
+        marriedMediaId: okMedia(o.marriedMediaId),
+        divorcedProv: ((provStatuses as readonly string[]).includes(o.divorcedProv ?? "") ? o.divorcedProv : "unverified") as ProvStatus,
+        divorcedMediaId: okMedia(o.divorcedMediaId),
       })
       .where(eq(relationship.id, o.id));
   }
@@ -749,6 +794,136 @@ export async function deleteEvent(id: string): Promise<{ ok: boolean }> {
   const db = await getDb();
   // event_person rows cascade on the FK.
   await db.delete(event).where(eq(event.id, id));
+  revalidatePath("/");
+  return { ok: true };
+}
+
+// ── Residencies ───────────────────────────────────────────────────────────────
+// Where a person lived, for a span of time. First-class (not an `event`): a start
+// and an optional end date, a structured location, and the unified provenance.
+
+export type ResidenceResult =
+  | { ok: true; id: string }
+  | { ok: false; errors: Record<string, string> };
+
+/** The shape the Add/Edit-residence dialog submits (controlled client state). */
+export interface ResidenceInput {
+  personId: string;
+  /** The chosen place (label + structured parts + optional coordinates). */
+  location: LocationValue | null;
+  /** Canonical partial-date strings ("YYYY" / "YYYY-MM" / "YYYY-MM-DD"), or null. */
+  start: string | null;
+  end?: string | null;
+  prov?: string;
+  /** A cited source document id, or null. */
+  mediaId?: string | null;
+  note?: string | null;
+}
+
+const locationInputSchema = z
+  .object({
+    label: z.string(),
+    country: z.string().nullish(),
+    region: z.string().nullish(),
+    locality: z.string().nullish(),
+    address: z.string().nullish(),
+    lat: z.number().nullish(),
+    lng: z.number().nullish(),
+    placeId: z.string().nullish(),
+  })
+  .nullable();
+
+const residenceInputSchema = z.object({
+  personId: z.string().min(1, "Pick whose residence this is"),
+  location: locationInputSchema,
+  start: z
+    .string()
+    .nullish()
+    .transform((v) => serializePartialDate(parsePartialDate(v ?? null))),
+  end: z
+    .string()
+    .nullish()
+    .transform((v) => serializePartialDate(parsePartialDate(v ?? null))),
+  prov: z.enum(provStatuses).catch("unverified"),
+  mediaId: z
+    .string()
+    .nullish()
+    .transform((v) => (v && v.length && v !== "__new" ? v : null)),
+  note: optionalText,
+});
+
+/** Validate a residence draft into the column values to write, or field errors. */
+async function residenceColumns(
+  db: DB,
+  input: ResidenceInput,
+): Promise<{ ok: true; cols: Record<string, unknown> } | { ok: false; errors: Record<string, string> }> {
+  const parsed = residenceInputSchema.safeParse(input);
+  if (!parsed.success) {
+    const errors: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      const key = String(issue.path[0] ?? "form");
+      if (!errors[key]) errors[key] = issue.message;
+    }
+    return { ok: false, errors };
+  }
+  const data = parsed.data;
+
+  const loc = locationToColumns(data.location as LocationValue | null);
+  if (!loc) return { ok: false, errors: { location: "Choose where they lived" } };
+
+  // The person and any cited document must exist (FKs would reject otherwise).
+  const [people, docs] = await Promise.all([
+    db.select({ id: person.id }).from(person).where(eq(person.id, data.personId)),
+    data.mediaId ? db.select({ id: media.id }).from(media).where(eq(media.id, data.mediaId)) : Promise.resolve([] as { id: string }[]),
+  ]);
+  if (people.length === 0) return { ok: false, errors: { personId: "That person no longer exists." } };
+  const mediaId = data.mediaId && docs.length ? data.mediaId : null;
+
+  return {
+    ok: true,
+    cols: {
+      personId: data.personId,
+      ...loc,
+      startDate: data.start,
+      startYear: parsePartialDate(data.start)?.year ?? null,
+      endDate: data.end,
+      endYear: parsePartialDate(data.end)?.year ?? null,
+      prov: data.prov,
+      mediaId,
+      note: data.note,
+    },
+  };
+}
+
+export async function createResidence(input: ResidenceInput): Promise<ResidenceResult> {
+  const db = await getDb();
+  const built = await residenceColumns(db, input);
+  if (!built.ok) return built;
+  const id = randomUUID();
+  await db.insert(residence).values({ id, ...built.cols } as typeof residence.$inferInsert);
+  revalidatePath("/");
+  return { ok: true, id };
+}
+
+export async function updateResidence(id: string, input: ResidenceInput): Promise<ResidenceResult> {
+  if (!id) return { ok: false, errors: { form: "Missing the residence to update." } };
+  const db = await getDb();
+  const built = await residenceColumns(db, input);
+  if (!built.ok) return built;
+  const updated = await db
+    .update(residence)
+    .set({ ...built.cols, updatedAt: new Date() } as Partial<typeof residence.$inferInsert>)
+    .where(eq(residence.id, id))
+    .returning({ id: residence.id });
+  if (updated.length === 0) return { ok: false, errors: { form: "That residence no longer exists." } };
+  revalidatePath("/");
+  return { ok: true, id };
+}
+
+export async function deleteResidence(id: string): Promise<{ ok: boolean }> {
+  if (!id) return { ok: false };
+  const db = await getDb();
+  await db.delete(residence).where(eq(residence.id, id));
   revalidatePath("/");
   return { ok: true };
 }

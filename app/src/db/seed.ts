@@ -11,7 +11,7 @@
 import { count } from "drizzle-orm";
 import { type NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "./schema";
-import { people, units, media, events } from "./seed-data";
+import { people, units, media, events, residences } from "./seed-data";
 import { parsePartialDate } from "../lib/dates";
 
 type DB = NodePgDatabase<typeof schema>;
@@ -52,8 +52,27 @@ export async function seed(db: DB): Promise<{ seeded: boolean }> {
       });
     }
 
+    // Media is inserted *before* relationships so a marriage's cited source FK
+    // (married_media_id) resolves; person_media links resolve off the people above.
+    for (const m of media) {
+      // Certificates and obituaries are official records → seed them verified;
+      // everything else starts unverified (the curator can confirm later).
+      const prov = m.type === "certificate" || m.type === "obituary" ? "verified" : "unverified";
+      await tx.insert(schema.media).values({ id: m.id, type: m.type, title: m.title, year: m.year, prov });
+      for (const pid of m.people) {
+        await tx.insert(schema.personMedia).values({ personId: pid, mediaId: m.id });
+      }
+    }
+
+    // A marriage cites a wedding/marriage document (linked to both partners) as its
+    // source, mirroring how the timeline used to infer it — so the demo opens with a
+    // few "verified" marriages instead of every one reading unverified.
+    const marriageSource = (a: string, b: string): string | null =>
+      media.find((m) => m.people.includes(a) && m.people.includes(b) && /\b(marri|wedding)/i.test(m.title))?.id ?? null;
+
     for (const u of units) {
       if (u.partner) {
+        const src = marriageSource(u.anchor, u.partner);
         await tx.insert(schema.relationship).values({
           id: `r_spouse_${u.id}`,
           kind: "spouse",
@@ -62,6 +81,8 @@ export async function seed(db: DB): Promise<{ seeded: boolean }> {
           status: u.rel,
           marriedDate: u.married ?? null,
           divorcedDate: u.divorced ?? null,
+          marriedProv: src ? "verified" : "unverified",
+          marriedMediaId: src,
         });
       }
       if (u.parent) {
@@ -111,13 +132,6 @@ export async function seed(db: DB): Promise<{ seeded: boolean }> {
       }
     }
 
-    for (const m of media) {
-      await tx.insert(schema.media).values({ id: m.id, type: m.type, title: m.title, year: m.year });
-      for (const pid of m.people) {
-        await tx.insert(schema.personMedia).values({ personId: pid, mediaId: m.id });
-      }
-    }
-
     for (const e of events) {
       await tx.insert(schema.event).values({
         id: e.id,
@@ -132,6 +146,27 @@ export async function seed(db: DB): Promise<{ seeded: boolean }> {
       for (const pid of e.people) {
         await tx.insert(schema.eventPerson).values({ eventId: e.id, personId: pid });
       }
+    }
+
+    // Residencies (where people lived). Inserted after media so a cited source FK
+    // resolves. The display label doubles as the structured `placeLabel`.
+    for (const r of residences) {
+      await tx.insert(schema.residence).values({
+        id: r.id,
+        personId: r.personId,
+        country: r.country ?? null,
+        region: r.region ?? null,
+        locality: r.locality ?? null,
+        address: null,
+        placeLabel: r.place,
+        startDate: r.start,
+        startYear: parsePartialDate(r.start)?.year ?? null,
+        endDate: r.end ?? null,
+        endYear: parsePartialDate(r.end ?? null)?.year ?? null,
+        prov: r.prov,
+        mediaId: r.mediaId ?? null,
+        note: r.note ?? null,
+      });
     }
   });
 
