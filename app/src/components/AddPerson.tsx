@@ -183,25 +183,30 @@ const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
  */
 function NameRow({
   row,
+  index,
   causeOptions,
   mediaOptions,
   onUpdate,
   onRemove,
 }: {
   row: NameRowState;
+  /** Position in the list (after the birth name) — names the group + drives the divider. */
+  index: number;
   causeOptions: { value: string; label: string }[];
   mediaOptions: { id: string; title: string }[];
   onUpdate: (patch: Partial<NameRowState>) => void;
   onRemove: () => void;
 }) {
+  // Grouped + hairline-separated (not boxed): depth from a rule, never a card-in-card.
   return (
     <div
+      role="group"
+      aria-label={`Name ${index + 1}`}
       style={{
         display: "grid",
         gap: "var(--space-sm)",
-        padding: "var(--space-md)",
-        border: "1px solid var(--color-border)",
-        borderRadius: "var(--radius-md)",
+        paddingTop: index > 0 ? "var(--space-lg)" : 0,
+        borderTop: index > 0 ? "1px solid var(--color-border)" : "none",
       }}
     >
       <div className="app-field-row" style={{ alignItems: "flex-end" }}>
@@ -742,10 +747,11 @@ export function AddPerson({
                 timeline. Link one to the marriage or event that caused it and it shows nested inside that event.
               </div>
               <div style={{ display: "grid", gap: "var(--space-md)" }}>
-                {names.map((row) => (
+                {names.map((row, i) => (
                   <NameRow
                     key={row.key}
                     row={row}
+                    index={i}
                     causeOptions={causeOptions}
                     mediaOptions={mediaOptions}
                     onUpdate={(patch) => updateName(row.key, patch)}
