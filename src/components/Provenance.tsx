@@ -27,17 +27,19 @@ interface StatusConfig {
   hint: string;
 }
 
+// Each glyph is drawn to optically centre on (8,8) and fill the same ~11-unit
+// footprint as the ring, so the four states swap in place without bobbing.
 const ICON = {
   // confirmed by a source
   check: (
-    <path d="M3.5 8.5l3 3 6-7" />
+    <path d="M3.25 8.25l3.25 3.25 6.5-7" />
   ),
   // recorded, no source yet
   ring: <circle cx="8" cy="8" r="5.5" />,
   // approximate
-  wave: <path d="M2.5 9c1.1-2 3-2 4 0s2.9 2 4 0 3-2 4 0" />,
+  wave: <path d="M2 8c1.1-2 3-2 4 0s2.9 2 4 0 3-2 4 0" />,
   // sources disagree
-  alert: <path d="M8 2.5l5.5 10h-11zM8 6.5v3.2M8 11.7v.1" />,
+  alert: <path d="M8 3l5.5 10h-11zM8 6.9v3.1M8 11.8v.1" />,
 } as const;
 
 const PROV: Record<ProvenanceStatus, StatusConfig> = {
@@ -105,7 +107,7 @@ export interface ProvenanceMarkProps {
   onChange?: (status: ProvenanceStatus, source?: string) => void;
   /** Candidate documents offered by the "Link a source" dialog. */
   sources?: SourceOption[];
-  /** Icon size in px. @default 15 */
+  /** Icon size in px. @default 16 */
   size?: number;
   className?: string;
 }
@@ -132,7 +134,7 @@ export function ProvenanceMark({
   source,
   onChange,
   sources = [],
-  size = 15,
+  size = 16,
   className,
 }: ProvenanceMarkProps) {
   const [dialog, setDialog] = useState(false);
@@ -327,7 +329,8 @@ function CheckMark() {
   return (
     <span className="fa-sourcecite__check" aria-hidden="true">
       <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3.5 8.5l3 3 6-7" />
+        {/* Same centred geometry as the verified provenance check (ICON.check). */}
+        <path d="M3.25 8.25l3.25 3.25 6.5-7" />
       </svg>
     </span>
   );

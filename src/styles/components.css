@@ -337,6 +337,9 @@ button.fa-chip:hover {
 
 /* ── Person Node (signature) ─────────────────────────────────────────── */
 .fa-person {
+  /* Card surface — also the colour the doc-dot ring punches itself out from,
+     so the badge stays legible when the card tints (in-path). */
+  --person-surface: var(--color-bg);
   display: inline-flex;
   align-items: center;
   gap: var(--space-md);
@@ -344,7 +347,7 @@ button.fa-chip:hover {
   width: 100%;
   max-width: 17rem;
   padding: 0.75rem 1rem;
-  background-color: var(--color-bg);
+  background-color: var(--person-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   cursor: pointer;
@@ -361,7 +364,7 @@ button.fa-chip:hover {
 }
 
 .fa-person--in-path {
-  background-color: var(--color-primary-tint);
+  --person-surface: var(--color-primary-tint);
   border-color: var(--color-primary);
 }
 
@@ -370,10 +373,16 @@ button.fa-chip:hover {
   box-shadow: 0 0 0 var(--focus-ring-width) var(--color-primary), var(--shadow-node-lift);
 }
 
+.fa-person__avatar {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+}
+
 .fa-person__body {
   display: flex;
   flex-direction: column;
-  gap: 0.125rem;
+  gap: 0.1875rem;
   min-width: 0;
 }
 
@@ -420,13 +429,15 @@ button.fa-chip:hover {
 }
 
 .fa-person__docdot {
-  width: 0.5rem;
-  height: 0.5rem;
-  flex: none;
-  margin-inline-start: auto;
-  align-self: flex-start;
+  position: absolute;
+  inset-inline-end: -1px;
+  inset-block-end: -1px;
+  width: 0.6875rem;
+  height: 0.6875rem;
   border-radius: var(--radius-full);
   background-color: var(--color-accent);
+  /* Ring in the card's own surface so the badge reads on tinted cards too. */
+  box-shadow: 0 0 0 2px var(--person-surface);
 }
 
 /* ── Dialog ──────────────────────────────────────────────────────────── */

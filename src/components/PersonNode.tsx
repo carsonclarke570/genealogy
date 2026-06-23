@@ -71,7 +71,16 @@ export function PersonNode({
       aria-current={focused ? "true" : undefined}
       {...rest}
     >
-      <Avatar name={name} src={photoUrl} size="md" />
+      <span className="fa-person__avatar">
+        <Avatar name={name} src={photoUrl} size="md" />
+        {hasDocuments && (
+          <span
+            className="fa-person__docdot"
+            aria-label="Has attached documents"
+            role="img"
+          />
+        )}
+      </span>
       <span className="fa-person__body">
         <span className="fa-person__name">{name}</span>
         {hasDates && (
@@ -92,13 +101,6 @@ export function PersonNode({
           </span>
         )}
       </span>
-      {hasDocuments && (
-        <span
-          className="fa-person__docdot"
-          aria-label="Has attached documents"
-          role="img"
-        />
-      )}
     </button>
   );
 }
