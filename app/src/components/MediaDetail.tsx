@@ -13,6 +13,7 @@ import {
 } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import { deleteMedia } from "@/lib/media-client";
+import { PROV_LABEL } from "@/lib/prov";
 import { Icon } from "./Icon";
 import { MediaEdit } from "./MediaEdit";
 
@@ -81,7 +82,6 @@ export function MediaDetail({
   const [error, setError] = useState<string | null>(null);
 
   if (!media) return null;
-  const status = media.type === "photo" ? "unverified" : "verified";
 
   const close = () => {
     if (busy) return;
@@ -183,9 +183,12 @@ export function MediaDetail({
           <span style={{ textTransform: "capitalize" }}>{media.type}</span>
         </Row>
         <Row label="Date">
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }} className="tnum">
-            {media.year}
-            <ProvenanceMark status={status} />
+          <span className="tnum">{media.year}</span>
+        </Row>
+        <Row label="Confidence">
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <ProvenanceMark status={media.prov} />
+            {PROV_LABEL[media.prov]}
           </span>
         </Row>
       </div>

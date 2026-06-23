@@ -10,7 +10,6 @@ import {
   MultiSelect,
   ProvenanceMark,
   SegmentedControl,
-  Timeline as TimelineRail,
   TimelineItem,
   Tooltip,
 } from "@family-archive/ui";
@@ -51,6 +50,119 @@ function eventCategory(e: TimelineEvent): string {
   return meta(e.type).label;
 }
 
+// ── Residence spans ─────────────────────────────────────────────────────────
+// A residence carries an `endDate`; everything else is a point in time. The end
+// year is null when the span is still open (rendered as "present").
+function isSpan(e: TimelineEvent): boolean {
+  return e.type === "residence";
+}
+function endYearOf(e: TimelineEvent): number | null {
+  return e.endDate?.year ?? null;
+}
+/** "1952 – 1968" / "1952 – present" for a residence span. */
+function spanLabel(e: TimelineEvent): string {
+  const start = yearOf(e);
+  if (start == null) return "";
+  const end = endYearOf(e);
+  return `${start} – ${end ?? "present"}`;
+}
+
+// ── EventRow sub-parts ──────────────────────────────────────────────────────
+// EventRow's meta strip is assembled from these small pieces so each affordance
+// (place / span / people / source / edit / nested) stays independently legible.
+
+function EventPlace({ place }: { place: string }) {
+  return (
+    <span className="app-evplace">
+      <Icon name="pin" size={13} />
+      {place}
+    </span>
+  );
+}
+
+/** A residence's date range, shown beside the row as a calm pill. */
+function EventSpan({ ev, color }: { ev: TimelineEvent; color: string }) {
+  return (
+    <span className="app-evspan tnum" style={{ ["--span-color" as string]: color }}>
+      <Icon name="clock" size={12} />
+      {spanLabel(ev)}
+    </span>
+  );
+}
+
+function EventPeople({
+  ids,
+  people,
+  contextId,
+  onOpen,
+}: {
+  ids: string[];
+  people: Record<string, Person>;
+  contextId?: string;
+  onOpen?: (id: string) => void;
+}) {
+  return (
+    <span className="app-evwith">
+      <span className="app-avstack">
+        {ids.slice(0, 3).map((id, i) => (
+          <Tooltip key={id} label={fullName(people[id])}>
+            <span
+              className="app-avstack-item"
+              style={{ marginLeft: i ? -7 : 0 }}
+              onClick={() => onOpen?.(id)}
+            >
+              <Avatar name={fullName(people[id])} size="sm" />
+            </span>
+          </Tooltip>
+        ))}
+      </span>
+      <span className="app-muted">
+        {contextId ? "with " : ""}
+        {ids.map((id) => people[id].given.split(" ")[0]).join(", ")}
+      </span>
+    </span>
+  );
+}
+
+function EventSource({ ev, onOpenDoc }: { ev: TimelineEvent; onOpenDoc?: () => void }) {
+  if (!ev.source) return null;
+  return (
+    <button type="button" className="app-evsource" style={{ marginLeft: "auto" }} onClick={onOpenDoc} title={`Source · ${ev.source.title}`}>
+      <DocChip type={ev.source.type}>{ev.source.title}</DocChip>
+    </button>
+  );
+}
+
+function EventEdit({ ev, onEdit }: { ev: TimelineEvent; onEdit: (ev: TimelineEvent) => void }) {
+  return (
+    <button
+      type="button"
+      className="app-link app-evedit"
+      style={{ marginLeft: ev.source ? "var(--space-sm)" : "auto" }}
+      onClick={() => onEdit(ev)}
+      title="Edit this event"
+    >
+      <Icon name="edit" size={14} />
+      Edit
+    </button>
+  );
+}
+
+/** Name changes that a marriage/immigration caused, rendered inline under it. */
+function EventNested({ nested }: { nested: TimelineEvent[] }) {
+  return (
+    <span className="app-evnested">
+      {nested.map((n) => (
+        <span key={n.id} className="app-evnested-row">
+          <Icon name="edit" size={12} />
+          {n.title}
+          <ProvenanceMark status={n.prov} source={n.prov === "verified" ? n.source?.title : undefined} size={12} />
+        </span>
+      ))}
+    </span>
+  );
+}
+
 /** One event in a vertical rail — DS TimelineItem with place, people, and source. */
 function EventRow({
   ev,
@@ -77,74 +189,25 @@ function EventRow({
     <TimelineItem
       last={last}
       icon={<IconBadge icon={<Icon name={m.icon as IconName} />} color={color} title={m.label} />}
-      date={fmtDate(ev)}
+      date={isSpan(ev) ? spanLabel(ev) : fmtDate(ev)}
       category={eventCategory(ev)}
       categoryColor={color}
       title={
-        <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-sm)", flexWrap: "wrap" }}>
+        <span className="app-evtitle">
           {ev.title}
           <ProvenanceMark status={ev.prov} source={ev.prov === "verified" ? ev.source?.title : undefined} size={13} />
         </span>
       }
       meta={
         <>
-          {ev.place && (
-            <span className="app-evplace">
-              <Icon name="pin" size={13} />
-              {ev.place}
-            </span>
-          )}
+          {ev.place && <EventPlace place={ev.place} />}
+          {isSpan(ev) && <EventSpan ev={ev} color={color} />}
           {others.length > 0 && (
-            <span className="app-evwith">
-              <span className="app-avstack">
-                {others.slice(0, 3).map((id, i) => (
-                  <Tooltip key={id} label={fullName(people[id])}>
-                    <span
-                      style={{ marginLeft: i ? -7 : 0, display: "inline-flex", borderRadius: "50%", outline: "2px solid var(--color-surface)", cursor: "pointer" }}
-                      onClick={() => onOpen?.(id)}
-                    >
-                      <Avatar name={fullName(people[id])} size="sm" />
-                    </span>
-                  </Tooltip>
-                ))}
-              </span>
-              <span className="app-muted">
-                {contextId ? "with " : ""}
-                {others.map((id) => people[id].given.split(" ")[0]).join(", ")}
-              </span>
-            </span>
+            <EventPeople ids={others} people={people} contextId={contextId} onOpen={onOpen} />
           )}
-          {ev.source && (
-            <button type="button" className="app-evsource" style={{ marginLeft: "auto" }} onClick={onOpenDoc} title={`Source · ${ev.source.title}`}>
-              <DocChip type={ev.source.type}>{ev.source.title}</DocChip>
-            </button>
-          )}
-          {!ev.auto && onEdit && (
-            <button
-              type="button"
-              className="app-link"
-              style={{ marginLeft: ev.source ? "var(--space-sm)" : "auto", display: "inline-flex", alignItems: "center", gap: 4, fontSize: "var(--text-body-sm)" }}
-              onClick={() => onEdit(ev)}
-              title="Edit this event"
-            >
-              <Icon name="edit" size={14} />
-              Edit
-            </button>
-          )}
-          {ev.nested && ev.nested.length > 0 && (
-            <span style={{ flexBasis: "100%", display: "grid", gap: 2, marginTop: 2 }}>
-              {ev.nested.map((n) => (
-                <span
-                  key={n.id}
-                  style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "var(--text-body-sm)", color: "var(--color-muted)" }}
-                >
-                  <Icon name="edit" size={12} />
-                  {n.title}
-                  <ProvenanceMark status={n.prov} source={n.prov === "verified" ? n.source?.title : undefined} size={12} />
-                </span>
-              ))}
-            </span>
-          )}
+          <EventSource ev={ev} onOpenDoc={onOpenDoc} />
+          {!ev.auto && onEdit && <EventEdit ev={ev} onEdit={onEdit} />}
+          {ev.nested && ev.nested.length > 0 && <EventNested nested={ev.nested} />}
         </>
       }
     />
@@ -171,32 +234,71 @@ function RiverView({ events, onOpen, onOpenDoc, onEdit }: { events: TimelineEven
 }
 
 // ── Decades: grouped sections ───────────────────────────────────────────────
+/** Whether a residence span overlaps the decade [decade, decade+9]. */
+function spanOverlapsDecade(e: TimelineEvent, decade: number): boolean {
+  const start = yearOf(e);
+  if (start == null) return false;
+  const end = endYearOf(e) ?? Infinity; // open span runs to the present
+  return start <= decade + 9 && end >= decade;
+}
+
 function DecadesView({ events, onOpen, onOpenDoc, onEdit }: { events: TimelineEvent[]; onOpen: (id: string) => void; onOpenDoc: () => void; onEdit?: (ev: TimelineEvent) => void }) {
+  // Residence spans are summarised per-decade (a "Lived in X" note) rather than
+  // drawn as point rows, so they never read as a single-day event. Everything
+  // else groups by the decade of its date.
+  const points = events.filter((e) => !isSpan(e));
+  const spans = events.filter(isSpan);
+
   const groups = new Map<number, TimelineEvent[]>();
-  for (const e of events) {
+  for (const e of points) {
     const d = decadeOf(e);
     if (d == null) continue;
     (groups.get(d) ?? groups.set(d, []).get(d)!).push(e);
   }
+  // Surface a decade even when its only content is a residence still in progress.
+  const now = new Date().getFullYear();
+  for (const e of spans) {
+    const start = yearOf(e);
+    if (start == null) continue;
+    const last = Math.floor((endYearOf(e) ?? now) / 10) * 10;
+    for (let d = Math.floor(start / 10) * 10; d <= last; d += 10) {
+      if (!groups.has(d)) groups.set(d, []);
+    }
+  }
+
   const decades = [...groups.keys()].sort((a, b) => a - b);
   return (
     <div style={{ display: "grid", gap: "var(--space-2xl)" }}>
       {decades.map((d) => {
-        const list = groups.get(d)!;
+        const list = groups.get(d) ?? [];
+        const active = spans.filter((e) => spanOverlapsDecade(e, d));
+        const count = list.length + active.length;
         return (
           <section key={d}>
             <div className="app-decadehead">
               <span className="app-display" style={{ fontSize: "var(--text-headline)" }}>{d}s</span>
               <span className="app-muted" style={{ fontSize: "var(--text-body-sm)" }}>
-                {list.length} {list.length === 1 ? "event" : "events"}
+                {count} {count === 1 ? "event" : "events"}
               </span>
               <span className="app-decaderule" />
             </div>
-            <div className="app-timeline">
-              {list.map((ev, i) => (
-                <EventRow key={ev.id} ev={ev} onOpen={onOpen} onOpenDoc={onOpenDoc} onEdit={onEdit} last={i === list.length - 1} />
-              ))}
-            </div>
+            {active.length > 0 && (
+              <div className="app-decade-living">
+                {active.map((e) => (
+                  <span key={e.id} className="app-decade-residence">
+                    <Icon name="home" size={12} />
+                    Lived in {e.place ?? "—"} ({spanLabel(e)})
+                  </span>
+                ))}
+              </div>
+            )}
+            {list.length > 0 && (
+              <div className="app-timeline">
+                {list.map((ev, i) => (
+                  <EventRow key={ev.id} ev={ev} onOpen={onOpen} onOpenDoc={onOpenDoc} onEdit={onEdit} last={i === list.length - 1} />
+                ))}
+              </div>
+            )}
           </section>
         );
       })}
@@ -233,6 +335,8 @@ function LanesView({
   const maxY = to + 9;
   const span = Math.max(1, maxY - minY);
   const x = (year: number) => ((year - minY) / span) * 100;
+  /** Clamp a year into the visible axis before mapping. */
+  const xClamped = (year: number) => x(Math.min(maxY, Math.max(minY, year)));
   const ticks: number[] = [];
   for (let d = Math.ceil(minY / 10) * 10; d <= maxY; d += 10) ticks.push(d);
   const stepPct = `${(10 / span) * 100}%`;
@@ -256,6 +360,8 @@ function LanesView({
           const p = people[id];
           if (!p) return null;
           const evs = events.filter((e) => e.people.includes(id));
+          const spans = evs.filter(isSpan);
+          const points = evs.filter((e) => !isSpan(e));
           const bornX = x(Math.max(minY, p.born ?? minY));
           const endY = p.living ? Math.min(maxY, nowYear) : p.died ?? maxY;
           const endX = x(Math.min(maxY, endY));
@@ -272,7 +378,24 @@ function LanesView({
               </button>
               <div className="app-lane-track" style={{ minWidth: TRACK_MIN, ["--step" as string]: stepPct }}>
                 <span className="app-lifebar" style={{ left: `${bornX}%`, width: `${Math.max(0, endX - bornX)}%` }} />
-                {evs.map((ev) => {
+                {spans.map((ev) => {
+                  const start = yearOf(ev);
+                  if (start == null) return null;
+                  const end = endYearOf(ev) ?? maxY; // open span runs to the lane end
+                  const left = xClamped(start);
+                  const width = Math.max(0, xClamped(end) - left);
+                  return (
+                    <Tooltip key={ev.id} label={`${spanLabel(ev)} · ${ev.title}`}>
+                      <button
+                        className="app-spanbar"
+                        style={{ left: `${left}%`, width: `${width}%`, background: eventColor(ev) }}
+                        onClick={() => onOpen(id)}
+                        aria-label={`${ev.title} (${spanLabel(ev)})`}
+                      />
+                    </Tooltip>
+                  );
+                })}
+                {points.map((ev) => {
                   const y = yearOf(ev);
                   if (y == null) return null;
                   return (
@@ -350,8 +473,8 @@ export function Timeline({
     [allEvents, types, persons, from, to],
   );
 
-  const filtersActive =
-    types.length !== TIMELINE_TYPE_ORDER.length || persons.length > 0 || from !== decadeMin || to !== decadeMax;
+  const periodActive = from !== decadeMin || to !== decadeMax;
+  const filtersActive = types.length !== TIMELINE_TYPE_ORDER.length || persons.length > 0 || periodActive;
   const resetAll = () => {
     setTypes(TIMELINE_TYPE_ORDER.slice());
     setPersons([]);
@@ -417,6 +540,7 @@ export function Timeline({
             <span className="app-muted" style={{ fontSize: "var(--text-body-sm)" }}>Period</span>
             <select
               className="app-periodsel"
+              aria-label="Period start decade"
               value={from}
               onChange={(e) => {
                 const v = +e.target.value;
@@ -431,6 +555,7 @@ export function Timeline({
             <span className="app-muted">–</span>
             <select
               className="app-periodsel"
+              aria-label="Period end decade"
               value={to}
               onChange={(e) => {
                 const v = +e.target.value;
@@ -445,12 +570,12 @@ export function Timeline({
           </div>
           {filtersActive && (
             <button className="app-link" style={{ fontSize: "var(--text-body-sm)" }} onClick={resetAll}>
-              Reset
+              Reset filters
             </button>
           )}
         </div>
 
-        <div style={{ display: "flex", gap: "var(--space-sm)", flexWrap: "wrap", margin: "var(--space-md) 0 var(--space-xl)" }}>
+        <div className="app-typechips">
           {presentTypes.map((k) => {
             const on = types.includes(k);
             const m = EVENT_META[k];
@@ -458,6 +583,7 @@ export function Timeline({
               <button
                 key={k}
                 className="app-typechip"
+                aria-pressed={on}
                 onClick={() => toggleType(k)}
                 style={{ opacity: on ? 1 : 0.4, borderColor: on ? "var(--color-border-strong)" : "var(--color-border)" }}
               >
@@ -519,11 +645,11 @@ export function PersonTimeline({ id, onOpen, onNavigate }: { id: string; onOpen:
   return (
     <div style={{ paddingTop: "var(--space-lg)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", flexWrap: "wrap", marginBottom: "var(--space-lg)" }}>
-        <button className="app-typechip" onClick={() => setFilter("all")} style={{ opacity: filter === "all" ? 1 : 0.5 }}>
+        <button className="app-typechip" aria-pressed={filter === "all"} onClick={() => setFilter("all")} style={{ opacity: filter === "all" ? 1 : 0.5 }}>
           All ({events.length})
         </button>
         {present.map((k) => (
-          <button key={k} className="app-typechip" onClick={() => setFilter(k)} style={{ opacity: filter === k ? 1 : 0.5 }}>
+          <button key={k} className="app-typechip" aria-pressed={filter === k} onClick={() => setFilter(k)} style={{ opacity: filter === k ? 1 : 0.5 }}>
             <span className="app-typedot" style={{ background: EVENT_META[k].color }} />
             {EVENT_META[k].label}
           </button>

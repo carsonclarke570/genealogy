@@ -30,6 +30,7 @@ never be served without an authenticated session.
 | Graph viz      | React Flow (`@xyflow/react`) for the explorable tree          |
 | Search         | Hybrid: pgvector (dense) + Postgres full-text, fused by RRF    |
 | Embeddings     | Self-hosted Hugging Face TEI (open-source model) — no 3rd party |
+| Geocoding      | Self-hosted Photon (Apache-2.0), env-gated — no 3rd party       |
 | Validation     | Zod for all input/boundary validation                         |
 | Hosting        | Railway (managed Postgres + a TEI service — see Deployment)    |
 
@@ -85,10 +86,32 @@ Schema in `app/src/db/schema.ts`; refined from the initial sketch:
   real per-person `mediaCount` from these rows (which `docCount` now prefers over
   the legacy `docs` JSON tally).
 - **event** + **event_person** — stored *custom* life events (immigration,
-  military, education, career, residence, religious, other), each linkable to one
+  military, education, career, religious, other), each linkable to one
   or more people and an optional source document. Births, deaths, marriages and
   divorces are **never stored** — they're derived on read (see below), so editing
-  a date updates the timeline with no sync.
+  a date updates the timeline with no sync. (Residence is no longer an event type —
+  it became the first-class span below.)
+- **residence** — a first-class *span* (not a point event): a structured location
+  (country → region → locality → address, plus `placeLabel` + optional lat/lng/
+  placeId from the geocoder), a start and optional end **partial date**, scoped to
+  one person, with **unified provenance** (status + optional linked source document
+  + note). Residencies **derive into the timeline** as span events on read (so
+  editing a residence updates the timeline with no sync). The `0005` migration
+  backfills old point-in-time `residence` *events* into one residence span per
+  linked person (keeping the event title as the residence note) and removes those
+  events; new installs seed residencies directly.
+
+**Unified provenance.** Every discrete fact — a person's birth/death dates and
+places, a marriage/divorce date, a media item, a residence, a stored event —
+carries a single consistent **`ProvenanceMark`**: a confidence `status`
+(`verified` | `unverified` | `estimated` | `disputed`, the `provStatuses` tuple in
+`app/src/lib/prov.ts`), an optional linked source **document** (`mediaId`, the
+record that backs the fact), and an optional free-text `note`. Stored on the
+relevant table (`person.prov` JSON map, `relationship.marriedProv`/`divorcedProv`
++ `*MediaId`, `media.prov`, `residence.prov` + `mediaId`, `event.prov` +
+`mediaId`), validated by the read model and the write path against the same tuple,
+and surfaced uniformly in the UI — so "how do we know this?" is answered the same
+way everywhere.
 
 The read model in `app/src/lib/queries.ts` assembles an in-memory `Dataset`
 ({ people, graph, relationships, media }) — deriving a **family-graph DAG** from
@@ -138,8 +161,9 @@ open on. Everything here is pure + unit-tested (`*.test.ts`, run with
 The **timeline** is another pure derivation off the same `Dataset`:
 `app/src/lib/timeline.ts` (`buildTimeline`, unit-tested in `timeline.test.ts`)
 merges *derived* events (birth/death from `person`, marriage/divorce from spouse
-`relationship` dates, a `document` per dated `media`) with *stored* `event` rows
-into one chronologically-sorted `events: TimelineEvent[]` on the `Dataset`.
+`relationship` dates, a `document` per dated `media`, a **residence span** per
+`residence` row) with *stored* `event` rows into one chronologically-sorted
+`events: TimelineEvent[]` on the `Dataset`.
 Birth-certificate / obituary / cited media are attached as an event's *source*
 and deduped out of the standalone document events. The Timeline screen
 (`app/src/components/Timeline.tsx`) draws it three ways (River / Lanes / Decades)
@@ -168,6 +192,7 @@ npm run build        # build dist/ (needed before the app compiles)
 # an embedding server) to talk to. docker-compose starts both:
 docker compose up -d # Postgres (pgvector/pgvector:pg16) :5432 + TEI :8080
                      # + MinIO (S3-compatible media storage) :9000, console :9001
+                     # + Photon geocoder :2322 (optional, large index — see below)
 
 # App (cd app/)
 npm install          # install app deps
@@ -184,7 +209,10 @@ npm test             # vitest — unit tests for the pure family-graph + layout 
 The app reads `DATABASE_URL` (and `AUTH_SECRET` / `SITE_PASSWORD`) from
 `app/.env.local` in dev; it defaults to the local Postgres above. For semantic
 search set `EMBEDDINGS_URL=http://localhost:8080` (the docker-compose TEI
-service); leave it unset to run search in lexical-only (keyword) mode.
+service); leave it unset to run search in lexical-only (keyword) mode. For the
+location picker set `GEOCODER_URL=http://localhost:2322` (the docker-compose
+Photon service); leave it unset to run the picker with archive-place autocomplete
+only.
 
 ### Search / embeddings
 
@@ -210,6 +238,28 @@ to lexical-only, so the repo runs keyless/serviceless.
   migration (drop/recreate the `embedding` column + HNSW index) and a full
   `db:reindex`.
 
+### Location picker / geocoding
+
+The location picker is the `LocationField` design-system component (root
+`src/components/LocationField.tsx`), used wherever a place is entered (person
+birth/death places, residencies). As the user types it calls `GET /api/geocode?q=…`
+(session-gated by middleware), which **merges** two sources: places already used in
+the archive (residencies + person/event places — so the picker is useful even with
+no geocoder at all) and structured results from a self-hosted geocoder.
+
+Geocoding is **self-hosted and env-gated**, mirroring the embeddings server.
+`app/src/lib/geocode.ts` reads `GEOCODER_URL` and queries a **Photon** instance
+(Apache-2.0, https://github.com/komoot/photon — returns GeoJSON country → address
+features). **No place query is sent to any third party.** When `GEOCODER_URL` is
+unset/unreachable (or a request fails/times out) it returns `[]` and the picker
+degrades to **archive-place autocomplete only** — so the repo stays
+keyless/serviceless by default, exactly like lexical-only search.
+
+- Env var: `GEOCODER_URL` (empty ⇒ archive-place autocomplete only). The
+  docker-compose `geocoder` service (Photon, `:2322`) is **optional and heavy** —
+  its search index is a multi-GB download, so the first boot is slow; omit the
+  service to run without it.
+
 ## Deployment (Railway)
 
 Data lives in a **managed Railway Postgres service** in the same project, so the
@@ -228,6 +278,13 @@ rely on it for data).
   runs on infra you own — no data leaves the project. Omit the service (and the
   var) to run search lexical-only. The managed Postgres supports pgvector; the
   migration enables the extension on first boot.
+- **Geocoder service** (optional): add a service from a Photon image (e.g.
+  `rtuszik/photon-docker`, or run the official Photon JAR), give it a volume for the
+  (large, multi-GB) search index, expose its HTTP port, and point the app at it via
+  a private-network reference variable
+  `GEOCODER_URL = http://${{ geocoder.RAILWAY_PRIVATE_DOMAIN }}:2322`. The geocoder
+  runs on infra you own — no place query leaves the project. Omit the service (and
+  the var) to run the location picker with archive-place autocomplete only.
 - **Media storage**: uploaded files live in S3-compatible object storage (never the
   ephemeral container disk). Production uses a **Railway managed Bucket** (create it
   in the project; wire its credentials into the app service). Local dev uses the
@@ -269,7 +326,15 @@ in the Gallery + person Documents tab (upload, view-detail, **edit metadata +
 re-link people** via `PUT /api/media/[id]`, download, delete). Stored timeline
 events are **editable in place** — an Edit affordance on each non-derived event row
 opens `AddEventDialog` in edit mode (change type, title, date, place, people,
-source, confidence) via the existing `updateEvent` action.
+source, confidence) via the existing `updateEvent` action. A **first-class
+residency system** is live: the `residence` table records structured
+country → address spans with start/end partial dates, they derive into the
+timeline as span events, and the `0005` migration backfills old point-in-time
+residence events. Places are entered through a **location picker** (`LocationField`
++ `/api/geocode`) backed by an optional **self-hosted Photon geocoder**
+(`GEOCODER_URL`), degrading to archive-place autocomplete when unset. Every
+discrete fact carries a **unified `ProvenanceMark`** (status + linked source
+document + note).
 Still stubbed: Auth.js (a shared password gate stands in) and image thumbnails
 (originals are served, lazy-loaded). Not yet wired: indexing events into hybrid
 search. Next up: thumbnail generation + Auth.js.

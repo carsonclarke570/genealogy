@@ -827,6 +827,12 @@ body {
 }
 
 /* the event "meta" row bits inside a DS TimelineItem */
+.app-evtitle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
 .app-evplace {
   display: inline-flex;
   align-items: center;
@@ -837,6 +843,40 @@ body {
 .app-evplace svg {
   flex: none;
 }
+/* residence span pill — the date range a residence covers */
+.app-evspan {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-label);
+  color: var(--span-color, var(--color-muted));
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--span-color, var(--color-muted)) 12%, transparent);
+}
+.app-evspan svg {
+  flex: none;
+  opacity: 0.85;
+}
+.app-evedit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-body-sm);
+}
+.app-evnested {
+  flex-basis: 100%;
+  display: grid;
+  gap: 2px;
+  margin-top: 2px;
+}
+.app-evnested-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-body-sm);
+  color: var(--color-muted);
+}
 .app-evwith {
   display: inline-flex;
   align-items: center;
@@ -845,6 +885,12 @@ body {
 }
 .app-avstack {
   display: inline-flex;
+}
+.app-avstack-item {
+  display: inline-flex;
+  border-radius: 50%;
+  outline: 2px solid var(--color-surface);
+  cursor: pointer;
 }
 .app-evsource {
   display: inline-flex;
@@ -893,6 +939,24 @@ body {
   height: 1px;
   background: var(--color-border);
 }
+/* residencies active across a decade — a calm note above the decade's events */
+.app-decade-living {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+  margin-bottom: var(--space-md);
+}
+.app-decade-residence {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-body-sm);
+  color: var(--color-muted);
+}
+.app-decade-residence svg {
+  flex: none;
+  color: var(--doc-other);
+}
 
 /* filter bar */
 .app-filterbar {
@@ -919,6 +983,12 @@ body {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   cursor: pointer;
+}
+.app-typechips {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  margin: var(--space-md) 0 var(--space-xl);
 }
 .app-typechip {
   display: inline-flex;
@@ -1071,6 +1141,24 @@ body {
   border-radius: var(--radius-full);
   background: var(--color-muted);
   opacity: 0.3;
+}
+/* residence span bar — a colored rule parallel to the gray lifebar */
+.app-spanbar {
+  position: absolute;
+  top: calc(50% + 7px);
+  transform: translateY(-50%);
+  height: 6px;
+  min-width: 4px;
+  border-radius: var(--radius-full);
+  border: none;
+  padding: 0;
+  opacity: 0.7;
+  cursor: pointer;
+}
+.app-spanbar:hover {
+  opacity: 1;
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
 }
 .app-lanedot-wrap {
   position: absolute;

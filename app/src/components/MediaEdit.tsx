@@ -3,10 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Avatar, Button, Dialog, Input, MultiSelect, Select, Textarea } from "@family-archive/ui";
+import type { ProvenanceStatus } from "@family-archive/ui";
 import { fullName, lifeDates, type MediaItem } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import { updateMedia } from "@/lib/media-client";
 import { MEDIA_TYPES } from "@/lib/media-validation";
+import { PROV_LABEL, provStatuses } from "@/lib/prov";
 import { Icon } from "./Icon";
 
 const TYPE_LABELS: [(typeof MEDIA_TYPES)[number], string][] = [
@@ -39,6 +41,7 @@ export function MediaEdit({
   const [title, setTitle] = useState("");
   const [type, setType] = useState<(typeof MEDIA_TYPES)[number]>("photo");
   const [year, setYear] = useState("");
+  const [prov, setProv] = useState<ProvenanceStatus>("unverified");
   const [description, setDescription] = useState("");
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -51,6 +54,7 @@ export function MediaEdit({
     setTitle(media.title);
     setType(media.type);
     setYear(media.year ? String(media.year) : "");
+    setProv(media.prov);
     setDescription(media.description ?? "");
     setSelectedPeople(media.people);
   }, [open, media]);
@@ -67,6 +71,7 @@ export function MediaEdit({
       title,
       type,
       year,
+      prov,
       description,
       personIds: selectedPeople,
     });
@@ -142,6 +147,20 @@ export function MediaEdit({
               error={errors.year}
               placeholder="e.g. 1915"
             />
+          </div>
+          <div style={{ flex: 1, minWidth: 160 }}>
+            <Select
+              label="Confidence"
+              value={prov}
+              error={errors.prov}
+              onChange={(e) => setProv(e.target.value as ProvenanceStatus)}
+            >
+              {provStatuses.map((s) => (
+                <option key={s} value={s}>
+                  {PROV_LABEL[s]}
+                </option>
+              ))}
+            </Select>
           </div>
         </div>
 
