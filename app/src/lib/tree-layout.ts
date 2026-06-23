@@ -39,7 +39,7 @@ const ORDER_SWEEPS = 4;
 const COORD_SWEEPS = 4;
 const UNION_DROP = 22; // how far the marriage knot sits below/right of a couple
 
-export { NODE_W, NODE_H };
+export { NODE_W, NODE_H, COLU };
 
 export interface TreeNode {
   id: string;
@@ -234,12 +234,31 @@ function blockKey(graph: FamilyGraph, p: string): string {
 }
 
 /**
- * Order one generation row. Sibling sets stay contiguous — each child-union is
- * an atomic block, blocks ordered by their mean barycenter — and couples are
- * pulled to a block boundary so partners sit adjacent without splitting either
- * sibling set (the old behaviour glued partners individually, which tore a
- * sibling group apart when one child married into another group).
+ * Order one generation row so that (a) full-sibling sets stay contiguous (each
+ * child-union is an atomic block) and (b) every same-row couple is drawn as an
+ * adjacent pair — *including* a person married more than once, who is seated
+ * BETWEEN their spouses (the spouses flank the sibling block from the outside).
+ *
+ * We contract each sibling set into an "atom", treat same-row marriages as edges
+ * between atoms, and walk each connected run of atoms as a chain: an atom is
+ * emitted with the member we entered through on its left end, the member we
+ * leave through on its right end, and its remaining siblings (barycenter-sorted)
+ * in between. Chains are entered at an endpoint atom (≤1 married neighbour), so a
+ * remarried person's two unions both stay local — and each union's children hang
+ * straight down from their own parents instead of from a midpoint knot stretched
+ * across the canvas (the bug that made cousins read as siblings).
+ *
+ * A sibling set with three+ married members can expose only two ends, so the
+ * third marriage can't be made adjacent here; that residual is left for the
+ * fog-of-war scope to fog the farther branch. Barycenter still drives every
+ * ordering choice, so cross-generation crossings keep reducing across sweeps.
  */
+interface AtomEdge {
+  via: string; // the member of this atom in the marriage
+  partner: string; // their spouse (in the neighbour atom)
+  to: string; // the neighbour atom key
+}
+
 function arrangeRow(
   graph: FamilyGraph,
   row: string[],
@@ -248,53 +267,99 @@ function arrangeRow(
   cmp: (a: string, b: string) => number,
 ): string[] {
   const inRow = new Set(row);
-  const partnersHere = (p: string) => partnersInRow(graph, p, members).filter((q) => inRow.has(q));
+  const keyOf = (p: string) => blockKey(graph, p);
 
-  // partition into blocks (first-seen order), members sorted within a block.
-  const blocks = new Map<string, string[]>();
+  // atoms: sibling block (or singleton) → members, barycenter-sorted within.
+  const atoms = new Map<string, string[]>();
   for (const p of row) {
-    const k = blockKey(graph, p);
-    const arr = blocks.get(k);
-    if (arr) arr.push(p);
-    else blocks.set(k, [p]);
+    const a = atoms.get(keyOf(p));
+    if (a) a.push(p);
+    else atoms.set(keyOf(p), [p]);
   }
-  for (const arr of blocks.values()) arr.sort((a, b) => bary[a] - bary[b] || cmp(a, b));
-
-  const blockBary = (k: string) => {
-    const m = blocks.get(k)!;
+  for (const a of atoms.values()) a.sort((x, y) => bary[x] - bary[y] || cmp(x, y));
+  const atomBary = (k: string) => {
+    const m = atoms.get(k)!;
     return m.reduce((s, p) => s + bary[p], 0) / m.length;
   };
-  const orderedKeys = [...blocks.keys()].sort((a, b) => blockBary(a) - blockBary(b) || (a < b ? -1 : 1));
 
-  // Walk blocks in barycenter order; after emitting one, pull any block holding
-  // a partner of its members adjacent, oriented so the partners touch.
-  const placed = new Set<string>();
+  // marriage edges between *different* atoms, indexed by the atom they leave.
+  const partnersOut = (p: string) =>
+    partnersInRow(graph, p, members).filter((q) => inRow.has(q) && keyOf(q) !== keyOf(p));
+  const adj = new Map<string, AtomEdge[]>();
+  for (const p of row) {
+    for (const q of partnersOut(p)) {
+      const k = keyOf(p);
+      const list = adj.get(k) ?? (adj.set(k, []), adj.get(k)!);
+      list.push({ via: p, partner: q, to: keyOf(q) });
+    }
+  }
+  const neighbourAtoms = (k: string) => new Set((adj.get(k) ?? []).map((e) => e.to));
+
   const out: string[] = [];
-  const emit = (k: string, leftMember?: string) => {
-    if (placed.has(k)) return;
-    placed.add(k);
-    const hasOpenPartner = (p: string) =>
-      partnersHere(p).some((q) => {
-        const kq = blockKey(graph, q);
-        return kq !== k && !placed.has(kq);
-      });
-    const m = [...blocks.get(k)!].sort((a, b) => {
-      if (a === leftMember) return -1; // adjacent to the previous block → left edge
-      if (b === leftMember) return 1;
-      const pa = hasOpenPartner(a) ? 1 : 0; // partnered-out members → right edge
-      const pb = hasOpenPartner(b) ? 1 : 0;
-      if (pa !== pb) return pa - pb;
-      return bary[a] - bary[b] || cmp(a, b);
-    });
-    out.push(...m);
-    for (let i = m.length - 1; i >= 0; i--) {
-      for (const q of partnersHere(m[i])) {
-        const kq = blockKey(graph, q);
-        if (kq !== k && !placed.has(kq)) emit(kq, q);
+  const done = new Set<string>();
+
+  // Emit one atom: entry member at the left edge, exit member at the right edge,
+  // the remaining siblings (barycenter order) in between.
+  const emitAtom = (k: string, entry: string | undefined, exit: string | undefined) => {
+    const mem = atoms.get(k)!;
+    const seen = new Set<string>();
+    const push = (x?: string) => {
+      if (x && !seen.has(x)) {
+        seen.add(x);
+        out.push(x);
       }
+    };
+    push(entry);
+    for (const m of mem) if (m !== entry && m !== exit) push(m);
+    push(exit);
+    for (const m of mem) push(m); // safety: never drop a member
+  };
+
+  // Walk a connected run of atoms as a chain from `startKey`, threading the
+  // marriage we leave through into the next atom's left (entry) edge.
+  const walk = (startKey: string) => {
+    let curKey: string | undefined = startKey;
+    let entry: string | undefined = undefined;
+    while (curKey) {
+      done.add(curKey);
+      const single = atoms.get(curKey)!.length === 1;
+      const exits = (adj.get(curKey) ?? []).filter((e) => !done.has(e.to));
+      // leave through a member other than the one we entered on (so entry stays
+      // on the left); a single-person atom is its own both-ends, so any exit.
+      let cand = single ? exits : exits.filter((e) => e.via !== entry);
+      if (cand.length === 0) cand = exits;
+      cand = [...cand].sort((a, b) => atomBary(a.to) - atomBary(b.to) || (a.partner < b.partner ? -1 : 1));
+      const exitEdge = cand[0];
+      emitAtom(curKey, entry, exitEdge?.via);
+      if (exitEdge) {
+        entry = exitEdge.partner;
+        curKey = exitEdge.to;
+      } else curKey = undefined;
     }
   };
-  for (const k of orderedKeys) emit(k);
+
+  // Connected components of the atom-marriage graph, each entered at its
+  // lowest-barycenter endpoint (≤1 married neighbour) so a chain is never
+  // started in its middle (which would strand one side's spouse).
+  const componentOf = (k: string): string[] => {
+    const comp: string[] = [];
+    const seen = new Set([k]);
+    const stack = [k];
+    while (stack.length) {
+      const c = stack.pop()!;
+      comp.push(c);
+      for (const n of neighbourAtoms(c)) if (!seen.has(n)) (seen.add(n), stack.push(n));
+    }
+    return comp;
+  };
+  const byBary = (a: string, b: string) => atomBary(a) - atomBary(b) || (a < b ? -1 : 1);
+  for (const k of [...atoms.keys()].sort(byBary)) {
+    if (done.has(k)) continue;
+    const comp = componentOf(k);
+    const endpoints = comp.filter((c) => neighbourAtoms(c).size <= 1);
+    const start = (endpoints.length ? endpoints : comp).sort(byBary)[0];
+    walk(start);
+  }
   return out;
 }
 
