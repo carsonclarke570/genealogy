@@ -14,6 +14,7 @@ import {
 import { useDataset } from "@/lib/dataset";
 import { deleteMedia } from "@/lib/media-client";
 import { Icon } from "./Icon";
+import { MediaEdit } from "./MediaEdit";
 
 /** A label/value row in the detail metadata list. */
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -72,6 +73,7 @@ export function MediaDetail({
   const router = useRouter();
   const { people } = useDataset();
   const [confirming, setConfirming] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -108,8 +110,9 @@ export function MediaDetail({
   };
 
   return (
+    <>
     <Dialog
-      open={!!media}
+      open={!!media && !editing}
       onClose={close}
       title={media.title}
       description={
@@ -141,6 +144,9 @@ export function MediaDetail({
           <>
             <Button variant="ghost" onClick={() => startConfirm(true)} iconStart={<Icon name="trash" size={16} />}>
               Delete
+            </Button>
+            <Button variant="ghost" onClick={() => setEditing(true)} iconStart={<Icon name="edit" size={16} />}>
+              Edit
             </Button>
             <Button variant="ghost" onClick={close}>
               Close
@@ -218,5 +224,18 @@ export function MediaDetail({
         </>
       )}
     </Dialog>
+    <MediaEdit
+      media={media}
+      open={editing}
+      onClose={() => setEditing(false)}
+      onToast={(msg) => {
+        // The edited fields live on `media`, a now-stale prop — close the detail
+        // so the refreshed dataset is what the user sees next.
+        setEditing(false);
+        onToast(msg);
+        onClose();
+      }}
+    />
+    </>
   );
 }

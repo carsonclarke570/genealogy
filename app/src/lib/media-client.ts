@@ -22,6 +22,30 @@ export async function uploadMedia(form: FormData): Promise<MediaMutationResult> 
   }
 }
 
+/** Edit an existing item's metadata + person links (the file is left untouched). */
+export interface MediaEditInput {
+  title: string;
+  type: string;
+  year: string | number;
+  description: string;
+  personIds: string[];
+}
+
+export async function updateMedia(id: string, input: MediaEditInput): Promise<MediaMutationResult> {
+  try {
+    const res = await fetch(`/api/media/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    const data = (await res.json().catch(() => null)) as MediaMutationResult | null;
+    if (data) return data;
+    return { ok: false, errors: { form: "Save failed. Please try again." } };
+  } catch {
+    return { ok: false, errors: { form: "Network error. Please try again." } };
+  }
+}
+
 export async function deleteMedia(id: string): Promise<MediaMutationResult> {
   try {
     const res = await fetch(`/api/media/${encodeURIComponent(id)}`, { method: "DELETE" });

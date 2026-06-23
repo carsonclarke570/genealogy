@@ -57,6 +57,8 @@ export interface MediaItem {
   title: string;
   year: number;
   people: string[];
+  /** Free-text notes/provenance; null when none recorded. */
+  description: string | null;
   /** Stored MIME type once a file is attached; null for fileless (legacy) rows. */
   mimeType: string | null;
   /** Whether an actual file is stored for this item (filePath is set). */

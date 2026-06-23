@@ -254,7 +254,11 @@ managed Railway Postgres and boots empty; local dev uses Docker Postgres seeded
 with the demo family. **Media upload + archive is live**: files go to S3-compatible
 object storage (Railway Bucket in prod, MinIO in dev) via the `minio` client, are
 served through an authenticated, Range-capable route, and surface as real previews
-in the Gallery + person Documents tab (upload, view-detail, download, delete).
+in the Gallery + person Documents tab (upload, view-detail, **edit metadata +
+re-link people** via `PUT /api/media/[id]`, download, delete). Stored timeline
+events are **editable in place** — an Edit affordance on each non-derived event row
+opens `AddEventDialog` in edit mode (change type, title, date, place, people,
+source, confidence) via the existing `updateEvent` action.
 Still stubbed: Auth.js (a shared password gate stands in) and image thumbnails
 (originals are served, lazy-loaded). Not yet wired: indexing events into hybrid
 search. Next up: thumbnail generation + Auth.js.
