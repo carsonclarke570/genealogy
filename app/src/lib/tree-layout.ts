@@ -119,15 +119,31 @@ function assignGenerations(graph: FamilyGraph): Record<string, number> {
   };
   for (const p of graph.placed) rank(p);
 
-  // Spouse pull-down: a parentless partner adopts the max gen of their union, so
-  // people who married in (no recorded ancestors) sit on their spouse's row.
-  for (let pass = 0; pass < graph.placed.length; pass++) {
+  // Reconcile to a fixpoint, alternating two relaxations (each only ever raises
+  // a generation, so this is monotone and terminates):
+  //   · spouse pull-down — a parentless partner adopts the max gen of their
+  //     union, so people who married in (no recorded ancestors) sit on their
+  //     spouse's row instead of floating at the top.
+  //   · child push-down — a child sits at least one row below every parent.
+  // The push-down is what keeps a *raised* parent from ending up level with
+  // their own child: when a married-in spouse is pulled down, the longest-path
+  // ranks computed before the pull no longer hold for that couple's descendants,
+  // so they must be re-pushed (and that can cascade through further remarriages).
+  for (let pass = 0; pass <= graph.placed.length; pass++) {
     let changed = false;
     for (const u of graph.unions) {
       const g = Math.max(...u.partners.map((p) => gen[p] ?? 0));
       for (const p of u.partners) {
         if ((graph.parentsOf[p]?.length ?? 0) === 0 && (gen[p] ?? 0) < g) {
           gen[p] = g;
+          changed = true;
+        }
+      }
+    }
+    for (const p of graph.placed) {
+      for (const parent of graph.parentsOf[p] ?? []) {
+        if ((gen[p] ?? 0) < (gen[parent] ?? 0) + 1) {
+          gen[p] = (gen[parent] ?? 0) + 1;
           changed = true;
         }
       }

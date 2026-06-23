@@ -56,6 +56,23 @@ describe("compute — layered DAG layout", () => {
     expect(nodes["marriedIn"].gen).toBe(1); // not floating at gen 0
   });
 
+  it("pushes a remarried couple's children below their pulled-down parents", () => {
+    // christa has parents; her second husband andrew married-in, and andrew also
+    // co-parents oliver with a (parentless) ex, connie. Both andrew and connie are
+    // pulled down onto christa's row — their child oliver must drop a row too,
+    // not stay level with them (regression: the pull-down skipped descendants).
+    const g = buildFamilyGraph([
+      spouse("gp1", "gp2"), parent("gp1", "christa"), parent("gp2", "christa"),
+      spouse("christa", "andrew", "married"),
+      spouse("andrew", "connie", "divorced"),
+      parent("andrew", "oliver"), parent("connie", "oliver"),
+    ]);
+    const { nodes } = compute(g, "vertical");
+    expect(nodes["andrew"].gen).toBe(nodes["christa"].gen); // married-in, pulled down
+    expect(nodes["connie"].gen).toBe(nodes["andrew"].gen); // co-parent, also pulled down
+    expect(nodes["oliver"].gen).toBe(nodes["andrew"].gen + 1); // child sits a row below
+  });
+
   it("produces only finite coordinates", () => {
     const g = buildFamilyGraph(twoSidedEdges);
     const layout = compute(g, "vertical");

@@ -100,11 +100,29 @@ ancestral lines of a couple (not just one "blood-line" side). The layered layout
 that positions it lives in `app/src/lib/tree-layout.ts` (generation layering →
 crossing-reduced ordering → coordinate assignment), and `relationsOf` /
 `lineageOf` read straight off the raw edges so the side panels don't depend on
-the layout. A same-row couple is emitted as a **marriage junction** (`Layout.junctions`):
-a bracket joining the partners to a shared knot that their children descend from
-(dashed + hollow when divorced) — so a couple never reads as two siblings.
-Both are pure + unit-tested (`*.test.ts`, run with `npm test`). The
-demo seed lives in `app/src/db/seed-data.ts`.
+the layout. Generation layering reconciles two relaxations to a fixpoint — a
+**spouse pull-down** (a married-in, ancestor-less partner adopts their spouse's
+row) and a **child push-down** (a child sits a row below every parent) — so a
+parent who is *raised* by the pull-down never ends up level with their own
+child (the remarriage case). Sibling sets stay contiguous: row ordering works at
+child-union (block) granularity and pulls couples to a block boundary, so two
+families never interleave at the same generation. A same-row couple is emitted
+as a **marriage junction** (`Layout.junctions`): a bracket joining the partners
+to a shared knot that their children descend from (dashed + hollow when
+divorced) — so a couple never reads as two siblings.
+
+The Explorer draws a **fog-of-war** neighbourhood, not the whole graph at once
+(`app/src/lib/family-scope.ts`, `scopeFamily`, unit-tested). A weighted BFS
+(Dijkstra over kin edges: spouse/sibling = 1, parent/child = 2) admits the
+closest relatives to the focus up to a node budget, keeps couples whole, fogs
+the farther spouse on the irreducible remarriage-with-siblings conflict, and
+prunes to what stays connected to the focus; the junction layout then runs on
+that sub-graph unchanged. Visible people touching hidden kin get a **frontier
+marker** (bucketed up / down / side); clicking a node re-centres the scope, a
+focus stack gives a back step, and an **Overview** toggle restores the
+whole-tree view. `homePerson` picks a deterministic most-connected person to
+open on. Everything here is pure + unit-tested (`*.test.ts`, run with
+`npm test`). The demo seed lives in `app/src/db/seed-data.ts`.
 
 The **timeline** is another pure derivation off the same `Dataset`:
 `app/src/lib/timeline.ts` (`buildTimeline`, unit-tested in `timeline.test.ts`)
