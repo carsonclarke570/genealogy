@@ -435,7 +435,11 @@ export function provSummary(p: Person): ProvSummary {
   return { key: "needs", tone: "warning", color: "var(--color-warning)", icon: "ring", label: "Needs sources" };
 }
 
-/** The archive documents offered by the SourceCite dialog. */
+/**
+ * The archive documents offered by the source pickers — the full archive, so
+ * any record can be cited. Search/scroll in the picker handles findability at
+ * scale (the old 6-item cap silently hid every document past the sixth).
+ */
 export function sourceOptions(media: MediaItem[]): SourceOption[] {
-  return media.slice(0, 6).map((m) => ({ id: m.id, label: m.title, type: m.type }));
+  return media.map((m) => ({ id: m.id, label: m.title, type: m.type, year: m.year }));
 }

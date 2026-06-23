@@ -1088,9 +1088,70 @@ button.fa-chip:hover {
 /* Link-a-source dialog body (rendered inside fa-dialog__body) */
 .fa-sourcecite {
   display: grid;
+  gap: var(--space-md);
+}
+/* Search field — mirrors .fa-combobox__control so both source pickers match. */
+.fa-sourcecite__search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-fast) var(--ease-standard);
+}
+.fa-sourcecite__search:focus-within {
+  background-color: var(--color-bg);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring-color);
+}
+.fa-sourcecite__searchicon {
+  flex: none;
+  color: var(--color-muted);
+}
+.fa-sourcecite__searchinput {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: 1.4;
+  color: var(--color-ink);
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+.fa-sourcecite__searchinput:focus {
+  outline: none;
+}
+.fa-sourcecite__searchinput::placeholder {
+  color: var(--color-muted);
+  opacity: 1;
+}
+/* Hide the native clear affordance — the count sits in that slot instead. */
+.fa-sourcecite__searchinput::-webkit-search-cancel-button {
+  appearance: none;
+}
+.fa-sourcecite__count {
+  flex: none;
+  font-size: var(--text-label);
+  color: var(--color-muted);
+  font-feature-settings: "tnum" 1;
+  white-space: nowrap;
+}
+.fa-sourcecite__rows {
+  display: grid;
   gap: var(--space-sm);
-  max-height: 18.75rem;
-  overflow: auto;
+}
+.fa-sourcecite__scroll {
+  display: grid;
+  gap: var(--space-sm);
+  max-height: 16.5rem;
+  overflow-y: auto;
+  /* Room for the focus ring so it isn't clipped by the scroll container. */
+  margin: calc(-1 * var(--focus-ring-width));
+  padding: var(--focus-ring-width);
 }
 .fa-sourcecite__row {
   display: flex;
@@ -1098,12 +1159,11 @@ button.fa-chip:hover {
   gap: var(--space-sm);
   width: 100%;
   text-align: start;
-  padding: 0.625rem 0.75rem;
+  padding: 0.5rem 0.75rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background-color: var(--color-bg);
   font-family: var(--font-sans);
-  font-size: var(--text-body-sm);
   color: var(--color-ink);
   cursor: pointer;
   transition: border-color var(--dur-fast) var(--ease-standard),
@@ -1120,6 +1180,15 @@ button.fa-chip:hover {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset);
 }
+/* The pinned upload row reads as an action, set off from the document list. */
+.fa-sourcecite__row--new {
+  border-style: dashed;
+  color: var(--color-muted);
+}
+.fa-sourcecite__row--new:hover,
+.fa-sourcecite__row--new.is-selected {
+  color: var(--color-ink);
+}
 .fa-sourcecite__dot {
   flex: none;
   width: 0.5rem;
@@ -1135,19 +1204,53 @@ button.fa-chip:hover {
   background: transparent !important;
   color: var(--color-muted);
 }
-.fa-sourcecite__label {
+.fa-sourcecite__text {
   flex: 1;
   min-width: 0;
 }
-.fa-sourcecite__type {
-  flex: none;
+.fa-sourcecite__label {
+  display: block;
+  font-size: var(--text-body-sm);
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fa-sourcecite__meta {
+  display: block;
   font-size: var(--text-label);
   color: var(--color-muted);
+  font-feature-settings: "tnum" 1;
 }
 .fa-sourcecite__check {
   flex: none;
   display: inline-flex;
   color: var(--color-primary);
+}
+/* Empty / no-match state inside the list. */
+.fa-sourcecite__placeholder {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xl) var(--space-md);
+  text-align: center;
+  color: var(--color-muted);
+}
+.fa-sourcecite__placeholder svg {
+  color: var(--color-faint);
+  margin-bottom: var(--space-xs);
+}
+.fa-sourcecite__placeholder-title {
+  margin: 0;
+  font-size: var(--text-body-sm);
+  font-weight: 500;
+  color: var(--color-ink);
+}
+.fa-sourcecite__placeholder-hint {
+  margin: 0;
+  max-width: 32ch;
+  font-size: var(--text-body-sm);
+  color: var(--color-muted);
 }
 
 /* ── SegmentedControl ────────────────────────────────────────────────── */
