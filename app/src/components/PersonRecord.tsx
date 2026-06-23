@@ -161,7 +161,7 @@ export function PersonRecord({
               <button className="app-evcard app-evcard-more" onClick={() => setTab("timeline")}>
                 <span
                   className="tnum"
-                  style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: "var(--text-headline)", color: "var(--color-ink)" }}
+                  style={{ fontFamily: "var(--font-sans)", fontWeight: "var(--fw-semibold)", fontSize: "var(--text-headline)", color: "var(--color-ink)" }}
                 >
                   +{events.length - 5}
                 </span>
@@ -409,7 +409,7 @@ export function PersonRecord({
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", flexWrap: "wrap" }}>
-                    <span style={{ fontFamily: "var(--font-sans)", fontWeight: 500, fontSize: "var(--text-body)", color: "var(--color-ink)" }}>
+                    <span style={{ fontFamily: "var(--font-sans)", fontWeight: "var(--fw-medium)", fontSize: "var(--text-body)", color: "var(--color-ink)" }}>
                       {r.place}
                     </span>
                     <ProvenanceMark status={r.prov} source={r.source?.title} size={13} />
@@ -507,7 +507,7 @@ export function PersonRecord({
                 }}
               >
                 {lifeDates(p)}
-                {p.maiden ? `  ·  née ${p.maiden}` : ""}
+                {p.maiden ? ` · née ${p.maiden}` : ""}
               </div>
               <div style={{ display: "flex", gap: "var(--space-sm)", flexWrap: "wrap", marginTop: "var(--space-md)" }}>
                 <Badge tone="neutral" dot>
@@ -540,7 +540,7 @@ export function PersonRecord({
                     style={{
                       fontFamily: f.serif ? "var(--font-serif)" : "var(--font-sans)",
                       fontSize: "var(--text-title)",
-                      fontWeight: f.serif ? 400 : 500,
+                      fontWeight: f.serif ? "var(--fw-regular)" : "var(--fw-medium)",
                       color: "var(--color-ink)",
                       minWidth: 0,
                       overflowWrap: "anywhere",
