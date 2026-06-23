@@ -323,10 +323,10 @@ function arrangeRow(
     while (curKey) {
       done.add(curKey);
       const single = atoms.get(curKey)!.length === 1;
-      const exits = (adj.get(curKey) ?? []).filter((e) => !done.has(e.to));
+      const exits: AtomEdge[] = (adj.get(curKey) ?? []).filter((e) => !done.has(e.to));
       // leave through a member other than the one we entered on (so entry stays
       // on the left); a single-person atom is its own both-ends, so any exit.
-      let cand = single ? exits : exits.filter((e) => e.via !== entry);
+      let cand: AtomEdge[] = single ? exits : exits.filter((e) => e.via !== entry);
       if (cand.length === 0) cand = exits;
       cand = [...cand].sort((a, b) => atomBary(a.to) - atomBary(b.to) || (a.partner < b.partner ? -1 : 1));
       const exitEdge = cand[0];
