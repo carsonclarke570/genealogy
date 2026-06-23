@@ -25,6 +25,18 @@ export interface RelationshipEdge {
   /** Spouse edges only: canonical partial-date strings the timeline reads. */
   marriedDate?: string | null;
   divorcedDate?: string | null;
+  /**
+   * Spouse edges only: provenance for the marriage / divorce dates. `*Source` is
+   * the resolved source document (title/type) when one is linked, for read-side
+   * rendering; `*MediaId` is the raw link the edit form seeds from. Optional so
+   * the pure graph code and its tests can ignore them.
+   */
+  marriedProv?: import("@family-archive/ui").ProvenanceStatus;
+  marriedMediaId?: string | null;
+  marriedSource?: { id: string; title: string; type: import("@family-archive/ui").DocType } | null;
+  divorcedProv?: import("@family-archive/ui").ProvenanceStatus;
+  divorcedMediaId?: string | null;
+  divorcedSource?: { id: string; title: string; type: import("@family-archive/ui").DocType } | null;
 }
 
 export type UnionStatus = "married" | "divorced" | null;

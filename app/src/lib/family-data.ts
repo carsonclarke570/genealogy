@@ -13,11 +13,13 @@ import type {
   SourceOption,
   BadgeTone,
   PartialDate,
+  LocationValue,
 } from "@family-archive/ui";
 import type { FamilyGraph, RelationshipEdge } from "./family-graph";
 import { parsePartialDate } from "./dates";
 
 export type { FamilyGraph, RelationshipEdge } from "./family-graph";
+export type { LocationValue } from "@family-archive/ui";
 // relationsOf is derived straight from the raw edges; it lives with the graph
 // model but is re-exported here so the UI keeps importing it from one place.
 export { relationsOf } from "./family-graph";
@@ -70,10 +72,20 @@ export interface PersonName {
   ordinal: number;
 }
 
-/** A recorded fact's confidence, plus the source cited when it's verified. */
+/**
+ * A recorded fact's confidence under the unified provenance model: a status, an
+ * optional linked source **document** (`mediaId`), and an optional free-text
+ * `note`. `source` is the resolved document's title, filled in on read for
+ * display (legacy rows that stored a free-text source string surface it here too).
+ */
 export interface ProvFact {
   status: ProvenanceStatus;
+  /** The cited source document's id, or null. */
+  mediaId?: string | null;
+  /** Display label for the cited source (resolved doc title, or legacy string). */
   source?: string | null;
+  /** A free-text curator note about this fact. */
+  note?: string | null;
 }
 
 export interface Person {
@@ -112,6 +124,8 @@ export interface MediaItem {
   people: string[];
   /** Free-text notes/provenance; null when none recorded. */
   description: string | null;
+  /** How confident we are this item is authentic (unified provenance status). */
+  prov: ProvenanceStatus;
   /** Stored MIME type once a file is attached; null for fileless (legacy) rows. */
   mimeType: string | null;
   /** Whether an actual file is stored for this item (filePath is set). */
@@ -155,12 +169,39 @@ export type EventType =
   | "religious"
   | "other";
 
+/**
+ * A place someone lived for a span of time. The structured `location` carries
+ * country → address granularity (+ optional coordinates); `place` is its display
+ * label. `start`/`end` are precision-aware partial dates (end null = ongoing).
+ * Provenance follows the unified model (status + linked source document + note).
+ */
+export interface Residence {
+  id: string;
+  personId: string;
+  location: LocationValue;
+  /** Display label for the location (mirrors `location.label`). */
+  place: string;
+  start: PartialDate | null;
+  end: PartialDate | null;
+  /** 4-digit start year, derived; kept for sort/compact display. */
+  startYear: number | null;
+  endYear: number | null;
+  prov: ProvenanceStatus;
+  source: { id: string; title: string; type: DocType } | null;
+  note: string | null;
+}
+
 export interface TimelineEvent {
-  /** Deterministic synthetic id (`b-`/`d-`/`m-`/`dv-`/`me-`/`ev-` prefixed). */
+  /** Deterministic synthetic id (`b-`/`d-`/`m-`/`dv-`/`me-`/`ev-`/`res-` prefixed). */
   id: string;
   type: EventType;
   /** Precision-aware date, or null when only a bucket is known. */
   date: PartialDate | null;
+  /**
+   * For span events (a residence), the precision-aware end date — null when the
+   * span is still open. Point events leave this undefined.
+   */
+  endDate?: PartialDate | null;
   /** Numeric sort key (year*10000 + month*100 + day), precomputed for cheap client sort. */
   sortKey: number;
   title: string;
@@ -187,6 +228,8 @@ export interface Dataset {
   /** Raw relationship edges (with ids) — the edit form removes specific ones. */
   relationships: RelationshipEdge[];
   media: MediaItem[];
+  /** Where people lived, and for what spans (drives the residence timeline + tab). */
+  residences: Residence[];
   /** The merged, chronologically-sorted life-event timeline (derived + stored). */
   events: TimelineEvent[];
 }
@@ -321,6 +364,26 @@ export function provOf(p: Person, field: string): ProvenanceStatus {
 /** The source cited for a recorded fact (when verified), or null. */
 export function provSourceOf(p: Person, field: string): string | null {
   return p.prov?.[field]?.source ?? null;
+}
+
+/** The linked source-document id cited for a recorded fact, or null. */
+export function provMediaIdOf(p: Person, field: string): string | null {
+  return p.prov?.[field]?.mediaId ?? null;
+}
+
+/** A person's residencies, earliest span first (undated spans sort last). */
+export function residencesOf(residences: Residence[], personId: string): Residence[] {
+  return residences
+    .filter((r) => r.personId === personId)
+    .sort((a, b) => dateSortKey(a.start) - dateSortKey(b.start));
+}
+
+/** "1952 – 1968" / "1952 – present" / "1952" for a residence span. */
+export function residenceSpan(r: Residence): string {
+  const start = r.startYear != null ? String(r.startYear) : r.start ? "?" : "";
+  if (r.endYear != null) return start ? `${start} – ${r.endYear}` : String(r.endYear);
+  if (r.end) return start ? `${start} – ?` : "";
+  return start ? `${start} – present` : "Dates unknown";
 }
 
 export interface Relation {

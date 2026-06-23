@@ -96,3 +96,6 @@ export type { DocChipProps } from "./components/DocChip";
 
 export { DateField, formatPartialDate } from "./components/DateField";
 export type { DateFieldProps, PartialDate, DatePrecision } from "./components/DateField";
+
+export { LocationField, formatLocation } from "./components/LocationField";
+export type { LocationFieldProps, LocationValue, LocationSuggestion } from "./components/LocationField";

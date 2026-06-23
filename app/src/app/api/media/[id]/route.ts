@@ -50,6 +50,7 @@ export async function PUT(
         title: meta.title,
         year: meta.year,
         description: meta.description,
+        prov: meta.prov,
       })
       .where(eq(mediaTable.id, params.id))
       .returning({ id: mediaTable.id });

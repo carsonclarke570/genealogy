@@ -102,9 +102,11 @@ export interface ProvenanceMarkProps {
   /**
    * Presence makes the mark editable: clicking opens a confidence picker, and
    * choosing "Verified" opens the {@link SourceCiteDialog} to cite a document.
-   * Called with the chosen status and, for verified, the linked source label.
+   * Called with the chosen status and, for verified, the linked source's label
+   * and id (`id` is `"__new"` when the user chose to upload a new document, or
+   * `undefined` for a non-verified status).
    */
-  onChange?: (status: ProvenanceStatus, source?: string) => void;
+  onChange?: (status: ProvenanceStatus, source?: string, sourceId?: string) => void;
   /** Candidate documents offered by the "Link a source" dialog. */
   sources?: SourceOption[];
   /** Icon size in px. @default 16 */
@@ -197,9 +199,9 @@ export function ProvenanceMark({
         open={dialog}
         sources={sources}
         onClose={() => setDialog(false)}
-        onConfirm={(src) => {
+        onConfirm={(src, id) => {
           setDialog(false);
-          onChange("verified", src);
+          onChange("verified", src, id);
         }}
       />
     </>
@@ -217,8 +219,12 @@ const DOC_LABEL: Record<DocType, string> = {
 export interface SourceCiteDialogProps {
   open: boolean;
   onClose: () => void;
-  /** Called with the chosen source's label once the user confirms. */
-  onConfirm: (source: string) => void;
+  /**
+   * Called once the user confirms, with the chosen source's label and id. `id` is
+   * `"__new"` when they chose to upload a new document. (The id is optional so
+   * existing label-only callers keep working.)
+   */
+  onConfirm: (source: string, id?: string) => void;
   /** Documents already in the archive that can prove the fact. */
   sources?: SourceOption[];
 }
@@ -265,7 +271,7 @@ export function SourceCiteDialog({
           <Button
             variant="primary"
             disabled={!selected}
-            onClick={() => selected && onConfirm(labelOf(selected))}
+            onClick={() => selected && onConfirm(labelOf(selected), selected)}
           >
             Mark verified
           </Button>

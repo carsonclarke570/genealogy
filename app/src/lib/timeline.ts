@@ -19,7 +19,7 @@
  * graph keys unions — the same couple never yields two marriage events.
  */
 import type { PartialDate, ProvenanceStatus, DocType } from "@family-archive/ui";
-import type { Person, MediaItem, EventType, TimelineEvent } from "./family-data";
+import type { Person, MediaItem, EventType, TimelineEvent, Residence } from "./family-data";
 import { sortNames, dateSortKey } from "./family-data";
 import type { RelationshipEdge } from "./family-graph";
 import { parsePartialDate } from "./dates";
@@ -71,13 +71,17 @@ export const TIMELINE_TYPE_ORDER: EventType[] = [
   "other",
 ];
 
-/** The event types a user can *add* by hand (the rest are derived). */
+/**
+ * The event types a user can *add* by hand on the event dialog. Residence is a
+ * first-class span (the `residence` table + its own dialog), not a point event,
+ * so it isn't here — though it stays in `EVENT_META`/`TIMELINE_TYPE_ORDER` so its
+ * derived span events still render + filter on the timeline.
+ */
 export const STORED_EVENT_TYPES: EventType[] = [
   "immigration",
   "military",
   "education",
   "career",
-  "residence",
   "religious",
   "other",
 ];
@@ -118,9 +122,10 @@ export function buildTimeline(input: {
   people: Record<string, Person>;
   relationships: RelationshipEdge[];
   media: MediaItem[];
+  residences?: Residence[];
   events: StoredEvent[];
 }): TimelineEvent[] {
-  const { people, relationships, media, events } = input;
+  const { people, relationships, media, residences = [], events } = input;
   const out: TimelineEvent[] = [];
   const consumed = new Set<string>(); // media ids used as a source (no standalone event)
 
@@ -183,11 +188,13 @@ export function buildTimeline(input: {
 
     const marr = parsePartialDate(r.marriedDate);
     if (marr) {
-      // A wedding/marriage document linked to both partners cites the event.
-      const src =
+      // Prefer the recorded provenance + linked source; otherwise fall back to a
+      // wedding/marriage document linked to both partners as the cited source.
+      const heuristic =
         media.find(
           (m) => m.people.includes(a) && m.people.includes(b) && /\b(marri|wedding)/i.test(m.title),
         ) ?? null;
+      const src = r.marriedSource ?? (heuristic ? { id: heuristic.id, title: heuristic.title, type: heuristic.type } : null);
       if (src) consumed.add(src.id);
       out.push(
         mk({
@@ -197,14 +204,16 @@ export function buildTimeline(input: {
           title: `${firstWord(pa.given)} & ${firstWord(pb.given)} married`,
           place: null,
           people: [a, b],
-          prov: src ? "verified" : "unverified",
-          source: src ? { id: src.id, title: src.title, type: src.type } : null,
+          prov: r.marriedProv ?? (src ? "verified" : "unverified"),
+          source: src,
           auto: true,
         }),
       );
     }
     const div = parsePartialDate(r.divorcedDate);
     if (r.status === "divorced" && div) {
+      const dsrc = r.divorcedSource ?? null;
+      if (dsrc) consumed.add(dsrc.id);
       out.push(
         mk({
           id: `dv-${pairKey}`,
@@ -213,8 +222,8 @@ export function buildTimeline(input: {
           title: `${firstWord(pa.given)} & ${firstWord(pb.given)} divorced`,
           place: null,
           people: [a, b],
-          prov: "unverified",
-          source: null,
+          prov: r.divorcedProv ?? "unverified",
+          source: dsrc,
           auto: true,
         }),
       );
@@ -257,6 +266,30 @@ export function buildTimeline(input: {
         prov: e.prov,
         source: sourceOf(e.mediaId),
         auto: false,
+      }),
+    );
+  }
+
+  // ── 4b. Residence spans — derived from the residence table ───────────────
+  // A residence is a *span* (start → optional end), not a point: it carries an
+  // `endDate` the views render as a bar. Marked `auto` (it's edited through the
+  // residence dialog, not the event dialog).
+  for (const r of residences) {
+    const p = people[r.personId];
+    if (!p) continue;
+    if (r.start == null && r.end == null) continue; // nothing to place on the axis
+    out.push(
+      mk({
+        id: `res-${r.id}`,
+        type: "residence",
+        date: r.start ?? r.end,
+        endDate: r.end,
+        title: `${firstWord(p.given)} ${p.surname} lived in ${r.place}`,
+        place: r.place,
+        people: [r.personId],
+        prov: r.prov,
+        source: r.source,
+        auto: true,
       }),
     );
   }

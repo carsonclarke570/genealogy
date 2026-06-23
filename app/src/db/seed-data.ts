@@ -15,7 +15,7 @@ import type { Person, MediaItem } from "@/lib/family-data";
 // (`mediaCount`) or that only exist once a real file is uploaded (`mimeType`,
 // `hasFile`) — the seed leaves the media file columns null.
 type SeedPerson = Omit<Person, "mediaCount" | "names">;
-type SeedMedia = Omit<MediaItem, "mimeType" | "hasFile" | "description">;
+type SeedMedia = Omit<MediaItem, "mimeType" | "hasFile" | "description" | "prov">;
 
 /**
  * Seed-authoring shape only: the demo family is written as couple "units" for
@@ -38,7 +38,7 @@ interface SeedUnit {
 /** A stored life event the timeline shows (births/deaths/marriages are derived). */
 export interface SeedEvent {
   id: string;
-  type: "immigration" | "military" | "education" | "career" | "residence" | "religious" | "other";
+  type: "immigration" | "military" | "education" | "career" | "religious" | "other";
   title: string;
   date: string;
   place: string | null;
@@ -46,6 +46,23 @@ export interface SeedEvent {
   /** Source document id (a media item), or null. */
   mediaId: string | null;
   prov: "verified" | "unverified" | "estimated" | "disputed";
+}
+
+/** A residence span (where someone lived, and for what period). */
+export interface SeedResidence {
+  id: string;
+  personId: string;
+  /** Display label + optional structured parts. */
+  place: string;
+  locality?: string | null;
+  region?: string | null;
+  country?: string | null;
+  /** Canonical partial-date strings; `end` null means they lived there onward. */
+  start: string | null;
+  end?: string | null;
+  prov: "verified" | "unverified" | "estimated" | "disputed";
+  mediaId?: string | null;
+  note?: string | null;
 }
 
 export const people: Record<string, SeedPerson> = {
@@ -103,14 +120,29 @@ export const events: SeedEvent[] = [
   { id: "E-bap-el", type: "religious", title: "Eleanor baptised at St. Mary's", date: "1915-09", place: "Boston, MA", people: ["eleanor"], mediaId: null, prov: "estimated" },
   { id: "E-mil-ar1", type: "military", title: "Arthur enlisted, U.S. Army", date: "1942-03", place: "Boston, MA", people: ["arthur"], mediaId: null, prov: "unverified" },
   { id: "E-mil-ar2", type: "military", title: "Reported missing in action, Normandy", date: "1944-06-12", place: "Normandy, France", people: ["arthur"], mediaId: "M-104", prov: "disputed" },
-  { id: "E-res-ef", type: "residence", title: "Eleanor & Frederick settled in Concord", date: "1950", place: "Concord, MA", people: ["eleanor", "frederick"], mediaId: null, prov: "unverified" },
   { id: "E-car-ro", type: "career", title: "Rose opened a bakery in Portland", date: "1958", place: "Portland, ME", people: ["rose"], mediaId: "M-109", prov: "verified" },
   { id: "E-edu-ja", type: "education", title: "James graduated, Boston College", date: "1965-05", place: "Boston, MA", people: ["james"], mediaId: "M-106", prov: "verified" },
   { id: "E-car-fr", type: "career", title: "Frederick retired from the railway", date: "1972", place: "Concord, MA", people: ["frederick"], mediaId: null, prov: "estimated" },
   { id: "E-edu-sa", type: "education", title: "Sarah graduated, UMass Amherst", date: "1994", place: "Amherst, MA", people: ["sarah"], mediaId: null, prov: "unverified" },
   { id: "E-car-mi", type: "career", title: "Michael joined a tech firm in Cambridge", date: "2001", place: "Cambridge, MA", people: ["michael"], mediaId: null, prov: "unverified" },
   { id: "E-rel-ol", type: "religious", title: "Olivia christened", date: "2002-11", place: "Cambridge, MA", people: ["olivia"], mediaId: null, prov: "unverified" },
-  { id: "E-res-tr", type: "residence", title: "The Tran family moved to Cambridge", date: "2003", place: "Cambridge, MA", people: ["sarah", "michael", "olivia"], mediaId: null, prov: "unverified" },
+];
+
+/**
+ * Residencies — where people lived, and for what spans. (The old "settled in…"
+ * residence *events* are modelled here now, as first-class spans, plus a few more
+ * to exercise the timeline's residence bars.)
+ */
+export const residences: SeedResidence[] = [
+  { id: "R-thomas-boston", personId: "thomas", place: "Boston, MA", locality: "Boston", region: "Massachusetts", country: "United States", start: "1911", end: "1971", prov: "estimated" },
+  { id: "R-alice-boston", personId: "alice", place: "Boston, MA", locality: "Boston", region: "Massachusetts", country: "United States", start: "1911", end: "1975", prov: "estimated" },
+  { id: "R-eleanor-concord", personId: "eleanor", place: "Concord, MA", locality: "Concord", region: "Massachusetts", country: "United States", start: "1950", end: "2001", prov: "unverified" },
+  { id: "R-frederick-concord", personId: "frederick", place: "Concord, MA", locality: "Concord", region: "Massachusetts", country: "United States", start: "1950", end: "1989", prov: "unverified" },
+  { id: "R-rose-portland", personId: "rose", place: "Portland, ME", locality: "Portland", region: "Maine", country: "United States", start: "1947", end: "2010", prov: "unverified" },
+  { id: "R-james-concord", personId: "james", place: "Concord, MA", locality: "Concord", region: "Massachusetts", country: "United States", start: "1943", end: "2018", prov: "verified", mediaId: "M-110" },
+  { id: "R-sarah-cambridge", personId: "sarah", place: "Cambridge, MA", locality: "Cambridge", region: "Massachusetts", country: "United States", start: "2003", prov: "unverified" },
+  { id: "R-michael-cambridge", personId: "michael", place: "Cambridge, MA", locality: "Cambridge", region: "Massachusetts", country: "United States", start: "2003", prov: "unverified" },
+  { id: "R-olivia-cambridge", personId: "olivia", place: "Cambridge, MA", locality: "Cambridge", region: "Massachusetts", country: "United States", start: "2003", end: "2020", prov: "unverified", note: "Family home through high school" },
 ];
 
 export const media: SeedMedia[] = [

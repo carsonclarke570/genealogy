@@ -10,6 +10,7 @@
  *    can carry script and would be an XSS vector when served same-origin.
  */
 import { z } from "zod";
+import { provStatuses } from "./prov";
 
 /** Hard ceiling on an uploaded file. */
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024; // 25 MB
@@ -53,6 +54,9 @@ export const mediaMetaSchema = z.object({
     })
     .catch(null),
   description: optionalText,
+  // How confident we are this item is authentic (unified provenance). Optional on
+  // the wire so older upload callers (which omit it) still validate.
+  prov: z.enum(provStatuses).catch("unverified"),
   personIds: z
     .array(z.string().min(1))
     .transform((ids) => [...new Set(ids)])

@@ -36,6 +36,13 @@
       "when": 1782234056941,
       "tag": "0004_previous_chameleon",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1782242299393,
+      "tag": "0005_last_mephisto",
+      "breakpoints": true
     }
   ]
 }

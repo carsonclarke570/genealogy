@@ -7,7 +7,7 @@ import {
   yearSpan,
   type StoredEvent,
 } from "./timeline";
-import type { Person, MediaItem, PersonName } from "./family-data";
+import type { Person, MediaItem, PersonName, Residence } from "./family-data";
 import type { RelationshipEdge } from "./family-graph";
 
 // ── factories ──────────────────────────────────────────────────────────────
@@ -56,6 +56,7 @@ const media = (id: string, over: Partial<MediaItem> = {}): MediaItem => ({
   year: over.year ?? 1950,
   people: over.people ?? [],
   description: over.description ?? null,
+  prov: over.prov ?? "unverified",
   mimeType: over.mimeType ?? null,
   hasFile: over.hasFile ?? false,
 });
@@ -85,7 +86,26 @@ const pname = (id: string, surname: string, over: Partial<PersonName> = {}): Per
   ordinal: over.ordinal ?? 0,
 });
 
-const empty = { people: {}, relationships: [], media: [], events: [] as StoredEvent[] };
+const residence = (id: string, personId: string, over: Partial<Residence> = {}): Residence => {
+  // `in` (not `??`) so an explicit `null` start/end is respected, not defaulted.
+  const start = "start" in over ? over.start ?? null : ({ precision: "year", year: 1950, month: null, day: null } as const);
+  const end = "end" in over ? over.end ?? null : null;
+  return {
+    id,
+    personId,
+    location: over.location ?? { label: over.place ?? "Boston, MA" },
+    place: over.place ?? "Boston, MA",
+    start,
+    end,
+    startYear: "startYear" in over ? over.startYear ?? null : start?.year ?? null,
+    endYear: "endYear" in over ? over.endYear ?? null : end?.year ?? null,
+    prov: over.prov ?? "unverified",
+    source: over.source ?? null,
+    note: over.note ?? null,
+  };
+};
+
+const empty = { people: {}, relationships: [], media: [], residences: [] as Residence[], events: [] as StoredEvent[] };
 
 describe("buildTimeline — derived birth/death", () => {
   it("synthesizes a birth and a death event from a person", () => {
@@ -264,6 +284,62 @@ describe("buildTimeline — name changes", () => {
     const q = person("don", { born: 1944 });
     const evs = buildTimeline({ ...empty, people: peopleMap(p, q), relationships: [spouse("meg", "don", { id: "R1" })] });
     expect(evs.some((e) => e.id === "nm-n1")).toBe(true);
+  });
+});
+
+describe("buildTimeline — residence spans", () => {
+  it("emits a residence span event with start + end dates", () => {
+    const p = person("ele", { born: 1915 });
+    const r = residence("r1", "ele", {
+      place: "Concord, MA",
+      start: { precision: "year", year: 1950, month: null, day: null },
+      end: { precision: "year", year: 1968, month: null, day: null },
+      startYear: 1950,
+      endYear: 1968,
+    });
+    const evs = buildTimeline({ ...empty, people: peopleMap(p), residences: [r] });
+    const res = evs.find((e) => e.id === "res-r1")!;
+    expect(res.type).toBe("residence");
+    expect(res.place).toBe("Concord, MA");
+    expect(res.date).toEqual({ precision: "year", year: 1950, month: null, day: null });
+    expect(res.endDate).toEqual({ precision: "year", year: 1968, month: null, day: null });
+    expect(eventsOf(evs, "ele").map((e) => e.id)).toContain("res-r1");
+  });
+
+  it("carries the residence's provenance + source", () => {
+    const p = person("ele", { born: 1915 });
+    const r = residence("r2", "ele", { prov: "verified", source: { id: "M-1", title: "Deed", type: "certificate" } });
+    const res = buildTimeline({ ...empty, people: peopleMap(p), residences: [r] }).find((e) => e.id === "res-r2")!;
+    expect(res.prov).toBe("verified");
+    expect(res.source).toEqual({ id: "M-1", title: "Deed", type: "certificate" });
+  });
+
+  it("skips a residence with no dates at all", () => {
+    const p = person("ele", { born: 1915 });
+    const r = residence("r3", "ele", { start: null, end: null, startYear: null, endYear: null });
+    const evs = buildTimeline({ ...empty, people: peopleMap(p), residences: [r] });
+    expect(evs.some((e) => e.id === "res-r3")).toBe(false);
+  });
+});
+
+describe("buildTimeline — marriage provenance", () => {
+  it("reads marriage prov + source from the spouse edge", () => {
+    const a = person("bob", { born: 1900 });
+    const b = person("amy", { born: 1902 });
+    const evs = buildTimeline({
+      ...empty,
+      people: peopleMap(a, b),
+      relationships: [
+        spouse("bob", "amy", {
+          marriedDate: "1925",
+          marriedProv: "verified",
+          marriedSource: { id: "M-9", title: "Marriage record", type: "certificate" },
+        }),
+      ],
+    });
+    const m = evs.find((e) => e.type === "marriage")!;
+    expect(m.prov).toBe("verified");
+    expect(m.source).toEqual({ id: "M-9", title: "Marriage record", type: "certificate" });
   });
 });
 
