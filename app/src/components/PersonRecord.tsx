@@ -8,9 +8,10 @@ import {
   Button,
   Card,
   Chip,
+  EmptyState,
   IconBadge,
-  Menu,
   ProvenanceMark,
+  Skeleton,
   Tabs,
 } from "@family-archive/ui";
 import type { ChipDot } from "@family-archive/ui";
@@ -18,7 +19,6 @@ import { formatPartialDate, formatLocation } from "@family-archive/ui";
 import {
   fullName,
   lifeDates,
-  docCount,
   provOf,
   provSourceOf,
   provSummary,
@@ -26,7 +26,6 @@ import {
   residencesOf,
   residenceSpan,
   NAME_REASON_LABEL,
-  type Person,
   type Relation,
   type MediaItem,
   type Residence,
@@ -41,45 +40,16 @@ import { MediaDetail } from "./MediaDetail";
 import { AddResidenceDialog } from "./AddResidenceDialog";
 import type { Screen } from "./AppShell";
 
-function bioParas(p: Person): string[] {
-  const name = p.given.split(" ")[0];
-  // Build each clause only from facts that are actually recorded, so a sparse
-  // record never reads "born in null in null".
-  const birthBits = [
-    p.bornPlace ? `in ${p.bornPlace}` : null,
-    p.born != null ? `in ${p.born}` : null,
-  ]
-    .filter(Boolean)
-    .join(" ");
-  const deathBits = [
-    p.diedPlace ? `in ${p.diedPlace}` : null,
-    p.died != null ? `in ${p.died}` : null,
-  ]
-    .filter(Boolean)
-    .join(" ");
-  let first: string;
-  if (birthBits && (p.living || deathBits)) {
-    first = `${name} was born ${birthBits}, ${p.living ? "and is living" : `and died ${deathBits}`}.`;
-  } else if (birthBits) {
-    first = `${name} was born ${birthBits}.`;
-  } else if (p.living) {
-    first = `${name} is living.`;
-  } else if (deathBits) {
-    first = `${name} died ${deathBits}.`;
-  } else {
-    first = `${name}'s biographical details haven't been recorded yet.`;
-  }
-  const second = p.maiden
-    ? `Recorded under the family name ${p.surname} (née ${p.maiden}), ${name} appears across several family photographs and certificates in the archive.`
-    : `${name}'s record draws on the photographs, certificates and articles attached below.`;
-  return [first, second];
-}
-
-function sourceFor(p: Person, field: string): string {
-  if (field === "name") return p.docs?.certificate ? "birth certificate" : p.docs?.obituary ? "obituary" : "census record";
-  if (field === "born" || field === "bornPlace") return p.docs?.certificate ? "birth certificate" : "family record";
-  if (field === "died" || field === "diedPlace") return p.docs?.obituary ? "obituary" : "death record";
-  return "source on file";
+/**
+ * Split the single free-text `notes` field into paragraphs. Blank lines (or any
+ * run of newlines) start a new paragraph; we never synthesise prose — what the
+ * curator recorded is all that shows.
+ */
+function notesParagraphs(notes: string | null | undefined): string[] {
+  return (notes ?? "")
+    .split(/\n+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 export function PersonRecord({
@@ -107,13 +77,49 @@ export function PersonRecord({
   // row into context (also guards against a stale/broken link). Render a light
   // placeholder rather than dereferencing undefined.
   if (!p) {
+    // Content-shaped skeleton mirroring the loaded record (breadcrumb → header
+    // card with portrait, name, dates, badges, facts → tab bar), so arrival
+    // causes no layout shift. Decorative shapes are aria-hidden; the region is
+    // marked busy with an off-screen status message for assistive tech.
     return (
       <div
         className="app-scroll"
         style={{ height: "100%", overflow: "auto", padding: "var(--space-xl) var(--space-2xl) var(--space-4xl)" }}
+        aria-busy="true"
       >
-        <div style={{ maxWidth: 940, margin: "0 auto" }} className="app-muted">
+        <span role="status" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" }}>
           Loading record…
+        </span>
+        <div style={{ maxWidth: 940, margin: "0 auto" }}>
+          <Skeleton variant="text" width={220} style={{ marginBottom: "var(--space-lg)" }} />
+          <Card>
+            <div style={{ display: "flex", gap: "var(--space-lg)", alignItems: "flex-start" }}>
+              <Skeleton variant="circle" width={64} height={64} />
+              <div style={{ flex: 1, minWidth: 0, display: "grid", gap: "var(--space-sm)" }}>
+                <Skeleton variant="text" width="46%" height={28} />
+                <Skeleton variant="text" width="30%" height={18} />
+                <div style={{ display: "flex", gap: "var(--space-sm)", marginTop: "var(--space-xs)" }}>
+                  <Skeleton width={86} height={22} style={{ borderRadius: "var(--radius-full)" }} />
+                  <Skeleton width={108} height={22} style={{ borderRadius: "var(--radius-full)" }} />
+                </div>
+              </div>
+              <Skeleton width={96} height={38} />
+            </div>
+            <hr className="app-divider" style={{ margin: "var(--space-lg) 0 var(--space-md)" }} />
+            <div className="app-grid-facts">
+              {[0, 1, 2].map((i) => (
+                <div key={i} style={{ display: "grid", gap: 6 }}>
+                  <Skeleton variant="text" width="55%" />
+                  <Skeleton variant="text" width="80%" height={18} />
+                </div>
+              ))}
+            </div>
+          </Card>
+          <div style={{ display: "flex", gap: "var(--space-lg)", marginTop: "var(--space-xl)" }}>
+            {[64, 92, 104, 96].map((w, i) => (
+              <Skeleton key={i} variant="text" width={w} height={16} />
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -124,6 +130,9 @@ export function PersonRecord({
   const events = eventsOf(allEvents, id);
   const residences = residencesOf(allResidences, id);
 
+  const firstName = p.given.split(" ")[0];
+  const hasRels =
+    rel.parents.length + rel.spouse.length + rel.children.length + rel.siblings.length > 0;
   const summary = provSummary(p);
 
   // A compact, horizontally-scrolling preview of this person's life events; the
@@ -131,9 +140,9 @@ export function PersonRecord({
   const EventStrip =
     events.length > 0 ? (
       <div>
-        <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
+        <h2 className="app-label" style={{ margin: "0 0 var(--space-sm)" }}>
           Life events
-        </div>
+        </h2>
         <div className="app-evstrip-wrap">
           <div className="app-evstrip">
             {events.slice(0, 5).map((ev) => {
@@ -150,7 +159,12 @@ export function PersonRecord({
             })}
             {events.length > 5 && (
               <button className="app-evcard app-evcard-more" onClick={() => setTab("timeline")}>
-                <span className="app-display" style={{ fontSize: "var(--text-headline)" }}>+{events.length - 5}</span>
+                <span
+                  className="tnum"
+                  style={{ fontFamily: "var(--font-sans)", fontWeight: "var(--fw-semibold)", fontSize: "var(--text-headline)", color: "var(--color-ink)" }}
+                >
+                  +{events.length - 5}
+                </span>
                 <span className="app-muted" style={{ fontSize: "var(--text-body-sm)" }}>more</span>
               </button>
             )}
@@ -162,9 +176,9 @@ export function PersonRecord({
   const RelGroup = ({ title, items }: { title: string; items: Relation[] }) =>
     items.length ? (
       <div>
-        <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
+        <h2 className="app-label" style={{ margin: "0 0 var(--space-sm)" }}>
           {title}
-        </div>
+        </h2>
         <div style={{ display: "grid", gap: "var(--space-sm)" }}>
           {items.map((r) => (
             <MiniNode key={r.id} id={r.id} rel={r.rel} onOpen={onOpen} />
@@ -173,7 +187,7 @@ export function PersonRecord({
       </div>
     ) : null;
 
-  const bio = bioParas(p);
+  const bio = notesParagraphs(p.notes);
   // The full name history (earliest → latest, already sorted by the read model).
   // Shown only when there's a change to surface — a single birth name is already
   // the record's headline.
@@ -181,9 +195,9 @@ export function PersonRecord({
   const NamesBlock =
     nameHistory.length > 1 ? (
       <div>
-        <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
+        <h2 className="app-label" style={{ margin: "0 0 var(--space-sm)" }}>
           Names
-        </div>
+        </h2>
         <div style={{ display: "grid", gap: "var(--space-sm)" }}>
           {nameHistory.map((n, i) => {
             const date = formatPartialDate(n.date ?? null);
@@ -208,36 +222,62 @@ export function PersonRecord({
       </div>
     ) : null;
   const Overview = (
-    <div style={{ display: "grid", gap: "var(--space-2xl)", paddingTop: "var(--space-lg)" }}>
+    <div style={{ display: "grid", gap: "var(--space-2xl)" }}>
       <div>
-        <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
+        <h2 className="app-label" style={{ margin: "0 0 var(--space-sm)" }}>
           Biography
-        </div>
-        <div
-          style={{
-            maxWidth: "68ch",
-            fontSize: "var(--text-body)",
-            lineHeight: 1.55,
-            color: "var(--color-ink)",
-            display: "grid",
-            gap: "0.75em",
-          }}
-        >
-          {bio.map((para, i) => (
-            <p key={i} style={{ margin: 0 }}>
-              {para}
-            </p>
-          ))}
-        </div>
+        </h2>
+        {bio.length > 0 ? (
+          <div
+            style={{
+              maxWidth: "68ch",
+              fontSize: "var(--text-body)",
+              lineHeight: 1.55,
+              color: "var(--color-ink)",
+              display: "grid",
+              gap: "0.75em",
+              textWrap: "pretty",
+            }}
+          >
+            {bio.map((para, i) => (
+              <p key={i} style={{ margin: 0 }}>
+                {para}
+              </p>
+            ))}
+          </div>
+        ) : (
+          <p className="app-muted" style={{ margin: 0, maxWidth: "68ch", fontSize: "var(--text-body)" }}>
+            No biography recorded yet.{" "}
+            <button type="button" className="app-link" onClick={() => onOpen(id, "edit")}>
+              Add one
+            </button>
+            .
+          </p>
+        )}
       </div>
       {NamesBlock}
       {EventStrip}
-      <div className="app-grid-rels">
-        <RelGroup title="Parents" items={rel.parents} />
-        <RelGroup title="Spouse" items={rel.spouse} />
-        <RelGroup title="Children" items={rel.children} />
-        <RelGroup title="Siblings" items={rel.siblings} />
-      </div>
+      {hasRels ? (
+        <div className="app-grid-rels">
+          <RelGroup title="Parents" items={rel.parents} />
+          <RelGroup title="Spouse" items={rel.spouse} />
+          <RelGroup title="Children" items={rel.children} />
+          <RelGroup title="Siblings" items={rel.siblings} />
+        </div>
+      ) : (
+        <div>
+          <h2 className="app-label" style={{ margin: "0 0 var(--space-sm)" }}>
+            Relationships
+          </h2>
+          <p className="app-muted" style={{ margin: 0, maxWidth: "68ch", fontSize: "var(--text-body)" }}>
+            No relationships recorded yet.{" "}
+            <button type="button" className="app-link" onClick={() => onOpen(id, "edit")}>
+              Link a parent, spouse, child or sibling
+            </button>
+            .
+          </p>
+        </div>
+      )}
     </div>
   );
 
@@ -249,8 +289,9 @@ export function PersonRecord({
     ["obituary", "Obituaries", "obituary"],
   ];
   const shownDocs = media.filter((m) => docFilter === "all" || m.type === docFilter);
+  const activeDocLabel = (docTypes.find(([k]) => k === docFilter)?.[1] ?? "documents").toLowerCase();
   const Documents = (
-    <div style={{ paddingTop: "var(--space-lg)" }}>
+    <div>
       <div style={{ display: "flex", gap: "var(--space-sm)", flexWrap: "wrap", marginBottom: "var(--space-lg)", alignItems: "center" }}>
         {docTypes.map(([k, label, dot]) => (
           <Chip key={k} selected={docFilter === k} dot={dot} onClick={() => setDocFilter(k)}>
@@ -263,6 +304,31 @@ export function PersonRecord({
           </Button>
         </span>
       </div>
+      {shownDocs.length === 0 ? (
+        media.length === 0 ? (
+          <EmptyState
+            icon={<Icon name="gallery" size={24} />}
+            title="No documents yet"
+            description={`Attach a photo, certificate, article or obituary to ${firstName}'s record.`}
+            action={
+              <Button variant="secondary" iconStart={<Icon name="upload" size={16} />} onClick={() => setUploadOpen(true)}>
+                Add document
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState
+            icon={<Icon name="gallery" size={24} />}
+            title={`No ${activeDocLabel} yet`}
+            description="Nothing matches this filter."
+            action={
+              <Button variant="secondary" onClick={() => setDocFilter("all")}>
+                Show all documents
+              </Button>
+            }
+          />
+        )
+      ) : (
       <div className="app-grid-docs">
         {shownDocs.map((m) => (
           <ClickableCard key={m.id} ariaLabel={`Open ${m.title}`} onOpen={() => setOpenMedia(m)}>
@@ -288,11 +354,12 @@ export function PersonRecord({
           </ClickableCard>
         ))}
       </div>
+      )}
     </div>
   );
 
   const Residences = (
-    <div style={{ paddingTop: "var(--space-lg)" }}>
+    <div>
       <div
         style={{
           display: "flex",
@@ -342,7 +409,7 @@ export function PersonRecord({
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", flexWrap: "wrap" }}>
-                    <span style={{ fontFamily: "var(--font-serif)", fontSize: "var(--text-body)", color: "var(--color-ink)" }}>
+                    <span style={{ fontFamily: "var(--font-sans)", fontWeight: "var(--fw-medium)", fontSize: "var(--text-body)", color: "var(--color-ink)" }}>
                       {r.place}
                     </span>
                     <ProvenanceMark status={r.prov} source={r.source?.title} size={13} />
@@ -383,38 +450,6 @@ export function PersonRecord({
     </div>
   );
 
-  const Notes = (
-    <div style={{ paddingTop: "var(--space-lg)", display: "grid", gap: "var(--space-lg)", maxWidth: "68ch" }}>
-      {(
-        [
-          ["Curator", "Mar 2024", "Cross-checked the 1940 census against the parish record; birthplace confirmed."],
-          ["Aunt Margaret", "Jan 2024", "She always told the story of the crossing on the SS Carmania — added the manifest to documents."],
-        ] as const
-      ).map(([who, when, text]) => (
-        <Card key={who}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: "var(--text-body-sm)",
-              color: "var(--color-muted)",
-              marginBottom: "var(--space-sm)",
-            }}
-          >
-            <strong style={{ color: "var(--color-ink)" }}>{who}</strong>
-            <span className="tnum">{when}</span>
-          </div>
-          <div style={{ fontSize: "var(--text-body)", lineHeight: 1.55 }}>{text}</div>
-        </Card>
-      ))}
-      <div>
-        <Button variant="ghost" size="sm" iconStart={<Icon name="plus" size={16} />}>
-          Add note
-        </Button>
-      </div>
-    </div>
-  );
-
   const fmtFact = (field: string, raw: string | number) => {
     const st = provOf(p, field);
     const v = st === "estimated" && /^\d/.test(String(raw)) ? "c. " + raw : String(raw);
@@ -423,12 +458,13 @@ export function PersonRecord({
   const bornText = formatPartialDate(p.bornDate ?? null) || (p.born != null ? String(p.born) : "?");
   const diedText = formatPartialDate(p.diedDate ?? null) || (p.died != null ? String(p.died) : "?");
   const facts = [
-    { k: "Born", field: "born", ...fmtFact("born", bornText) },
-    { k: "Birthplace", field: "bornPlace", ...fmtFact("bornPlace", (p.bornPlace ?? "?").split(",")[0]) },
+    // Serif is reserved for life-dates (Born/Died); places and status are the
+    // tool's voice → sans (the Serif-For-People rule).
+    { k: "Born", field: "born", serif: true, ...fmtFact("born", bornText) },
+    { k: "Birthplace", field: "bornPlace", serif: false, ...fmtFact("bornPlace", (p.bornPlace ?? "?").split(",")[0]) },
     p.living
-      ? { k: "Status", field: null as string | null, v: "Living", st: provOf(p, "name") }
-      : { k: "Died", field: "died", ...fmtFact("died", diedText) },
-    { k: "Documents", field: null as string | null, v: String(docCount(p)), st: provOf(p, "name") },
+      ? { k: "Status", field: null as string | null, serif: false, v: "Living", st: provOf(p, "name") }
+      : { k: "Died", field: "died", serif: true, ...fmtFact("died", diedText) },
   ];
 
   return (
@@ -448,20 +484,20 @@ export function PersonRecord({
         </div>
 
         <Card>
-          <div style={{ display: "flex", gap: "var(--space-lg)", alignItems: "flex-start" }}>
+          <div className="app-person-head" style={{ display: "flex", gap: "var(--space-lg)", alignItems: "flex-start" }}>
             <Avatar name={fullName(p)} size="lg" />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div
+              <h1
                 className="app-display"
-                style={{ fontSize: "var(--text-display)", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
+                style={{ margin: 0, fontSize: "var(--text-display)", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
               >
-                <span>{fullName(p)}</span>
+                <span style={{ textWrap: "balance" }}>{fullName(p)}</span>
                 <ProvenanceMark
                   status={provOf(p, "name")}
-                  source={provOf(p, "name") === "verified" ? sourceFor(p, "name") : undefined}
+                  source={provOf(p, "name") === "verified" ? provSourceOf(p, "name") ?? undefined : undefined}
                   size={16}
                 />
-              </div>
+              </h1>
               <div
                 style={{
                   fontFamily: "var(--font-serif)",
@@ -471,7 +507,7 @@ export function PersonRecord({
                 }}
               >
                 {lifeDates(p)}
-                {p.maiden ? `  ·  née ${p.maiden}` : ""}
+                {p.maiden ? ` · née ${p.maiden}` : ""}
               </div>
               <div style={{ display: "flex", gap: "var(--space-sm)", flexWrap: "wrap", marginTop: "var(--space-md)" }}>
                 <Badge tone="neutral" dot>
@@ -480,37 +516,34 @@ export function PersonRecord({
                 <Badge tone={summary.tone} dot>
                   {summary.label}
                 </Badge>
-                <Badge tone="info">{docCount(p)} documents</Badge>
+                {media.length > 0 && (
+                  <Badge tone="info">
+                    {media.length} {media.length === 1 ? "document" : "documents"}
+                  </Badge>
+                )}
               </div>
             </div>
-            <div style={{ display: "flex", gap: "var(--space-sm)", flex: "none" }}>
+            <div className="app-person-actions" style={{ display: "flex", gap: "var(--space-sm)", flex: "none" }}>
               <Button variant="primary" iconStart={<Icon name="edit" size={16} />} onClick={() => onOpen(id, "edit")}>
                 Edit
               </Button>
-              <Menu
-                align="end"
-                trigger={<Button variant="secondary" iconStart={<Icon name="dots" size={16} />} aria-label="More actions" />}
-                items={[
-                  { label: "Share" },
-                  { label: "Merge with…" },
-                  { label: "Delete", danger: true },
-                ]}
-              />
             </div>
           </div>
           <hr className="app-divider" style={{ margin: "var(--space-lg) 0 var(--space-md)" }} />
           <div className="app-grid-facts">
             {facts.map((f) => (
-              <div key={f.k}>
+              <div key={f.k} style={{ minWidth: 0 }}>
                 <div style={{ fontSize: "var(--text-body-sm)", color: "var(--color-muted)" }}>{f.k}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2, minWidth: 0 }}>
                   <span
                     className="tnum"
                     style={{
-                      fontFamily: "var(--font-serif)",
+                      fontFamily: f.serif ? "var(--font-serif)" : "var(--font-sans)",
                       fontSize: "var(--text-title)",
+                      fontWeight: f.serif ? "var(--fw-regular)" : "var(--fw-medium)",
                       color: "var(--color-ink)",
-                      whiteSpace: "nowrap",
+                      minWidth: 0,
+                      overflowWrap: "anywhere",
                     }}
                   >
                     {f.v}
@@ -540,7 +573,6 @@ export function PersonRecord({
               },
               { value: "residences", label: `Residences (${residences.length})`, content: Residences },
               { value: "documents", label: `Documents (${media.length})`, content: Documents },
-              { value: "notes", label: "Notes (2)", content: Notes },
             ]}
           />
         </div>

@@ -17,6 +17,13 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: ButtonSize;
   /** Stretch to fill the container width. */
   fullWidth?: boolean;
+  /**
+   * Square, label-less button for a lone glyph (e.g. an overflow `⋯` trigger).
+   * Drops the label-side padding and locks the box to a 1:1 ratio so the icon
+   * sits centred at the same height as a normal button. Always pair with an
+   * `aria-label`.
+   */
+  iconOnly?: boolean;
   /** Show a spinner and disable interaction while an action is in flight. */
   loading?: boolean;
   /** Optional icon rendered before the label. */
@@ -41,6 +48,7 @@ export function Button({
   variant = "primary",
   size = "md",
   fullWidth = false,
+  iconOnly = false,
   loading = false,
   iconStart,
   className,
@@ -54,6 +62,7 @@ export function Button({
     `fa-btn--${variant}`,
     size === "sm" && "fa-btn--sm",
     fullWidth && "fa-btn--block",
+    iconOnly && "fa-btn--icon",
     className,
   ]
     .filter(Boolean)
