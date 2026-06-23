@@ -10,7 +10,6 @@ import {
   Chip,
   EmptyState,
   IconBadge,
-  Menu,
   ProvenanceMark,
   Skeleton,
   Tabs,
@@ -528,15 +527,6 @@ export function PersonRecord({
               <Button variant="primary" iconStart={<Icon name="edit" size={16} />} onClick={() => onOpen(id, "edit")}>
                 Edit
               </Button>
-              <Menu
-                align="end"
-                trigger={<Button variant="secondary" iconOnly iconStart={<Icon name="dots" size={16} />} aria-label="More actions" />}
-                items={[
-                  { label: "Share" },
-                  { label: "Merge with…" },
-                  { label: "Delete", danger: true },
-                ]}
-              />
             </div>
           </div>
           <hr className="app-divider" style={{ margin: "var(--space-lg) 0 var(--space-md)" }} />
