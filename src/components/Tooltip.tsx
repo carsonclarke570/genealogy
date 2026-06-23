@@ -1,4 +1,4 @@
-import { cloneElement, isValidElement, useId } from "react";
+import { cloneElement, isValidElement, useEffect, useId, useRef, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 
 export interface TooltipProps {
@@ -24,9 +24,32 @@ export interface TooltipProps {
  */
 export function Tooltip({ label, open, children }: TooltipProps) {
   const id = useId();
-  const classes = ["fa-tooltip", open && "fa-tooltip--open"]
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  // Touch has no hover, so a tap toggles the bubble. Pointer/keyboard still use
+  // the CSS :hover / :focus-within paths and never set this.
+  const [tapOpen, setTapOpen] = useState(false);
+  const shown = open || tapOpen;
+  const classes = ["fa-tooltip", shown && "fa-tooltip--open"]
     .filter(Boolean)
     .join(" ");
+
+  useEffect(() => {
+    if (!tapOpen) return;
+    const dismiss = (e: Event) => {
+      if (e.type === "scroll" || !wrapRef.current?.contains(e.target as Node)) {
+        setTapOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setTapOpen(false);
+    document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", dismiss, true);
+    return () => {
+      document.removeEventListener("pointerdown", dismiss);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", dismiss, true);
+    };
+  }, [tapOpen]);
 
   // Associate the bubble with its trigger so assistive tech announces it.
   const trigger = isValidElement(children)
@@ -38,7 +61,13 @@ export function Tooltip({ label, open, children }: TooltipProps) {
     : children;
 
   return (
-    <span className="fa-tooltip-wrap">
+    <span
+      ref={wrapRef}
+      className="fa-tooltip-wrap"
+      onPointerDown={(e) => {
+        if (e.pointerType === "touch") setTapOpen((v) => !v);
+      }}
+    >
       {trigger}
       <span role="tooltip" id={id} className={classes}>
         {label}

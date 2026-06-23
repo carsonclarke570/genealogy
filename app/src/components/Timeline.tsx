@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Avatar,
   Button,
@@ -295,6 +295,21 @@ export function Timeline({
   const [dialog, setDialog] = useState(false);
   const [editEvent, setEditEvent] = useState<TimelineEvent | null>(null);
 
+  // The Lanes view needs ~890px of horizontal room; on phones it degrades to a
+  // sideways-scrolling sliver, so we drop it from the choices and fall back to
+  // River there.
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 760px)");
+    const sync = () => setNarrow(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+  useEffect(() => {
+    if (narrow && layout === "lanes") setLayout("river");
+  }, [narrow, layout]);
+
   const [span] = useMemo(() => [yearSpan(allEvents)] as const, [allEvents]);
   const decadeMin = Math.floor(span[0] / 10) * 10;
   const decadeMax = Math.ceil(span[1] / 10) * 10;
@@ -355,7 +370,9 @@ export function Timeline({
               onValueChange={(k) => setLayout(k as Layout)}
               items={[
                 { value: "river", label: "River", icon: <Icon name="clock" size={15} /> },
-                { value: "lanes", label: "Lanes", icon: <Icon name="sliders" size={15} /> },
+                ...(narrow
+                  ? []
+                  : [{ value: "lanes", label: "Lanes", icon: <Icon name="sliders" size={15} /> }]),
                 { value: "decades", label: "Decades", icon: <Icon name="calendar" size={15} /> },
               ]}
             />

@@ -57,7 +57,10 @@ export function Menu({ trigger, items, open, align = "start" }: MenuProps) {
       }
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setInternal(false);
+      if (e.key === "Escape") {
+        setInternal(false);
+        (triggerRef.current?.querySelector("button, [tabindex], a") as HTMLElement | null)?.focus();
+      }
     };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
@@ -66,6 +69,41 @@ export function Menu({ trigger, items, open, align = "start" }: MenuProps) {
       document.removeEventListener("keydown", onKey);
     };
   }, [isOpen, uncontrolled]);
+
+  // Focus the first item when the menu opens (next frame — the panel mounts via
+  // a portal), so arrow keys work immediately and focus is trapped sensibly.
+  useEffect(() => {
+    if (!isOpen || !uncontrolled) return;
+    const raf = requestAnimationFrame(() => {
+      popRef.current
+        ?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')
+        ?.focus();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [isOpen, uncontrolled]);
+
+  // Roving arrow-key navigation between the (enabled) items.
+  const onItemKeyDown = (e: React.KeyboardEvent) => {
+    const items = popRef.current?.querySelectorAll<HTMLButtonElement>(
+      '[role="menuitem"]:not(:disabled)',
+    );
+    if (!items?.length) return;
+    const arr = Array.from(items);
+    const i = arr.indexOf(document.activeElement as HTMLButtonElement);
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      arr[(i + 1) % arr.length]?.focus();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      arr[(i - 1 + arr.length) % arr.length]?.focus();
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      arr[0]?.focus();
+    } else if (e.key === "End") {
+      e.preventDefault();
+      arr[arr.length - 1]?.focus();
+    }
+  };
 
   const menuClasses = ["fa-menu", align === "end" && "fa-menu--end"]
     .filter(Boolean)
@@ -105,6 +143,7 @@ export function Menu({ trigger, items, open, align = "start" }: MenuProps) {
                   it.onSelect?.();
                   if (uncontrolled) setInternal(false);
                 }}
+                onKeyDown={onItemKeyDown}
               >
                 {it.icon && <span className="fa-menu__item-icon">{it.icon}</span>}
                 {it.label}

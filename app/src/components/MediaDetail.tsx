@@ -36,8 +36,11 @@ function Preview({ media }: { media: MediaItem }) {
       <img
         src={mediaFileUrl(media.id)}
         alt={media.title}
-        // min-height reserves space so the centered dialog doesn't jump as the image loads.
-        style={{ width: "100%", minHeight: 160, maxHeight: 360, objectFit: "contain", borderRadius: "var(--radius-sm)", background: "var(--color-surface-sunken)" }}
+        loading="lazy"
+        // A fixed 4:3 box (capped at 360px) reserves space up-front so the dialog
+        // doesn't reflow when the image loads; objectFit:contain letterboxes any
+        // aspect into it.
+        style={{ width: "100%", aspectRatio: "4 / 3", maxHeight: 360, objectFit: "contain", borderRadius: "var(--radius-sm)", background: "var(--color-surface-sunken)" }}
       />
     );
   }
