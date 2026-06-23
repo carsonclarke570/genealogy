@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { SegmentedControl } from "./SegmentedControl";
+import { AnchoredPopover } from "./AnchoredPopover";
 
 /** How much of a date is actually known. */
 export type DatePrecision = "year" | "month" | "day";
@@ -199,6 +200,7 @@ export function DateField({
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  const popRef = useRef<HTMLDivElement | null>(null);
   // When true, the focus effect moves DOM focus to the active cell after render.
   const wantFocus = useRef(false);
 
@@ -229,7 +231,9 @@ export function DateField({
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      // The calendar is portaled out of rootRef, so treat it as "inside" too.
+      if (!rootRef.current?.contains(t) && !popRef.current?.contains(t)) setOpen(false);
     };
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -593,7 +597,7 @@ export function DateField({
           )}
         </button>
 
-        {open && (
+        <AnchoredPopover anchorRef={triggerRef} open={open} matchWidth={false} popRef={popRef}>
           <div
             id={dialogId}
             className="fa-cal"
@@ -662,7 +666,7 @@ export function DateField({
               )}
             </div>
           </div>
-        )}
+        </AnchoredPopover>
       </div>
 
       {invalid ? (

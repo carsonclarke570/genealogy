@@ -516,6 +516,32 @@ button.fa-chip:hover {
   color: var(--color-ink);
 }
 
+/* On phones a centred modal is cramped; dock it to the bottom as a full-width
+   sheet (the pattern the explorer peek already uses). The slide-up is zeroed by
+   the global prefers-reduced-motion block. */
+@media (max-width: 640px) {
+  .fa-dialog-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .fa-dialog {
+    max-width: none;
+    max-height: 90vh;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-bottom: none;
+    padding-bottom: calc(var(--space-xl) + env(safe-area-inset-bottom, 0px));
+    animation: fa-sheet-up var(--dur-base) var(--ease-out-quart);
+  }
+}
+@keyframes fa-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
 /* ── Select ──────────────────────────────────────────────────────────── */
 .fa-select-wrap {
   position: relative;
@@ -1295,7 +1321,7 @@ button.fa-chip:hover {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  z-index: 30;
+  z-index: var(--z-dropdown);
   padding: var(--space-sm);
   background-color: var(--color-bg);
   border: 1px solid var(--color-border);
@@ -1472,7 +1498,7 @@ button.fa-chip:hover {
   top: calc(100% + 6px);
   left: 0;
   right: 0;
-  z-index: 30;
+  z-index: var(--z-dropdown);
   padding: var(--space-sm);
   background-color: var(--color-bg);
   border: 1px solid var(--color-border);
@@ -1905,5 +1931,41 @@ button.fa-chip:hover {
   .fa-cal,
   .fa-cal__body {
     animation: none;
+  }
+}
+
+/* ── Touch targets ───────────────────────────────────────────────────────
+   On touch (coarse) pointers, lift the smaller controls to a ~44px hit area
+   (WCAG 2.5.5). Visual scale stays largely the same — min-height drives the
+   row, and the icon-only controls grow to a square tap zone. Mouse/trackpad
+   (fine pointers) keep the denser desktop sizing. */
+@media (pointer: coarse) {
+  .fa-btn--sm {
+    min-height: 44px;
+  }
+  button.fa-chip {
+    min-height: 44px;
+  }
+  .fa-tab {
+    min-height: 44px;
+  }
+  .fa-seg__item {
+    min-height: 40px;
+  }
+  .fa-menu__item {
+    min-height: 44px;
+  }
+  /* Icon-only close / clear controls → square 44px tap zone. */
+  .fa-dialog__close,
+  .fa-toast__dismiss,
+  .fa-combobox__clear,
+  .fa-datefield__clear {
+    width: 44px;
+    height: 44px;
+  }
+  /* The switch's hit area is the whole label row; give the standalone track
+     vertical breathing room so a label-less switch is still tappable. */
+  .fa-switch {
+    min-height: 44px;
   }
 }

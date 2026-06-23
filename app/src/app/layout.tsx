@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Hanken_Grotesk, Spectral } from "next/font/google";
 import "@family-archive/ui/styles.css";
 import "./app.css";
@@ -27,6 +27,15 @@ export const metadata: Metadata = {
   description:
     "A private archive for recording and exploring our family — people, relationships, and the documents that prove them.",
   robots: { index: false, follow: false },
+};
+
+// viewportFit: "cover" lets the layout extend under notches/home indicators so the
+// `env(safe-area-inset-*)` values the app shell relies on (bottom nav, bottom-sheet
+// peek, toasts) resolve to real insets instead of 0 on notched phones.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
