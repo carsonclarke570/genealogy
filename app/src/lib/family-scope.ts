@@ -177,7 +177,7 @@ function graphToRels(graph: FamilyGraph): RelationshipEdge[] {
 
 /** A geometric ambiguity in a trial layout + the people whose removal could fix it. */
 export interface LayoutConflict {
-  kind: "crossing" | "wide-union" | "coincident-knot";
+  kind: "crossing" | "wide-union" | "coincident-knot" | "cross-gen-union";
   /** Candidate people to fog (the farthest-from-focus one is chosen). */
   candidates: string[];
 }
@@ -203,7 +203,12 @@ const segCross = (
  *     stranded between far-apart partners, e.g. a remarried person with a
  *     sibling who can't sit between both spouses),
  *   · coincident-knot — two unions sharing a marriage knot (children of two
- *     couples fanning from one point).
+ *     couples fanning from one point),
+ *   · cross-gen-union — a parenting couple whose partners sit on different
+ *     generation rows (each has recorded ancestry of differing depth, so neither
+ *     is pulled down to the other). The layout can only draw them as a diagonal
+ *     elbow spanning two rows, reading as "a generation apart"; fogging the
+ *     farther partner hides the misalignment behind a frontier indicator.
  * Pure over the trial layout; orientation is the Explorer's default (vertical).
  */
 export function detectLayoutConflicts(
@@ -249,6 +254,19 @@ export function detectLayoutConflicts(
       }
       out.push({ kind: "wide-union", candidates: [...u.partners, ...u.children, ...competing] });
     }
+  }
+
+  // A parenting couple split across two generation rows draws as a diagonal
+  // spouse elbow (the layout's `aligned()` fails when the partners' gens differ).
+  // Gated on children to match wide-union: a *childless* cross-gen couple has no
+  // child-edge to misread, so it's left as a harmless diagonal. Fogging the
+  // farther partner collapses the union and lets the nearer partner carry a
+  // hidden-spouse frontier marker instead.
+  for (const u of graph.unions) {
+    if (u.partners.length !== 2 || u.children.length === 0) continue;
+    const [n0, n1] = u.partners.map((p) => layout.nodes[p]);
+    if (!n0 || !n1 || n0.gen === n1.gen) continue;
+    out.push({ kind: "cross-gen-union", candidates: [...u.partners] });
   }
 
   const knots = layout.junctions;
