@@ -11,13 +11,20 @@ import {
   Combobox,
   DateField,
   Input,
+  LocationField,
   ProvenanceMark,
   RadioGroup,
   Select,
   Switch,
   Textarea,
 } from "@family-archive/ui";
-import type { ProvenanceStatus, PartialDate, SourceOption } from "@family-archive/ui";
+import type {
+  ProvenanceStatus,
+  PartialDate,
+  SourceOption,
+  LocationValue,
+  LocationSuggestion,
+} from "@family-archive/ui";
 import {
   fullName,
   lifeDates,
@@ -30,16 +37,30 @@ import {
 } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import { serializePartialDate, parsePartialDate } from "@/lib/dates";
+import { locationFromLabel, locationLabel } from "@/lib/locations";
 import { PROV_LABEL } from "@/lib/prov";
 import { createPerson, updatePerson, type NameDraft, type RelationDraft, type RelationOp } from "@/lib/actions";
 import { Icon } from "./Icon";
 import { MiniNode } from "./shared";
 import type { Screen } from "./AppShell";
 
+/**
+ * Unified provenance for one fact: a confidence status plus, when verified, the
+ * linked archive **document** that sources it (`mediaId`) and an optional note —
+ * matching the read model's `ProvFact`. "Source" is always a cited document, never
+ * a free-text label.
+ */
 interface ProvState {
   status: ProvenanceStatus;
-  source?: string;
+  mediaId?: string | null;
+  note?: string | null;
 }
+
+/** Hit the geocoder route for location suggestions (country → address). */
+const geocode = (q: string): Promise<LocationSuggestion[]> =>
+  fetch(`/api/geocode?q=${encodeURIComponent(q)}`)
+    .then((r) => r.json())
+    .then((d) => (d.suggestions ?? []) as LocationSuggestion[]);
 
 /** A relationship being drafted in the form, before it's submitted. */
 interface RelRowState {
@@ -281,7 +302,8 @@ function initialProv(person: Person | null): Record<string, ProvState> {
   const out: Record<string, ProvState> = {};
   for (const [domainKey, fact] of Object.entries(person.prov)) {
     const formKey = PROV_DOMAIN_TO_FORM[domainKey];
-    if (formKey && fact) out[formKey] = { status: fact.status, source: fact.source ?? undefined };
+    if (formKey && fact)
+      out[formKey] = { status: fact.status, mediaId: fact.mediaId ?? null, note: fact.note ?? null };
   }
   return out;
 }
@@ -301,7 +323,7 @@ function ProvLabel({
   label: string;
   status: ProvenanceStatus;
   sources: SourceOption[];
-  onChange: (status: ProvenanceStatus, source?: string) => void;
+  onChange: (status: ProvenanceStatus, sourceLabel?: string, sourceId?: string) => void;
 }) {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -335,7 +357,7 @@ function ProvField({
   error?: string;
   status: ProvenanceStatus;
   sources: SourceOption[];
-  onProvChange: (k: string, status: ProvenanceStatus, source?: string) => void;
+  onProvChange: (k: string, status: ProvenanceStatus, sourceLabel?: string, sourceId?: string) => void;
 }) {
   return (
     <div style={{ flex: 1 }}>
@@ -350,7 +372,58 @@ function ProvField({
             label={label}
             status={status}
             sources={sources}
-            onChange={(s, src) => onProvChange(fieldKey, s, src)}
+            onChange={(s, srcLabel, srcId) => onProvChange(fieldKey, s, srcLabel, srcId)}
+          />
+        }
+      />
+    </div>
+  );
+}
+
+/**
+ * A structured place picker (country → address) carrying its provenance mark —
+ * the location-aware sibling of {@link ProvField}. The picked {@link LocationValue}
+ * lives in local state for the geocoder UX, but the form still submits a plain
+ * label string (`fieldKey`) via a hidden input, so the write path is unchanged.
+ * Module-scoped so React keeps it mounted across the parent's re-renders.
+ */
+function ProvLocationField({
+  label,
+  placeholder,
+  fieldKey,
+  value,
+  onChange,
+  status,
+  sources,
+  onProvChange,
+  onSearch,
+}: {
+  label: string;
+  placeholder: string;
+  /** The form field name the place label submits under, and the provenance key the
+   * mark reads/writes — both `birthPlace`/`deathPlace`, matching ProvField's key. */
+  fieldKey: string;
+  value: LocationValue | null;
+  onChange: (value: LocationValue | null) => void;
+  status: ProvenanceStatus;
+  sources: SourceOption[];
+  onProvChange: (k: string, status: ProvenanceStatus, sourceLabel?: string, sourceId?: string) => void;
+  onSearch: (query: string) => Promise<LocationSuggestion[]>;
+}) {
+  return (
+    <div style={{ flex: 1 }}>
+      <input type="hidden" name={fieldKey} value={locationLabel(value)} />
+      <LocationField
+        value={value}
+        onChange={onChange}
+        onSearch={onSearch}
+        hint={placeholder}
+        label={
+          <ProvLabel
+            label={label}
+            status={status}
+            sources={sources}
+            onChange={(s, srcLabel, srcId) => onProvChange(fieldKey, s, srcLabel, srcId)}
           />
         }
       />
@@ -374,6 +447,11 @@ export function AddPerson({
   const isEdit = Boolean(editId);
   const [prov, setProv] = useState<Record<string, ProvState>>(() => initialProv(person));
   const [bornDate, setBornDate] = useState<PartialDate | null>(person?.bornDate ?? null);
+  // Birth/death places are picked structurally (country → address) but submitted as
+  // a plain label string, so they're seeded from the stored label and stay backward-
+  // compatible with the free-text place fields.
+  const [bornPlace, setBornPlace] = useState<LocationValue | null>(() => locationFromLabel(person?.bornPlace));
+  const [diedPlace, setDiedPlace] = useState<LocationValue | null>(() => locationFromLabel(person?.diedPlace));
 
   // The Identity card edits the *birth* name (the first in the person's history);
   // the Names section below manages every later name. Seed both from person.names.
@@ -437,24 +515,38 @@ export function AddPerson({
     return out.sort((a, b) => a.label.localeCompare(b.label));
   }, [relationships, editId]);
 
-  // Editable married/divorced dates for each existing spouse edge, seeded from
-  // the stored partial-date strings. Keyed by edge id; emitted as setDates ops.
-  const [spouseDates, setSpouseDates] = useState<
-    Record<string, { married: PartialDate | null; divorced: PartialDate | null }>
-  >(() => {
-    const out: Record<string, { married: PartialDate | null; divorced: PartialDate | null }> = {};
+  // Editable married/divorced dates for each existing spouse edge, seeded from the
+  // stored partial-date strings — each date carrying its own provenance (status +
+  // linked source document) under the unified model. Keyed by edge id; emitted as
+  // setDates ops.
+  type SpouseDateState = {
+    married: PartialDate | null;
+    divorced: PartialDate | null;
+    marriedProv: ProvState;
+    divorcedProv: ProvState;
+  };
+  const emptySpouseDates: SpouseDateState = {
+    married: null,
+    divorced: null,
+    marriedProv: { status: "unverified" },
+    divorcedProv: { status: "unverified" },
+  };
+  const [spouseDates, setSpouseDates] = useState<Record<string, SpouseDateState>>(() => {
+    const out: Record<string, SpouseDateState> = {};
     for (const r of relationships) {
       if (r.kind === "spouse" && (r.personId === editId || r.relatedId === editId)) {
-        out[r.id] = { married: parsePartialDate(r.marriedDate), divorced: parsePartialDate(r.divorcedDate) };
+        out[r.id] = {
+          married: parsePartialDate(r.marriedDate),
+          divorced: parsePartialDate(r.divorcedDate),
+          marriedProv: { status: r.marriedProv ?? "unverified", mediaId: r.marriedMediaId ?? null },
+          divorcedProv: { status: r.divorcedProv ?? "unverified", mediaId: r.divorcedMediaId ?? null },
+        };
       }
     }
     return out;
   });
-  const setSpouseDate = (edgeId: string, patch: Partial<{ married: PartialDate | null; divorced: PartialDate | null }>) =>
-    setSpouseDates((s) => {
-      const cur = s[edgeId] ?? { married: null, divorced: null };
-      return { ...s, [edgeId]: { ...cur, ...patch } };
-    });
+  const setSpouseDate = (edgeId: string, patch: Partial<SpouseDateState>) =>
+    setSpouseDates((s) => ({ ...s, [edgeId]: { ...(s[edgeId] ?? emptySpouseDates), ...patch } }));
 
   const siblings = useMemo(
     () => (editId ? relationsOf(graph, editId).siblings : []),
@@ -474,12 +566,19 @@ export function AddPerson({
     // Persist dates for every spouse edge that's staying (idempotent re-write).
     ...editableRels
       .filter((r) => r.kind === "spouse" && !removedEdges.has(r.edgeId))
-      .map((r): RelationOp => ({
-        op: "setDates",
-        id: r.edgeId,
-        marriedDate: serializePartialDate(spouseDates[r.edgeId]?.married ?? null),
-        divorcedDate: serializePartialDate(spouseDates[r.edgeId]?.divorced ?? null),
-      })),
+      .map((r): RelationOp => {
+        const s = spouseDates[r.edgeId] ?? emptySpouseDates;
+        return {
+          op: "setDates",
+          id: r.edgeId,
+          marriedDate: serializePartialDate(s.married),
+          divorcedDate: serializePartialDate(s.divorced),
+          marriedProv: s.marriedProv.status,
+          marriedMediaId: s.marriedProv.mediaId ?? null,
+          divorcedProv: s.divorcedProv.status,
+          divorcedMediaId: s.divorcedProv.mediaId ?? null,
+        };
+      }),
   ];
 
   const updateRel = (key: string, patch: Partial<RelRowState>) =>
@@ -558,8 +657,10 @@ export function AddPerson({
     });
 
   const stOf = (k: string): ProvenanceStatus => prov[k]?.status ?? "unverified";
-  const setP = (k: string, status: ProvenanceStatus, source?: string) =>
-    setProv((s) => ({ ...s, [k]: { status, source } }));
+  // A verified mark cites a *document* (sourceId); the label is display-only and
+  // not persisted, so we keep the linked mediaId and drop the free-text label.
+  const setP = (k: string, status: ProvenanceStatus, _sourceLabel?: string, sourceId?: string) =>
+    setProv((s) => ({ ...s, [k]: { status, mediaId: sourceId ?? null, note: s[k]?.note ?? null } }));
 
   const handleSubmit = (formData: FormData) =>
     startTransition(async () => {
@@ -592,7 +693,7 @@ export function AddPerson({
   // A field label with its confidence mark inline — wraps the module-scope
   // ProvLabel with this form's prov state, for the precision-aware date fields.
   const provLabel = (label: string, k: string) => (
-    <ProvLabel label={label} status={stOf(k)} sources={sources} onChange={(s, src) => setP(k, s, src)} />
+    <ProvLabel label={label} status={stOf(k)} sources={sources} onChange={(s, srcLabel, srcId) => setP(k, s, srcLabel, srcId)} />
   );
   // The per-field provenance wiring every ProvField needs, keyed by field name.
   const provProps = (k: string) => ({ fieldKey: k, status: stOf(k), sources, onProvChange: setP, error: errors[k] });
@@ -720,7 +821,17 @@ export function AddPerson({
                         onChange={setBornDate}
                       />
                     </div>
-                    <ProvField label="Place" placeholder="City, country" defaultValue={person?.bornPlace ?? undefined} {...provProps("birthPlace")} />
+                    <ProvLocationField
+                      label="Place"
+                      placeholder="Search a place, or type to add one"
+                      fieldKey="birthPlace"
+                      value={bornPlace}
+                      onChange={setBornPlace}
+                      onSearch={geocode}
+                      status={stOf("birthPlace")}
+                      sources={sources}
+                      onProvChange={setP}
+                    />
                   </div>
                 </div>
                 <div>
@@ -735,7 +846,17 @@ export function AddPerson({
                         onChange={setDiedDate}
                       />
                     </div>
-                    <ProvField label="Place" placeholder="City, country" defaultValue={person?.diedPlace ?? undefined} {...provProps("deathPlace")} />
+                    <ProvLocationField
+                      label="Place"
+                      placeholder="Search a place, or type to add one"
+                      fieldKey="deathPlace"
+                      value={diedPlace}
+                      onChange={setDiedPlace}
+                      onSearch={geocode}
+                      status={stOf("deathPlace")}
+                      sources={sources}
+                      onProvChange={setP}
+                    />
                   </div>
                 </div>
               </div>
@@ -808,24 +929,49 @@ export function AddPerson({
                               {marked ? "Undo" : ""}
                             </Button>
                           </div>
-                          {r.kind === "spouse" && !marked && (
-                            <div className="app-field-row" style={{ paddingLeft: "var(--space-lg)" }}>
-                              <div style={{ flex: 1 }}>
-                                <DateField
-                                  label="Married"
-                                  value={spouseDates[r.edgeId]?.married ?? null}
-                                  onChange={(d) => setSpouseDate(r.edgeId, { married: d })}
-                                />
+                          {r.kind === "spouse" && !marked && (() => {
+                            const sd = spouseDates[r.edgeId] ?? emptySpouseDates;
+                            const setMarriedProv = (status: ProvenanceStatus, _l?: string, id?: string) =>
+                              setSpouseDate(r.edgeId, { marriedProv: { status, mediaId: id ?? null } });
+                            const setDivorcedProv = (status: ProvenanceStatus, _l?: string, id?: string) =>
+                              setSpouseDate(r.edgeId, { divorcedProv: { status, mediaId: id ?? null } });
+                            return (
+                              <div className="app-field-row" style={{ paddingLeft: "var(--space-lg)" }}>
+                                <div style={{ flex: 1 }}>
+                                  <DateField
+                                    label={
+                                      <ProvLabel
+                                        label="Married"
+                                        status={sd.marriedProv.status}
+                                        sources={sources}
+                                        onChange={setMarriedProv}
+                                      />
+                                    }
+                                    value={sd.married}
+                                    onChange={(d) => setSpouseDate(r.edgeId, { married: d })}
+                                  />
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                  <DateField
+                                    label={
+                                      sd.divorced ? (
+                                        <ProvLabel
+                                          label="Divorced (if applicable)"
+                                          status={sd.divorcedProv.status}
+                                          sources={sources}
+                                          onChange={setDivorcedProv}
+                                        />
+                                      ) : (
+                                        "Divorced (if applicable)"
+                                      )
+                                    }
+                                    value={sd.divorced}
+                                    onChange={(d) => setSpouseDate(r.edgeId, { divorced: d })}
+                                  />
+                                </div>
                               </div>
-                              <div style={{ flex: 1 }}>
-                                <DateField
-                                  label="Divorced (if applicable)"
-                                  value={spouseDates[r.edgeId]?.divorced ?? null}
-                                  onChange={(d) => setSpouseDate(r.edgeId, { divorced: d })}
-                                />
-                              </div>
-                            </div>
-                          )}
+                            );
+                          })()}
                         </div>
                       );
                     })}
