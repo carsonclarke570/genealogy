@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { AnchoredPopover } from "./AnchoredPopover";
 
 export interface ComboboxOption {
   /** Stable identifier — the value passed to `onChange`. */
@@ -100,6 +101,7 @@ export function Combobox({
   const [active, setActive] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const popRef = useRef<HTMLDivElement | null>(null);
 
   const autoId = useId();
   const inputId = `${autoId}-input`;
@@ -130,7 +132,9 @@ export function Combobox({
   useEffect(() => {
     if (!open || controlled) return;
     const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) close();
+      const t = e.target as Node;
+      // The panel is portaled out of rootRef, so treat it as "inside" too.
+      if (!rootRef.current?.contains(t) && !popRef.current?.contains(t)) close();
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
@@ -253,8 +257,13 @@ export function Combobox({
           )}
         </div>
 
-        {open && (
-          <div className="fa-combobox__pop" style={panelWidth ? { width: panelWidth } : undefined}>
+        <AnchoredPopover
+          anchorRef={rootRef}
+          open={open}
+          width={panelWidth}
+          className="fa-combobox__pop"
+          popRef={popRef}
+        >
             <ul className="fa-combobox__list" id={listId} role="listbox">
               {filtered.length === 0 ? (
                 <li className="fa-combobox__empty" role="presentation">
@@ -303,8 +312,7 @@ export function Combobox({
                 })
               )}
             </ul>
-          </div>
-        )}
+        </AnchoredPopover>
       </div>
 
       {invalid ? (

@@ -1088,3 +1088,38 @@ body {
   outline: 2px solid var(--color-primary);
   outline-offset: 1px;
 }
+
+/* ── Touch targets ───────────────────────────────────────────────────────
+   Lift the app-shell's small controls to a ~44px hit area on touch pointers
+   (WCAG 2.5.5) without changing how they look on desktop. The dense canvas
+   markers (lane dots, fog chips) grow an invisible tap zone via a pseudo so
+   the visual timeline stays unchanged. */
+@media (pointer: coarse) {
+  .app-iconbtn {
+    width: 44px;
+    height: 44px;
+  }
+  .app-segbtn {
+    min-height: 40px;
+  }
+  .app-typechip,
+  .app-periodsel {
+    min-height: 40px;
+  }
+  /* Expand the clickable area around small canvas markers without resizing
+     the dot/pill itself. */
+  .app-lanedot::after,
+  .app-fog-chip::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+  .app-lanedot,
+  .app-fog-chip {
+    position: relative;
+  }
+}

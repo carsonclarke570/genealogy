@@ -552,7 +552,7 @@ function Peek({
     <div className="app-peek app-scroll">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <span className="app-label">Focused person</span>
-        <button className="app-iconbtn" onClick={onClose} aria-label="Close" style={{ width: 28, height: 28 }}>
+        <button className="app-iconbtn" onClick={onClose} aria-label="Close">
           <Icon name="close" size={16} />
         </button>
       </div>

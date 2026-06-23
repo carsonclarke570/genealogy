@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { AnchoredPopover } from "./AnchoredPopover";
 
 export interface MenuItem {
   label: ReactNode;
@@ -41,6 +42,30 @@ export function Menu({ trigger, items, open, align = "start" }: MenuProps) {
   const [internal, setInternal] = useState(false);
   const isOpen = open ?? internal;
   const uncontrolled = open === undefined;
+  const triggerRef = useRef<HTMLSpanElement>(null);
+  const popRef = useRef<HTMLDivElement | null>(null);
+
+  // Dismiss on outside click / Escape (uncontrolled only). The panel is portaled
+  // out of this subtree, so an "inside" click can land in either the trigger or
+  // the panel — check both.
+  useEffect(() => {
+    if (!isOpen || !uncontrolled) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (!triggerRef.current?.contains(t) && !popRef.current?.contains(t)) {
+        setInternal(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setInternal(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [isOpen, uncontrolled]);
 
   const menuClasses = ["fa-menu", align === "end" && "fa-menu--end"]
     .filter(Boolean)
@@ -49,14 +74,22 @@ export function Menu({ trigger, items, open, align = "start" }: MenuProps) {
   return (
     <div className="fa-menu-wrap">
       <span
+        ref={triggerRef}
         style={{ display: "inline-flex" }}
         onClick={() => uncontrolled && setInternal((v) => !v)}
       >
         {trigger}
       </span>
-      {isOpen && (
-        <div className={menuClasses} role="menu">
-          {items.map((it, i) =>
+      <AnchoredPopover
+        anchorRef={triggerRef}
+        open={isOpen}
+        align={align}
+        matchWidth={false}
+        className={menuClasses}
+        role="menu"
+        popRef={popRef}
+      >
+        {items.map((it, i) =>
             it === "separator" ? (
               <div key={i} className="fa-menu__sep" role="separator" />
             ) : (
@@ -78,8 +111,7 @@ export function Menu({ trigger, items, open, align = "start" }: MenuProps) {
               </button>
             )
           )}
-        </div>
-      )}
+      </AnchoredPopover>
     </div>
   );
 }

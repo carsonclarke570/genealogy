@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { AnchoredPopover } from "./AnchoredPopover";
 
 export interface MultiSelectOption {
   /** Stable identifier. */
@@ -71,12 +72,15 @@ export function MultiSelect({
   const isOpen = open ?? internalOpen;
   const uncontrolled = open === undefined;
   const ref = useRef<HTMLDivElement>(null);
+  const popRef = useRef<HTMLDivElement | null>(null);
   const listId = useId();
 
   useEffect(() => {
     if (!isOpen || !uncontrolled) return;
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setInternalOpen(false);
+      const t = e.target as Node;
+      // The panel is portaled out of `ref`, so treat it as "inside" too.
+      if (!ref.current?.contains(t) && !popRef.current?.contains(t)) setInternalOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setInternalOpen(false);
@@ -128,8 +132,13 @@ export function MultiSelect({
         </svg>
       </button>
 
-      {isOpen && (
-        <div className="fa-multiselect__pop" style={{ width: panelWidth }}>
+      <AnchoredPopover
+        anchorRef={ref}
+        open={isOpen}
+        width={panelWidth}
+        className="fa-multiselect__pop"
+        popRef={popRef}
+      >
           <div className="fa-multiselect__head">
             <span className="fa-multiselect__heading">{label ?? "Filter"}</span>
             {count > 0 && (
@@ -172,8 +181,7 @@ export function MultiSelect({
               );
             })}
           </ul>
-        </div>
-      )}
+      </AnchoredPopover>
     </div>
   );
 }
