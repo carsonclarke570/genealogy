@@ -5,16 +5,19 @@ import { useRouter } from "next/navigation";
 import {
   Avatar,
   Button,
+  Combobox,
   DateField,
   Dialog,
+  DOC_TYPE_LABEL,
   IconBadge,
   Input,
   LocationField,
   MultiSelect,
   Select,
+  sourceMeta,
 } from "@family-archive/ui";
 import type { LocationValue, PartialDate, ProvenanceStatus } from "@family-archive/ui";
-import { fullName, lifeDates, type TimelineEvent } from "@/lib/family-data";
+import { fullName, lifeDates, sourceOptions, type TimelineEvent } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import { serializePartialDate } from "@/lib/dates";
 import { locationFromLabel, locationLabel } from "@/lib/locations";
@@ -101,6 +104,26 @@ export function AddEventDialog({
       description: lifeDates(p),
       leading: <Avatar name={fullName(p)} size="sm" />,
     }));
+
+  // The full archive, as searchable source options (title + type · year).
+  const sourceDocOptions = sourceOptions(media).map((s) => ({
+    value: s.id,
+    label: s.label,
+    description: sourceMeta(s),
+    leading: (
+      <span
+        aria-hidden="true"
+        style={{
+          display: "block",
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          background: `var(--doc-${s.type ?? "other"})`,
+        }}
+      />
+    ),
+    keywords: `${s.type ? DOC_TYPE_LABEL[s.type] : ""} ${s.year ?? ""}`,
+  }));
 
   const submit = () =>
     startTransition(async () => {
@@ -224,15 +247,15 @@ export function AddEventDialog({
         </div>
 
         <div className="app-field-row">
-          <div style={{ flex: 1 }}>
-            <Select label="Source document (optional)" value={mediaId} onChange={(e) => setMediaId(e.target.value)}>
-              <option value="">No source on file</option>
-              {media.map((doc) => (
-                <option key={doc.id} value={doc.id}>
-                  {doc.title}
-                </option>
-              ))}
-            </Select>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Combobox
+              label="Source document (optional)"
+              placeholder="Search documents…"
+              emptyMessage="No documents match"
+              value={mediaId || null}
+              onChange={(v) => setMediaId(v ?? "")}
+              options={sourceDocOptions}
+            />
           </div>
           <div style={{ width: 170, flex: "none" }}>
             <Select label="Confidence" value={prov} onChange={(e) => setProv(e.target.value as ProvenanceStatus)}>

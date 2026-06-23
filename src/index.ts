@@ -64,7 +64,12 @@ export type { SpinnerProps, SpinnerSize } from "./components/Spinner";
 export { Skeleton } from "./components/Skeleton";
 export type { SkeletonProps, SkeletonVariant } from "./components/Skeleton";
 
-export { ProvenanceMark, SourceCiteDialog } from "./components/Provenance";
+export {
+  ProvenanceMark,
+  SourceCiteDialog,
+  DOC_TYPE_LABEL,
+  sourceMeta,
+} from "./components/Provenance";
 export type {
   ProvenanceMarkProps,
   SourceCiteDialogProps,
