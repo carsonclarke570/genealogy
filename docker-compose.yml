@@ -6,6 +6,7 @@
 # The app reads (set these in app/.env.local):
 #   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/genealogy
 #   EMBEDDINGS_URL=http://localhost:8080   (omit it to run search lexical-only)
+#   GEOCODER_URL=http://localhost:2322     (omit it for archive-place autocomplete only)
 #   # Media object storage (the MinIO service below). In production these point at
 #   # a Railway managed Bucket instead — same S3 API, see CLAUDE.md "Deployment".
 #   STORAGE_ENDPOINT=localhost
@@ -55,6 +56,33 @@ services:
       timeout: 5s
       retries: 10
 
+  # Open-source geocoder (Photon, Apache-2.0 — https://github.com/komoot/photon).
+  # Powers the location picker: turns a typed query into structured country → address
+  # results, self-hosted so no place query leaves the machine. Optional and heavy —
+  # the search index is a multi-GB download (the rtuszik/photon-docker image fetches
+  # it into the named volume on first boot, so the first start is slow). Stop this
+  # service (or unset GEOCODER_URL) and the picker falls back to archive-place
+  # autocomplete only — exactly like search degrading to lexical-only.
+  geocoder:
+    image: rtuszik/photon-docker:latest
+    container_name: genealogy-geocoder
+    restart: unless-stopped
+    environment:
+      # Region to index (continent/country/code, or "planet" for worldwide). Pick a
+      # smaller extract — e.g. "usa" — to shrink the download; the index is fetched
+      # into the volume on first boot when the data dir is empty.
+      REGION: "planet"
+    ports:
+      - "2322:2322"
+    volumes:
+      - genealogy-photon-index:/photon/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:2322/api?q=test || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 300s
+
   # S3-compatible object storage for uploaded media (photos, certificates, PDFs).
   # The app talks to it via the `minio` client (lib/storage); the `family-media`
   # bucket is auto-created on first use. Console UI at http://localhost:9001.
@@ -81,4 +109,5 @@ services:
 volumes:
   genealogy-pgdata:
   genealogy-tei-cache:
+  genealogy-photon-index:
   genealogy-minio:
