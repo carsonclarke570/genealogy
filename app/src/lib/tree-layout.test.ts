@@ -73,6 +73,27 @@ describe("compute — layered DAG layout", () => {
     expect(nodes["oliver"].gen).toBe(nodes["andrew"].gen + 1); // child sits a row below
   });
 
+  it("seats a twice-married person between both spouses (each union keeps a local knot)", () => {
+    // christa (no siblings) married edward (→carson) then andrew (→mabel). She
+    // can sit adjacent to BOTH, so each marriage gets its own local knot and the
+    // children hang from their own parents — no midpoint knot stretched between
+    // far-apart partners (the bug that made cousins read as siblings).
+    const g = buildFamilyGraph([
+      spouse("edward", "christa", "divorced"), parent("edward", "carson"), parent("christa", "carson"),
+      spouse("christa", "andrew", "married"), parent("christa", "mabel"), parent("andrew", "mabel"),
+    ]);
+    const { nodes, junctions } = compute(g, "vertical");
+    // all three share christa's row, with christa physically in the middle
+    expect(nodes["edward"].gen).toBe(nodes["christa"].gen);
+    expect(nodes["andrew"].gen).toBe(nodes["christa"].gen);
+    const mid = [nodes["edward"].x, nodes["christa"].x, nodes["andrew"].x].sort((a, b) => a - b)[1];
+    expect(nodes["christa"].x).toBe(mid);
+    // the two marriage knots are distinct points, not stacked on one another
+    const k1 = junctions.find((j) => j.union === "un_christa__edward")!.knot;
+    const k2 = junctions.find((j) => j.union === "un_andrew__christa")!.knot;
+    expect(Math.abs(k1.x - k2.x)).toBeGreaterThan(1);
+  });
+
   it("produces only finite coordinates", () => {
     const g = buildFamilyGraph(twoSidedEdges);
     const layout = compute(g, "vertical");

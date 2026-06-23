@@ -106,7 +106,13 @@ row) and a **child push-down** (a child sits a row below every parent) — so a
 parent who is *raised* by the pull-down never ends up level with their own
 child (the remarriage case). Sibling sets stay contiguous: row ordering works at
 child-union (block) granularity and pulls couples to a block boundary, so two
-families never interleave at the same generation. A same-row couple is emitted
+families never interleave at the same generation. Within a row, sibling sets are
+contracted to **atoms** and same-row marriages become edges between atoms; each
+connected run is walked as a **chain** that seats a person married more than once
+*between* their spouses (spouses flank the sibling block from the outside), so a
+remarried/divorced person's two unions both stay local and each union's children
+hang from their own parents — never from a midpoint knot stretched across the
+canvas (the bug that made cousins read as siblings). A same-row couple is emitted
 as a **marriage junction** (`Layout.junctions`): a bracket joining the partners
 to a shared knot that their children descend from (dashed + hollow when
 divorced) — so a couple never reads as two siblings.
@@ -114,13 +120,18 @@ divorced) — so a couple never reads as two siblings.
 The Explorer draws a **fog-of-war** neighbourhood, not the whole graph at once
 (`app/src/lib/family-scope.ts`, `scopeFamily`, unit-tested). A weighted BFS
 (Dijkstra over kin edges: spouse/sibling = 1, parent/child = 2) admits the
-closest relatives to the focus up to a node budget, keeps couples whole, fogs
-the farther spouse on the irreducible remarriage-with-siblings conflict, and
-prunes to what stays connected to the focus; the junction layout then runs on
-that sub-graph unchanged. Visible people touching hidden kin get a **frontier
-marker** (bucketed up / down / side); clicking a node re-centres the scope, a
-focus stack gives a back step, and an **Overview** toggle restores the
-whole-tree view. `homePerson` picks a deterministic most-connected person to
+closest relatives to the focus up to a node budget, keeps couples whole, and
+prunes to what stays connected to the focus. Fogging is then **layout-aware**
+(`detectLayoutConflicts` + `resolveByLayout`): the scope is trial-laid-out, and
+while the result still holds a *geometric* ambiguity — a parent→child link
+**crossing**, a **stranded knot** (partners ≥1.5 slots apart with children
+hanging between them), or two unions sharing a **coincident knot** — it fogs the
+farthest-from-focus person feeding the conflict and recomputes, never touching
+the focus's nuclear family (distance ≤ 2). This triggers regardless of budget, so
+a small family with a bad local arrangement (the remarriage/cousin cases) is
+protected too. Visible people touching hidden kin get a **frontier marker**
+(bucketed up / down / side); clicking a node re-centres the scope, a focus stack
+gives a back step, and an **Overview** toggle restores the whole-tree view. `homePerson` picks a deterministic most-connected person to
 open on. Everything here is pure + unit-tested (`*.test.ts`, run with
 `npm test`). The demo seed lives in `app/src/db/seed-data.ts`.
 

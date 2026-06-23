@@ -14,7 +14,8 @@
  * total-ordered function of (graph, focus, budget) — every sort breaks ties by
  * birth year then id, exactly like the layout's `makeCmp`.
  */
-import type { FamilyGraph, RelationshipEdge } from "./family-graph";
+import { buildFamilyGraph, type FamilyGraph, type RelationshipEdge } from "./family-graph";
+import { compute, COLU } from "./tree-layout";
 
 /**
  * Edge weights set the closeness ordering — the single tuning knob. With
@@ -125,8 +126,10 @@ export function scopeFamily(graph: FamilyGraph, focusId: string, opts: ScopeOpts
     }
   }
 
-  // --- Resolve the irreducible remarriage-with-siblings conflict (v1: structural).
-  resolveConflicts(graph, visible, distance, bornCmp);
+  // --- Resolve residual *geometric* ambiguity (v2: layout-aware). Trial-lay-out
+  // the visible set, and while it still has crossings / stretched or coincident
+  // unions, fog the farthest-from-focus person feeding the conflict and retry.
+  resolveByLayout(graph, visible, distance, bornCmp, focusId, bornOf);
 
   // --- Keep only what stays connected to the focus through real (parent/child/
   // spouse) edges, so `compute` never gets a floating component or an orphaned
@@ -151,38 +154,149 @@ export function scopeFamily(graph: FamilyGraph, focusId: string, opts: ScopeOpts
 }
 
 /**
- * A person remarried (≥2 fully-visible couples) who also has a visible sibling
- * can't keep both spouses adjacent AND stay in their sibling block — one spouse
- * edge would cross a sibling. Keep the couple closest to focus and fog the
- * competing spouse(s); `pruneToConnected` then sweeps any in-law branch that
- * dangled off them. Deterministic: closeness, then birth year, then id.
+ * Reconstruct the raw relationship edges a `FamilyGraph` was built from, so a
+ * sub-scope can be re-built (and trial-laid-out) without the caller threading
+ * the original rows back in. Spouse status comes from the spouse map; parent
+ * edges from `parentsOf`. Edge ids are synthetic — only kind/endpoints/status
+ * matter to `buildFamilyGraph` + `compute`.
  */
-function resolveConflicts(
+function graphToRels(graph: FamilyGraph): RelationshipEdge[] {
+  const rels: RelationshipEdge[] = [];
+  for (const child of Object.keys(graph.parentsOf)) {
+    for (const parent of graph.parentsOf[child]) {
+      rels.push({ id: `p:${parent}:${child}`, kind: "parent", personId: parent, relatedId: child });
+    }
+  }
+  for (const p of Object.keys(graph.spouses)) {
+    for (const s of graph.spouses[p]) {
+      if (p < s.id) rels.push({ id: `s:${p}:${s.id}`, kind: "spouse", personId: p, relatedId: s.id, status: s.rel });
+    }
+  }
+  return rels;
+}
+
+/** A geometric ambiguity in a trial layout + the people whose removal could fix it. */
+export interface LayoutConflict {
+  kind: "crossing" | "wide-union" | "coincident-knot";
+  /** Candidate people to fog (the farthest-from-focus one is chosen). */
+  candidates: string[];
+}
+
+const segCross = (
+  p1: { x: number; y: number }, p2: { x: number; y: number },
+  p3: { x: number; y: number }, p4: { x: number; y: number },
+): boolean => {
+  const eq = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+    Math.abs(a.x - b.x) < 0.01 && Math.abs(a.y - b.y) < 0.01;
+  // shared endpoints (common knot / same child target) are not a crossing
+  if (eq(p1, p3) || eq(p1, p4) || eq(p2, p3) || eq(p2, p4)) return false;
+  const d = (a: { x: number; y: number }, b: { x: number; y: number }, c: { x: number; y: number }) =>
+    (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  const d1 = d(p3, p4, p1), d2 = d(p3, p4, p2), d3 = d(p1, p2, p3), d4 = d(p1, p2, p4);
+  return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
+};
+
+/**
+ * Detect the genealogically-ambiguous geometry the fog is meant to prevent:
+ *   · crossing — two parent→child links that cross (cousins read as siblings),
+ *   · wide-union — a same-row couple drawn more than ~1.5 slots apart (a knot
+ *     stranded between far-apart partners, e.g. a remarried person with a
+ *     sibling who can't sit between both spouses),
+ *   · coincident-knot — two unions sharing a marriage knot (children of two
+ *     couples fanning from one point).
+ * Pure over the trial layout; orientation is the Explorer's default (vertical).
+ */
+export function detectLayoutConflicts(
+  graph: FamilyGraph,
+  bornOf: Record<string, number | null | undefined> = {},
+): LayoutConflict[] {
+  const layout = compute(graph, "vertical", bornOf);
+  const out: LayoutConflict[] = [];
+
+  const childEdges = layout.edges.filter((e) => e.kind === "child") as Array<
+    Extract<(typeof layout.edges)[number], { kind: "child" }>
+  >;
+  for (let i = 0; i < childEdges.length; i++) {
+    for (let j = i + 1; j < childEdges.length; j++) {
+      const a = childEdges[i], b = childEdges[j];
+      if (a.child === b.child) continue;
+      if (segCross(a.from, a.to, b.from, b.to)) {
+        out.push({ kind: "crossing", candidates: [a.child, b.child] });
+      }
+    }
+  }
+
+  // Adjacent partners sit one slot (COLU) apart; a knot is only *stranded*
+  // (ambiguous) when a sibling sits between the partners — i.e. ≥2 slots — AND
+  // children actually hang from that stranded knot. A wide *childless* marriage
+  // has no child-edge to misread, so it is never flagged.
+  const WIDE = COLU * 1.5;
+  for (const u of graph.unions) {
+    if (u.partners.length !== 2 || u.children.length === 0) continue;
+    const [n0, n1] = u.partners.map((p) => layout.nodes[p]);
+    if (!n0 || !n1 || n0.gen !== n1.gen) continue;
+    if (Math.abs(n0.x - n1.x) > WIDE) {
+      out.push({ kind: "wide-union", candidates: [...u.partners, ...u.children] });
+    }
+  }
+
+  const knots = layout.junctions;
+  for (let i = 0; i < knots.length; i++) {
+    for (let j = i + 1; j < knots.length; j++) {
+      if (Math.abs(knots[i].knot.x - knots[j].knot.x) < 0.5 && Math.abs(knots[i].knot.y - knots[j].knot.y) < 0.5) {
+        const ua = graph.unionById[knots[i].union], ub = graph.unionById[knots[j].union];
+        out.push({ kind: "coincident-knot", candidates: [...ua.partners, ...ua.children, ...ub.partners, ...ub.children] });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Layout-aware conflict resolution (the "fog on conflict" the design promised).
+ * Trial-lay-out the visible scope; while it still contains a geometric
+ * ambiguity, fog the farthest-from-focus person feeding any conflict and retry.
+ * Always shrinks `visible` by one per pass over a person that is not the focus,
+ * so it terminates; `pruneToConnected` then sweeps anything it strands.
+ * Triggers on conflict regardless of budget — a small family with a bad local
+ * arrangement (the remarriage/cousin cases) gets protected too.
+ */
+function resolveByLayout(
   graph: FamilyGraph,
   visible: Set<string>,
   distance: Map<string, number>,
   bornCmp: (a: string, b: string) => number,
+  focusId: string,
+  bornOf: Record<string, number | null | undefined>,
 ): void {
-  const unionDist = (uid: string): number => {
-    const u = graph.unionById[uid];
-    const ds = [...u.partners, ...u.children]
-      .filter((m) => visible.has(m))
-      .map((m) => distance.get(m) ?? Infinity);
-    return ds.length ? Math.min(...ds) : Infinity;
-  };
-  for (const x of [...visible].sort()) {
-    const couples = (graph.partnerUnions[x] ?? []).filter((uid) => {
-      const u = graph.unionById[uid];
-      return u.partners.length === 2 && u.partners.every((p) => visible.has(p));
-    });
-    if (couples.length < 2) continue;
-    if (!siblingsOf(graph, x).some((s) => visible.has(s))) continue; // not in a sibling block
-    const keep = [...couples].sort((a, b) => unionDist(a) - unionDist(b) || (a < b ? -1 : 1))[0];
-    for (const uid of couples) {
-      if (uid === keep) continue;
-      const partner = graph.unionById[uid].partners.find((p) => p !== x);
-      if (partner) visible.delete(partner);
+  const allRels = graphToRels(graph);
+  for (let pass = 0; pass < graph.placed.length; pass++) {
+    const sub = allRels.filter((e) => visible.has(e.personId) && visible.has(e.relatedId));
+    const conflicts = detectLayoutConflicts(buildFamilyGraph(sub), bornOf);
+    if (conflicts.length === 0) break;
+
+    // Pick the farthest-from-focus candidate across all conflicts. Never fog the
+    // focus's nuclear family (distance ≤ 2: spouse, siblings, parents, children) —
+    // hiding someone's parent to declutter a distant cousin would be worse than
+    // the crossing. If only protected kin feed a conflict, we leave it drawn.
+    // Ties: keep the closer birth year / smaller id visible → fog later.
+    const PROTECT = 2;
+    let victim: string | null = null;
+    let best = -1;
+    for (const c of conflicts) {
+      for (const cand of c.candidates) {
+        if (cand === focusId || !visible.has(cand)) continue;
+        const d = distance.get(cand) ?? Infinity;
+        if (d <= PROTECT) continue;
+        if (d > best || (d === best && victim !== null && (bornCmp(cand, victim) > 0 || (bornCmp(cand, victim) === 0 && cand > victim)))) {
+          best = d;
+          victim = cand;
+        }
+      }
     }
+    if (victim === null) break; // only the focus feeds the conflict — can't reduce
+    visible.delete(victim);
+    pruneToConnected(graph, visible, focusId);
   }
 }
 
