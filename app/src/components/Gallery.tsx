@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Avatar, Button, Chip, EmptyState, Select } from "@family-archive/ui";
+import { Avatar, Button, Chip, EmptyState, ProvenanceMark, Select } from "@family-archive/ui";
 import type { ChipDot } from "@family-archive/ui";
 import { fullName, type MediaItem, type Person } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
@@ -143,8 +143,9 @@ export function Gallery({
                 >
                   <DocDot type={m.type} />
                   {m.type}
-                  <span className="tnum" style={{ marginLeft: "auto" }}>
-                    {m.year}
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+                    <ProvenanceMark status={m.prov} size={14} />
+                    <span className="tnum">{m.year}</span>
                   </span>
                 </div>
                 <div style={{ fontSize: "var(--text-body)", lineHeight: 1.3, marginBottom: "var(--space-sm)" }}>{m.title}</div>

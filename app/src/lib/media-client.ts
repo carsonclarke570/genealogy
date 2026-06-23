@@ -27,6 +27,8 @@ export interface MediaEditInput {
   title: string;
   type: string;
   year: string | number;
+  /** Confidence under the unified provenance model; the route defaults it when omitted. */
+  prov?: string;
   description: string;
   personIds: string[];
 }
