@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildFamilyGraph, type RelationshipEdge } from "./family-graph";
-import { scopeFamily, homePerson, edgeWithinScope } from "./family-scope";
+import { scopeFamily, homePerson, edgeWithinScope, detectLayoutConflicts } from "./family-scope";
 
 let seq = 0;
 const spouse = (a: string, b: string): RelationshipEdge => ({
@@ -98,5 +98,36 @@ describe("scopeFamily — remarriage-with-siblings conflict", () => {
 
   it("homePerson is the most-connected person", () => {
     expect(homePerson(g)).toBe("christa");
+  });
+});
+
+describe("scopeFamily — layout-aware fog (geometric ambiguity)", () => {
+  // dad & uncle are siblings; me is dad's child, cousin is uncle's child (same
+  // generation). me marries a spouse whose own parents sit on the far side, so
+  // the layout can't keep me under my parents AND beside my spouse — the cousin
+  // link crosses. The scope must fog the farther branch, not draw the crossing.
+  const cousins: RelationshipEdge[] = [
+    spouse("gpa", "gma"), parent("gpa", "dad"), parent("gma", "dad"), parent("gpa", "uncle"), parent("gma", "uncle"),
+    spouse("dad", "mom"), parent("dad", "me"), parent("mom", "me"),
+    spouse("uncle", "aunt"), parent("uncle", "cousin"), parent("aunt", "cousin"),
+    spouse("me", "spouse"), parent("sdad", "spouse"), parent("smom", "spouse"), spouse("sdad", "smom"),
+  ];
+  const g = buildFamilyGraph(cousins);
+
+  it("leaves no geometric conflict in any scoped layout", () => {
+    for (const focus of g.placed) {
+      const { visible } = scopeFamily(g, focus, { budget: 100 });
+      const sub = cousins.filter(edgeWithinScope(visible));
+      expect(detectLayoutConflicts(buildFamilyGraph(sub))).toHaveLength(0);
+    }
+  });
+
+  it("never fogs the focus's nuclear family (distance ≤ 2)", () => {
+    const { distance, dropped } = scopeFamily(g, "me", { budget: 100 });
+    for (const p of dropped) expect(distance.get(p)!).toBeGreaterThan(2);
+    // ...and a conflict that only the nuclear family feeds is left drawn, never
+    // resolved by hiding a parent/child/sibling/spouse.
+    const { visible } = scopeFamily(g, "me", { budget: 100 });
+    for (const close of ["mom", "dad", "spouse"]) expect(visible.has(close)).toBe(true);
   });
 });
