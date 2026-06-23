@@ -16,7 +16,7 @@ import { z } from "zod";
 import { getDb } from "@/db/client";
 import { person, personName, relationship, event, eventPerson, media } from "@/db/schema";
 import { provStatuses, type ProvStatus } from "./prov";
-import { sortNames, type NameReason } from "./family-data";
+import { dateSortKey, type NameReason } from "./family-data";
 import { parsePartialDate, serializePartialDate } from "./dates";
 import { indexPerson } from "./search/index-doc";
 
@@ -512,25 +512,23 @@ function parseNames(raw: FormDataEntryValue | null): NameDraft[] {
 async function syncPersonNames(db: DB, personId: string, drafts: NameDraft[]): Promise<void> {
   if (drafts.length === 0) return;
 
-  const existing = await db
-    .select({ id: personName.id })
-    .from(personName)
-    .where(eq(personName.personId, personId));
-  const existingIds = new Set(existing.map((r) => r.id));
-
-  // Validate optional FK references so a stale/tampered id can't break the insert.
+  // The current rows for this person, plus FK existence for any cited
+  // relationship/event/media — all independent, so fetch them concurrently.
   const relIds = [...new Set(drafts.map((d) => d.causeRelationshipId).filter((x): x is string => !!x))];
   const evIds = [...new Set(drafts.map((d) => d.causeEventId).filter((x): x is string => !!x))];
   const medIds = [...new Set(drafts.map((d) => d.mediaId).filter((x): x is string => !!x))];
-  const validRel = relIds.length
-    ? new Set((await db.select({ id: relationship.id }).from(relationship).where(inArray(relationship.id, relIds))).map((r) => r.id))
-    : new Set<string>();
-  const validEv = evIds.length
-    ? new Set((await db.select({ id: event.id }).from(event).where(inArray(event.id, evIds))).map((r) => r.id))
-    : new Set<string>();
-  const validMed = medIds.length
-    ? new Set((await db.select({ id: media.id }).from(media).where(inArray(media.id, medIds))).map((r) => r.id))
-    : new Set<string>();
+  const idsOf = <T extends { id: string }>(rows: T[]) => new Set(rows.map((r) => r.id));
+  const none = Promise.resolve([] as { id: string }[]);
+  const [existing, relRows, evRows, medRows] = await Promise.all([
+    db.select({ id: personName.id }).from(personName).where(eq(personName.personId, personId)),
+    relIds.length ? db.select({ id: relationship.id }).from(relationship).where(inArray(relationship.id, relIds)) : none,
+    evIds.length ? db.select({ id: event.id }).from(event).where(inArray(event.id, evIds)) : none,
+    medIds.length ? db.select({ id: media.id }).from(media).where(inArray(media.id, medIds)) : none,
+  ]);
+  const existingIds = idsOf(existing);
+  const validRel = idsOf(relRows);
+  const validEv = idsOf(evRows);
+  const validMed = idsOf(medRows);
 
   const kept = new Set<string>();
   const rows = drafts.map((d, idx) => {
@@ -554,42 +552,30 @@ async function syncPersonNames(db: DB, personId: string, drafts: NameDraft[]): P
     };
   });
 
+  // Most-recent (current) and earliest (birth) name, ordered like the read model
+  // (effective date, then ordinal, then id) — drives the denormalised cache.
+  const ordered = [...rows].sort((a, b) => {
+    const ka = dateSortKey(parsePartialDate(a.effectiveDate));
+    const kb = dateSortKey(parsePartialDate(b.effectiveDate));
+    if (ka !== kb) return ka - kb;
+    if (a.ordinal !== b.ordinal) return a.ordinal - b.ordinal;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+  const birth = ordered[0];
+  const current = ordered[ordered.length - 1];
+  const maiden = birth.surname !== current.surname ? birth.surname : null;
+
+  // Reconcile the rows (delete removed, insert new in one batch, update kept) and
+  // rewrite the cache — all disjoint targets, so run them concurrently.
   const toDelete = [...existingIds].filter((id) => !kept.has(id));
-  if (toDelete.length > 0) await db.delete(personName).where(inArray(personName.id, toDelete));
-
-  for (const row of rows) {
-    if (existingIds.has(row.id)) {
-      await db.update(personName).set(row).where(eq(personName.id, row.id));
-    } else {
-      await db.insert(personName).values(row);
-    }
-  }
-
-  // Recompute the cache from the freshly-written set (same sort as the read model).
-  const sorted = sortNames(
-    rows.map((r) => ({
-      id: r.id,
-      given: r.given,
-      surname: r.surname,
-      date: parsePartialDate(r.effectiveDate),
-      reason: r.reason as NameReason,
-      relationshipId: r.relationshipId,
-      eventId: r.eventId,
-      source: null,
-      prov: "unverified" as const,
-      note: r.note,
-      ordinal: r.ordinal,
-    })),
-  );
-  const current = sorted[sorted.length - 1];
-  const birth = sorted[0];
-  if (current) {
-    const maiden = birth && birth.surname !== current.surname ? birth.surname : null;
-    await db
-      .update(person)
-      .set({ given: current.given, surname: current.surname, maiden })
-      .where(eq(person.id, personId));
-  }
+  const toInsert = rows.filter((r) => !existingIds.has(r.id));
+  const toUpdate = rows.filter((r) => existingIds.has(r.id));
+  await Promise.all([
+    ...(toDelete.length ? [db.delete(personName).where(inArray(personName.id, toDelete))] : []),
+    ...(toInsert.length ? [db.insert(personName).values(toInsert)] : []),
+    ...toUpdate.map((r) => db.update(personName).set(r).where(eq(personName.id, r.id))),
+    db.update(person).set({ given: current.given, surname: current.surname, maiden }).where(eq(person.id, personId)),
+  ]);
 }
 
 /** Compose the full name history from the validated birth name + the form's later names. */

@@ -20,7 +20,7 @@
  */
 import type { PartialDate, ProvenanceStatus, DocType } from "@family-archive/ui";
 import type { Person, MediaItem, EventType, TimelineEvent } from "./family-data";
-import { sortNames } from "./family-data";
+import { sortNames, dateSortKey } from "./family-data";
 import type { RelationshipEdge } from "./family-graph";
 import { parsePartialDate } from "./dates";
 
@@ -91,17 +91,9 @@ const typeRank = (t: EventType): number => {
   return i === -1 ? TIMELINE_TYPE_ORDER.length : i;
 };
 
-const firstName = (p: Person): string => p.given.split(" ")[0];
 const firstWord = (given: string): string => given.split(" ")[0];
 
 const yearDate = (year: number): PartialDate => ({ precision: "year", year, month: null, day: null });
-
-/** Numeric sort key; missing components pad to the low end so a year-only date
- *  sorts at the start of its year, before any fully-dated event that year. */
-function sortKeyOf(date: PartialDate | null): number {
-  if (!date || date.year == null) return Number.POSITIVE_INFINITY; // undated → last
-  return date.year * 10000 + (date.month ?? 1) * 100 + (date.day ?? 1);
-}
 
 /** Chronological order, with a deterministic tiebreak so the same input is stable. */
 export function byDate(a: TimelineEvent, b: TimelineEvent): number {
@@ -114,7 +106,7 @@ export function byDate(a: TimelineEvent, b: TimelineEvent): number {
 function mk(
   partial: Omit<TimelineEvent, "sortKey"> & { sortKey?: number },
 ): TimelineEvent {
-  return { ...partial, sortKey: partial.sortKey ?? sortKeyOf(partial.date) };
+  return { ...partial, sortKey: partial.sortKey ?? dateSortKey(partial.date) };
 }
 
 /**
@@ -149,7 +141,7 @@ export function buildTimeline(input: {
           id: `b-${p.id}`,
           type: "birth",
           date: p.bornDate ?? yearDate(p.born),
-          title: `${firstName(p)} ${p.surname} was born`,
+          title: `${firstWord(p.given)} ${p.surname} was born`,
           place: p.bornPlace,
           people: [p.id],
           prov: factProv(p, "born"),
@@ -166,7 +158,7 @@ export function buildTimeline(input: {
           id: `d-${p.id}`,
           type: "death",
           date: p.diedDate ?? yearDate(p.died),
-          title: `${firstName(p)} ${p.surname} died`,
+          title: `${firstWord(p.given)} ${p.surname} died`,
           place: p.diedPlace,
           people: [p.id],
           prov: factProv(p, "died"),
@@ -202,7 +194,7 @@ export function buildTimeline(input: {
           id: `m-${pairKey}`,
           type: "marriage",
           date: marr,
-          title: `${firstName(pa)} & ${firstName(pb)} married`,
+          title: `${firstWord(pa.given)} & ${firstWord(pb.given)} married`,
           place: null,
           people: [a, b],
           prov: src ? "verified" : "unverified",
@@ -218,7 +210,7 @@ export function buildTimeline(input: {
           id: `dv-${pairKey}`,
           type: "divorce",
           date: div,
-          title: `${firstName(pa)} & ${firstName(pb)} divorced`,
+          title: `${firstWord(pa.given)} & ${firstWord(pb.given)} divorced`,
           place: null,
           people: [a, b],
           prov: "unverified",

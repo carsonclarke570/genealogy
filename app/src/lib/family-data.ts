@@ -200,19 +200,23 @@ export function shortName(p: Person): string {
   return `${p.given.split(" ")[0]} ${p.surname}`;
 }
 
-// ── Names (pure, unit-tested) ────────────────────────────────────────────────
-
-/** Numeric sort key for a name's effective date; undated sorts last (most recent). */
-function nameSortKey(date: PartialDate | null): number {
+/**
+ * Numeric sort key for a precision-aware partial date; a missing date sorts last
+ * (`+Infinity`). Shared by the timeline ordering and the name history so both
+ * agree on how an undated event/name ranks.
+ */
+export function dateSortKey(date: PartialDate | null): number {
   if (!date || date.year == null) return Number.POSITIVE_INFINITY;
   return date.year * 10000 + (date.month ?? 1) * 100 + (date.day ?? 1);
 }
 
+// ── Names (pure, unit-tested) ────────────────────────────────────────────────
+
 /** A person's names in effect order (earliest → latest), ties broken by ordinal then id. */
 export function sortNames(names: PersonName[]): PersonName[] {
   return [...names].sort((a, b) => {
-    const ka = nameSortKey(a.date);
-    const kb = nameSortKey(b.date);
+    const ka = dateSortKey(a.date);
+    const kb = dateSortKey(b.date);
     if (ka !== kb) return ka - kb;
     if (a.ordinal !== b.ordinal) return a.ordinal - b.ordinal;
     return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;

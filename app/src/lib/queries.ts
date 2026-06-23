@@ -44,13 +44,17 @@ function parseJson<T>(raw: string, schema: z.ZodType<T>): T {
 
 export async function getDataset(): Promise<Dataset> {
   const db = await getDb();
-  const personRows = await db.select().from(schema.person);
-  const relationshipRows = await db.select().from(schema.relationship);
-  const mediaRows = await db.select().from(schema.media);
-  const links = await db.select().from(schema.personMedia);
-  const eventRows = await db.select().from(schema.event);
-  const eventLinks = await db.select().from(schema.eventPerson);
-  const nameRows = await db.select().from(schema.personName);
+  // Independent table reads — fetch concurrently rather than round-trip by round-trip.
+  const [personRows, relationshipRows, mediaRows, links, eventRows, eventLinks, nameRows] =
+    await Promise.all([
+      db.select().from(schema.person),
+      db.select().from(schema.relationship),
+      db.select().from(schema.media),
+      db.select().from(schema.personMedia),
+      db.select().from(schema.event),
+      db.select().from(schema.eventPerson),
+      db.select().from(schema.personName),
+    ]);
 
   // Real attached-media count per person, derived from the link table.
   const mediaCountByPerson = new Map<string, number>();

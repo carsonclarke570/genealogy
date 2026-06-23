@@ -30,6 +30,7 @@ import {
 } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import { serializePartialDate, parsePartialDate } from "@/lib/dates";
+import { PROV_LABEL } from "@/lib/prov";
 import { createPerson, updatePerson, type NameDraft, type RelationDraft, type RelationOp } from "@/lib/actions";
 import { Icon } from "./Icon";
 import { MiniNode } from "./shared";
@@ -173,7 +174,6 @@ const NAME_REASON_CHOICES: NameReason[] = [
   "other",
 ];
 const PROV_CHOICES: ProvenanceStatus[] = ["unverified", "verified", "estimated", "disputed"];
-const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
 /**
  * One row of the Names editor: a full given+surname pair the person took on, with
@@ -256,7 +256,7 @@ function NameRow({
           <Select label="Confidence" value={row.prov} onChange={(e) => onUpdate({ prov: e.target.value as ProvenanceStatus })}>
             {PROV_CHOICES.map((s) => (
               <option key={s} value={s}>
-                {cap(s)}
+                {PROV_LABEL[s]}
               </option>
             ))}
           </Select>

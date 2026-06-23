@@ -23,7 +23,6 @@ import {
   provSourceOf,
   provSummary,
   relationsOf,
-  sortNames,
   NAME_REASON_LABEL,
   type Person,
   type Relation,
@@ -168,9 +167,10 @@ export function PersonRecord({
     ) : null;
 
   const bio = bioParas(p);
-  // The full name history (earliest → latest). Shown only when there's a change
-  // to surface — a single birth name is already the record's headline.
-  const nameHistory = sortNames(p.names ?? []);
+  // The full name history (earliest → latest, already sorted by the read model).
+  // Shown only when there's a change to surface — a single birth name is already
+  // the record's headline.
+  const nameHistory = p.names ?? [];
   const NamesBlock =
     nameHistory.length > 1 ? (
       <div>
