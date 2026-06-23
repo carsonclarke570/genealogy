@@ -105,9 +105,9 @@ export function PersonRecord({
   const EventStrip =
     events.length > 0 ? (
       <div>
-        <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
+        <h2 className="app-label" style={{ margin: "0 0 var(--space-sm)" }}>
           Life events
-        </div>
+        </h2>
         <div className="app-evstrip-wrap">
           <div className="app-evstrip">
             {events.slice(0, 5).map((ev) => {
@@ -124,7 +124,12 @@ export function PersonRecord({
             })}
             {events.length > 5 && (
               <button className="app-evcard app-evcard-more" onClick={() => setTab("timeline")}>
-                <span className="app-display" style={{ fontSize: "var(--text-headline)" }}>+{events.length - 5}</span>
+                <span
+                  className="tnum"
+                  style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: "var(--text-headline)", color: "var(--color-ink)" }}
+                >
+                  +{events.length - 5}
+                </span>
                 <span className="app-muted" style={{ fontSize: "var(--text-body-sm)" }}>more</span>
               </button>
             )}
@@ -136,9 +141,9 @@ export function PersonRecord({
   const RelGroup = ({ title, items }: { title: string; items: Relation[] }) =>
     items.length ? (
       <div>
-        <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
+        <h2 className="app-label" style={{ margin: "0 0 var(--space-sm)" }}>
           {title}
-        </div>
+        </h2>
         <div style={{ display: "grid", gap: "var(--space-sm)" }}>
           {items.map((r) => (
             <MiniNode key={r.id} id={r.id} rel={r.rel} onOpen={onOpen} />
@@ -155,9 +160,9 @@ export function PersonRecord({
   const NamesBlock =
     nameHistory.length > 1 ? (
       <div>
-        <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
+        <h2 className="app-label" style={{ margin: "0 0 var(--space-sm)" }}>
           Names
-        </div>
+        </h2>
         <div style={{ display: "grid", gap: "var(--space-sm)" }}>
           {nameHistory.map((n, i) => {
             const date = formatPartialDate(n.date ?? null);
@@ -184,9 +189,9 @@ export function PersonRecord({
   const Overview = (
     <div style={{ display: "grid", gap: "var(--space-2xl)" }}>
       <div>
-        <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
+        <h2 className="app-label" style={{ margin: "0 0 var(--space-sm)" }}>
           Biography
-        </div>
+        </h2>
         {bio.length > 0 ? (
           <div
             style={{
@@ -226,9 +231,9 @@ export function PersonRecord({
         </div>
       ) : (
         <div>
-          <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
+          <h2 className="app-label" style={{ margin: "0 0 var(--space-sm)" }}>
             Relationships
-          </div>
+          </h2>
           <p className="app-muted" style={{ margin: 0, maxWidth: "68ch", fontSize: "var(--text-body)" }}>
             No relationships recorded yet.{" "}
             <button type="button" className="app-link" onClick={() => onOpen(id, "edit")}>
@@ -369,7 +374,7 @@ export function PersonRecord({
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", flexWrap: "wrap" }}>
-                    <span style={{ fontFamily: "var(--font-serif)", fontSize: "var(--text-body)", color: "var(--color-ink)" }}>
+                    <span style={{ fontFamily: "var(--font-sans)", fontWeight: 500, fontSize: "var(--text-body)", color: "var(--color-ink)" }}>
                       {r.place}
                     </span>
                     <ProvenanceMark status={r.prov} source={r.source?.title} size={13} />
@@ -418,11 +423,13 @@ export function PersonRecord({
   const bornText = formatPartialDate(p.bornDate ?? null) || (p.born != null ? String(p.born) : "?");
   const diedText = formatPartialDate(p.diedDate ?? null) || (p.died != null ? String(p.died) : "?");
   const facts = [
-    { k: "Born", field: "born", ...fmtFact("born", bornText) },
-    { k: "Birthplace", field: "bornPlace", ...fmtFact("bornPlace", (p.bornPlace ?? "?").split(",")[0]) },
+    // Serif is reserved for life-dates (Born/Died); places and status are the
+    // tool's voice → sans (the Serif-For-People rule).
+    { k: "Born", field: "born", serif: true, ...fmtFact("born", bornText) },
+    { k: "Birthplace", field: "bornPlace", serif: false, ...fmtFact("bornPlace", (p.bornPlace ?? "?").split(",")[0]) },
     p.living
-      ? { k: "Status", field: null as string | null, v: "Living", st: provOf(p, "name") }
-      : { k: "Died", field: "died", ...fmtFact("died", diedText) },
+      ? { k: "Status", field: null as string | null, serif: false, v: "Living", st: provOf(p, "name") }
+      : { k: "Died", field: "died", serif: true, ...fmtFact("died", diedText) },
   ];
 
   return (
@@ -445,17 +452,17 @@ export function PersonRecord({
           <div style={{ display: "flex", gap: "var(--space-lg)", alignItems: "flex-start" }}>
             <Avatar name={fullName(p)} size="lg" />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div
+              <h1
                 className="app-display"
-                style={{ fontSize: "var(--text-display)", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
+                style={{ margin: 0, fontSize: "var(--text-display)", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
               >
-                <span>{fullName(p)}</span>
+                <span style={{ textWrap: "balance" }}>{fullName(p)}</span>
                 <ProvenanceMark
                   status={provOf(p, "name")}
                   source={provOf(p, "name") === "verified" ? provSourceOf(p, "name") ?? undefined : undefined}
                   size={16}
                 />
-              </div>
+              </h1>
               <div
                 style={{
                   fontFamily: "var(--font-serif)",
@@ -501,8 +508,9 @@ export function PersonRecord({
                   <span
                     className="tnum"
                     style={{
-                      fontFamily: "var(--font-serif)",
+                      fontFamily: f.serif ? "var(--font-serif)" : "var(--font-sans)",
                       fontSize: "var(--text-title)",
+                      fontWeight: f.serif ? 400 : 500,
                       color: "var(--color-ink)",
                       whiteSpace: "nowrap",
                     }}
