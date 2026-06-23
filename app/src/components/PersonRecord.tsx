@@ -502,9 +502,9 @@ export function PersonRecord({
           <hr className="app-divider" style={{ margin: "var(--space-lg) 0 var(--space-md)" }} />
           <div className="app-grid-facts">
             {facts.map((f) => (
-              <div key={f.k}>
+              <div key={f.k} style={{ minWidth: 0 }}>
                 <div style={{ fontSize: "var(--text-body-sm)", color: "var(--color-muted)" }}>{f.k}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2, minWidth: 0 }}>
                   <span
                     className="tnum"
                     style={{
@@ -512,7 +512,8 @@ export function PersonRecord({
                       fontSize: "var(--text-title)",
                       fontWeight: f.serif ? 400 : 500,
                       color: "var(--color-ink)",
-                      whiteSpace: "nowrap",
+                      minWidth: 0,
+                      overflowWrap: "anywhere",
                     }}
                   >
                     {f.v}
