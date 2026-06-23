@@ -131,3 +131,45 @@ describe("scopeFamily — layout-aware fog (geometric ambiguity)", () => {
     for (const close of ["mom", "dad", "spouse"]) expect(visible.has(close)).toBe(true);
   });
 });
+
+describe("scopeFamily — cross-generation union fog", () => {
+  // focus's child marries an in-law whose own line is recorded 2 rows deep, so
+  // longest-path seats the in-law a generation above `child`: their parenting
+  // union draws as a diagonal elbow instead of a side-by-side couple. The fog
+  // should hide the farther partner (the in-law) behind a frontier marker.
+  //   focus+fspouse → child ; child+inlaw → gkid ; igp → ip → inlaw
+  const crossGen: RelationshipEdge[] = [
+    spouse("focus", "fspouse"), parent("focus", "child"), parent("fspouse", "child"),
+    spouse("child", "inlaw"), parent("child", "gkid"), parent("inlaw", "gkid"),
+    parent("ip", "inlaw"), parent("igp", "ip"),
+  ];
+  const g = buildFamilyGraph(crossGen);
+
+  it("detects a parenting couple split across two generation rows", () => {
+    const conflicts = detectLayoutConflicts(g);
+    const cg = conflicts.filter((c) => c.kind === "cross-gen-union");
+    expect(cg).toHaveLength(1);
+    expect([...cg[0].candidates].sort()).toEqual(["child", "inlaw"]);
+  });
+
+  it("fogs the farther partner and leaves a conflict-free scoped layout", () => {
+    const { visible, frontier } = scopeFamily(g, "focus", { budget: 100 });
+    // the in-law (distance > 2) and their fogged-along ancestry are hidden...
+    expect(visible.has("inlaw")).toBe(false);
+    expect(visible.has("ip")).toBe(false);
+    expect(visible.has("igp")).toBe(false);
+    // ...while the family-side partner stays, carrying a hidden-spouse marker.
+    expect(visible.has("child")).toBe(true);
+    expect(frontier.get("child")?.side).toBeGreaterThan(0);
+    // the resolved scope is free of the diagonal elbow.
+    const sub = crossGen.filter(edgeWithinScope(visible));
+    expect(detectLayoutConflicts(buildFamilyGraph(sub))).toHaveLength(0);
+  });
+
+  it("leaves a cross-gen couple drawn when it is the focus's nuclear family", () => {
+    // Focused on `child`, the in-law spouse is distance 1 — protected, so the
+    // elbow is kept rather than hiding an immediate spouse.
+    const { visible } = scopeFamily(g, "child", { budget: 100 });
+    expect(visible.has("inlaw")).toBe(true);
+  });
+});
