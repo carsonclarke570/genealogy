@@ -30,6 +30,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { EMBEDDING_DIM } from "../lib/search/config";
 import { provStatuses } from "../lib/prov";
+import { residenceDateKinds } from "../lib/dates";
 
 const timestamps = {
   createdAt: timestamp("created_at").defaultNow(),
@@ -225,7 +226,11 @@ export const residence = pgTable(
     lat: doublePrecision("lat"),
     lng: doublePrecision("lng"),
     placeId: text("place_id"),
+    // How the dates are meant: a "range" (move-in → move-out) or a "point" (a
+    // single known date we only know they lived here around — no span).
+    dateKind: text("date_kind", { enum: [...residenceDateKinds] }).notNull().default("range"),
     // Canonical partial-date strings + derived 4-digit years (mirrors person dates).
+    // For a "point" residence only the start fields are used (the known date).
     startDate: text("start_date"),
     startYear: integer("start_year"),
     endDate: text("end_date"),

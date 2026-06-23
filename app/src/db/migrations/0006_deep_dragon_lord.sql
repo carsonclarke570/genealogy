@@ -1,0 +1,1 @@
+ALTER TABLE "residence" ADD COLUMN "date_kind" text DEFAULT 'range' NOT NULL;

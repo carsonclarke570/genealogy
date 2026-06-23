@@ -95,6 +95,7 @@ const residence = (id: string, personId: string, over: Partial<Residence> = {}):
     personId,
     location: over.location ?? { label: over.place ?? "Boston, MA" },
     place: over.place ?? "Boston, MA",
+    dateKind: over.dateKind ?? "range",
     start,
     end,
     startYear: "startYear" in over ? over.startYear ?? null : start?.year ?? null,
@@ -319,6 +320,29 @@ describe("buildTimeline — residence spans", () => {
     const r = residence("r3", "ele", { start: null, end: null, startYear: null, endYear: null });
     const evs = buildTimeline({ ...empty, people: peopleMap(p), residences: [r] });
     expect(evs.some((e) => e.id === "res-r3")).toBe(false);
+  });
+
+  it("emits a 'point' residence as a point, not a span (no endDate)", () => {
+    const p = person("ele", { born: 1915 });
+    const r = residence("r4", "ele", {
+      dateKind: "point",
+      start: { precision: "year", year: 1911, month: null, day: null },
+      startYear: 1911,
+      // An end lingering on the row must be ignored for a point residence.
+      end: { precision: "year", year: 1999, month: null, day: null },
+      endYear: 1999,
+    });
+    const res = buildTimeline({ ...empty, people: peopleMap(p), residences: [r] }).find((e) => e.id === "res-r4")!;
+    expect(res.type).toBe("residence");
+    expect(res.date).toEqual({ precision: "year", year: 1911, month: null, day: null });
+    expect(res.endDate).toBeUndefined();
+  });
+
+  it("skips a 'point' residence with no date", () => {
+    const p = person("ele", { born: 1915 });
+    const r = residence("r5", "ele", { dateKind: "point", start: null, startYear: null });
+    const evs = buildTimeline({ ...empty, people: peopleMap(p), residences: [r] });
+    expect(evs.some((e) => e.id === "res-r5")).toBe(false);
   });
 });
 

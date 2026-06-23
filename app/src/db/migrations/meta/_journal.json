@@ -43,6 +43,13 @@
       "when": 1782242299393,
       "tag": "0005_last_mephisto",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1782249811426,
+      "tag": "0006_deep_dragon_lord",
+      "breakpoints": true
     }
   ]
 }

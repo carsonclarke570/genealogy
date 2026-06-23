@@ -17,7 +17,7 @@ import { getDb } from "@/db/client";
 import { person, personName, relationship, event, eventPerson, media, residence } from "@/db/schema";
 import { provStatuses, type ProvStatus } from "./prov";
 import { dateSortKey, type NameReason } from "./family-data";
-import { parsePartialDate, serializePartialDate } from "./dates";
+import { parsePartialDate, serializePartialDate, residenceDateKinds } from "./dates";
 import { locationToColumns } from "./locations";
 import type { LocationValue } from "@family-archive/ui";
 import { indexPerson } from "./search/index-doc";
@@ -811,6 +811,8 @@ export interface ResidenceInput {
   personId: string;
   /** The chosen place (label + structured parts + optional coordinates). */
   location: LocationValue | null;
+  /** "range" (move-in → move-out) or "point" (a single known date). @default "range" */
+  dateKind?: string;
   /** Canonical partial-date strings ("YYYY" / "YYYY-MM" / "YYYY-MM-DD"), or null. */
   start: string | null;
   end?: string | null;
@@ -836,6 +838,7 @@ const locationInputSchema = z
 const residenceInputSchema = z.object({
   personId: z.string().min(1, "Pick whose residence this is"),
   location: locationInputSchema,
+  dateKind: z.enum(residenceDateKinds).catch("range"),
   start: z
     .string()
     .nullish()
@@ -879,15 +882,21 @@ async function residenceColumns(
   if (people.length === 0) return { ok: false, errors: { personId: "That person no longer exists." } };
   const mediaId = data.mediaId && docs.length ? data.mediaId : null;
 
+  // A "point" residence has no span — only the single known date in `start`;
+  // drop any end so it can never read back as a range.
+  const isPoint = data.dateKind === "point";
+  const end = isPoint ? null : data.end;
+
   return {
     ok: true,
     cols: {
       personId: data.personId,
       ...loc,
+      dateKind: data.dateKind,
       startDate: data.start,
       startYear: parsePartialDate(data.start)?.year ?? null,
-      endDate: data.end,
-      endYear: parsePartialDate(data.end)?.year ?? null,
+      endDate: end,
+      endYear: parsePartialDate(end)?.year ?? null,
       prov: data.prov,
       mediaId,
       note: data.note,

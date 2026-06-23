@@ -51,10 +51,11 @@ function eventCategory(e: TimelineEvent): string {
 }
 
 // ── Residence spans ─────────────────────────────────────────────────────────
-// A residence carries an `endDate`; everything else is a point in time. The end
-// year is null when the span is still open (rendered as "present").
+// A *range* residence carries an `endDate` (null when still open) and renders as
+// a span; a *point* residence (a single known date) leaves `endDate` undefined
+// and renders as a point, like every other event.
 function isSpan(e: TimelineEvent): boolean {
-  return e.type === "residence";
+  return e.type === "residence" && e.endDate !== undefined;
 }
 function endYearOf(e: TimelineEvent): number | null {
   return e.endDate?.year ?? null;
@@ -65,6 +66,15 @@ function spanLabel(e: TimelineEvent): string {
   if (start == null) return "";
   const end = endYearOf(e);
   return `${start} – ${end ?? "present"}`;
+}
+/** The date shown beside a row: a span's range, a point residence's "c. YYYY", else the date. */
+function dateLabel(e: TimelineEvent): string {
+  if (isSpan(e)) return spanLabel(e);
+  if (e.type === "residence") {
+    const y = yearOf(e);
+    return y != null ? `c. ${y}` : fmtDate(e);
+  }
+  return fmtDate(e);
 }
 
 // ── EventRow sub-parts ──────────────────────────────────────────────────────
@@ -189,7 +199,7 @@ function EventRow({
     <TimelineItem
       last={last}
       icon={<IconBadge icon={<Icon name={m.icon as IconName} />} color={color} title={m.label} />}
-      date={isSpan(ev) ? spanLabel(ev) : fmtDate(ev)}
+      date={dateLabel(ev)}
       category={eventCategory(ev)}
       categoryColor={color}
       title={
@@ -400,7 +410,7 @@ function LanesView({
                   if (y == null) return null;
                   return (
                     <span key={ev.id} className="app-lanedot-wrap" style={{ left: `${x(y)}%` }}>
-                      <Tooltip label={`${fmtDate(ev)} · ${ev.title}`}>
+                      <Tooltip label={`${dateLabel(ev)} · ${ev.title}`}>
                         <button
                           className="app-lanedot"
                           style={{ background: eventColor(ev) }}

@@ -185,6 +185,7 @@ export async function getDataset(): Promise<Dataset> {
       personId: r.personId,
       location: locationFromColumns(r),
       place: r.placeLabel,
+      dateKind: r.dateKind === "point" ? "point" : "range",
       start,
       end,
       startYear: start?.year ?? r.startYear ?? null,

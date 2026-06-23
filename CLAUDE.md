@@ -91,15 +91,20 @@ Schema in `app/src/db/schema.ts`; refined from the initial sketch:
   divorces are **never stored** — they're derived on read (see below), so editing
   a date updates the timeline with no sync. (Residence is no longer an event type —
   it became the first-class span below.)
-- **residence** — a first-class *span* (not a point event): a structured location
+- **residence** — a first-class location record: a structured location
   (country → region → locality → address, plus `placeLabel` + optional lat/lng/
-  placeId from the geocoder), a start and optional end **partial date**, scoped to
-  one person, with **unified provenance** (status + optional linked source document
-  + note). Residencies **derive into the timeline** as span events on read (so
-  editing a residence updates the timeline with no sync). The `0005` migration
-  backfills old point-in-time `residence` *events* into one residence span per
-  linked person (keeping the event title as the residence note) and removes those
-  events; new installs seed residencies directly.
+  placeId from the geocoder), scoped to one person, with **unified provenance**
+  (status + optional linked source document + note). Its `dateKind` (`0006`
+  migration) picks how the dates read: a **range** (the default — `start` = moved
+  in, `end` = moved out, null end = lived there onward / "present") or a **point**
+  (a single *known* date in `start` — "we know they lived here around then but not
+  the span", rendered "c. YYYY", `end` unused). The distinction is stored
+  explicitly because "a start with no end" can't otherwise be told apart from
+  "still there". Residencies **derive into the timeline** on read — ranges as span
+  events, points as point events (so editing a residence updates the timeline with
+  no sync). The `0005` migration backfills old point-in-time `residence` *events*
+  into one residence span per linked person (keeping the event title as the
+  residence note) and removes those events; new installs seed residencies directly.
 
 **Unified provenance.** Every discrete fact — a person's birth/death dates and
 places, a marriage/divorce date, a media item, a residence, a stored event —

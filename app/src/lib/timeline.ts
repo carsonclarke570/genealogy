@@ -270,28 +270,33 @@ export function buildTimeline(input: {
     );
   }
 
-  // ── 4b. Residence spans — derived from the residence table ───────────────
-  // A residence is a *span* (start → optional end), not a point: it carries an
-  // `endDate` the views render as a bar. Marked `auto` (it's edited through the
-  // residence dialog, not the event dialog).
+  // ── 4b. Residencies — derived from the residence table ───────────────────
+  // A "range" residence is a *span* (start → optional end): it carries an
+  // `endDate` the views render as a bar. A "point" residence is a single known
+  // date — we leave `endDate` undefined so it renders as a point, never a bar
+  // stretched to "present". Both are marked `auto` (edited via the residence
+  // dialog, not the event dialog).
   for (const r of residences) {
     const p = people[r.personId];
     if (!p) continue;
+    const title = `${firstWord(p.given)} ${p.surname} lived in ${r.place}`;
+    const base = {
+      id: `res-${r.id}`,
+      type: "residence" as const,
+      title,
+      place: r.place,
+      people: [r.personId],
+      prov: r.prov,
+      source: r.source,
+      auto: true,
+    };
+    if (r.dateKind === "point") {
+      if (r.start == null) continue; // a point with no date can't be placed
+      out.push(mk({ ...base, date: r.start })); // no endDate ⇒ a point, not a span
+      continue;
+    }
     if (r.start == null && r.end == null) continue; // nothing to place on the axis
-    out.push(
-      mk({
-        id: `res-${r.id}`,
-        type: "residence",
-        date: r.start ?? r.end,
-        endDate: r.end,
-        title: `${firstWord(p.given)} ${p.surname} lived in ${r.place}`,
-        place: r.place,
-        people: [r.personId],
-        prov: r.prov,
-        source: r.source,
-        auto: true,
-      }),
-    );
+    out.push(mk({ ...base, date: r.start ?? r.end, endDate: r.end }));
   }
 
   // ── 5. Name changes — derived per person_name row, skipping the birth name ──
