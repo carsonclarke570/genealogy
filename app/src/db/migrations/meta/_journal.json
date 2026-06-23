@@ -29,6 +29,13 @@
       "when": 1782150804396,
       "tag": "0003_closed_micromax",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1782234056941,
+      "tag": "0004_previous_chameleon",
+      "breakpoints": true
     }
   ]
 }

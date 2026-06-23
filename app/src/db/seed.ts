@@ -22,6 +22,16 @@ export async function seed(db: DB): Promise<{ seeded: boolean }> {
 
   const unitById = new Map(units.map((u) => [u.id, u]));
 
+  // Each partner's spouse edge (id + married date), so a married-name change can
+  // link to the marriage that caused it (and inherit its date).
+  const spouseByPerson = new Map<string, { relId: string; married?: string }>();
+  for (const u of units) {
+    if (!u.partner) continue;
+    const relId = `r_spouse_${u.id}`;
+    spouseByPerson.set(u.anchor, { relId, married: u.married });
+    spouseByPerson.set(u.partner, { relId, married: u.married });
+  }
+
   await db.transaction(async (tx) => {
     for (const p of Object.values(people)) {
       await tx.insert(schema.person).values({
@@ -66,6 +76,38 @@ export async function seed(db: DB): Promise<{ seeded: boolean }> {
             relatedId: u.anchor, // child
           });
         }
+      }
+    }
+
+    // Name history. Every person gets a birth name; anyone with a recorded maiden
+    // surname (i.e. who changed their name) also gets a current/married name row,
+    // linked to the marriage that caused it — exercising the name-change timeline.
+    // Inserted after the spouse rows above so the relationship FK resolves.
+    for (const p of Object.values(people)) {
+      const birthSurname = p.maiden ?? p.surname;
+      await tx.insert(schema.personName).values({
+        id: `pn_${p.id}_birth`,
+        personId: p.id,
+        given: p.given,
+        surname: birthSurname,
+        effectiveDate: p.born != null ? String(p.born) : null,
+        effectiveYear: p.born,
+        reason: "birth",
+        ordinal: 0,
+      });
+      if (p.maiden && p.maiden !== p.surname) {
+        const sp = spouseByPerson.get(p.id);
+        await tx.insert(schema.personName).values({
+          id: `pn_${p.id}_married`,
+          personId: p.id,
+          given: p.given,
+          surname: p.surname,
+          effectiveDate: sp?.married ?? null,
+          effectiveYear: parsePartialDate(sp?.married ?? null)?.year ?? null,
+          reason: "marriage",
+          relationshipId: sp?.relId ?? null,
+          ordinal: 1,
+        });
       }
     }
 

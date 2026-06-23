@@ -18,10 +18,19 @@ import {
   Textarea,
 } from "@family-archive/ui";
 import type { ProvenanceStatus, PartialDate, SourceOption } from "@family-archive/ui";
-import { fullName, lifeDates, relationsOf, sourceOptions, type Person } from "@/lib/family-data";
+import {
+  fullName,
+  lifeDates,
+  relationsOf,
+  sortNames,
+  sourceOptions,
+  NAME_REASON_LABEL,
+  type NameReason,
+  type Person,
+} from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import { serializePartialDate, parsePartialDate } from "@/lib/dates";
-import { createPerson, updatePerson, type RelationDraft, type RelationOp } from "@/lib/actions";
+import { createPerson, updatePerson, type NameDraft, type RelationDraft, type RelationOp } from "@/lib/actions";
 import { Icon } from "./Icon";
 import { MiniNode } from "./shared";
 import type { Screen } from "./AppShell";
@@ -118,6 +127,136 @@ function RelRow({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** One later name (a name change) being drafted in the form. */
+interface NameRowState {
+  /** Stable React key, local to the form. */
+  key: string;
+  /** Existing `person_name` id (preserved across edits), or null for a new name. */
+  id: string | null;
+  given: string;
+  surname: string;
+  /** When this name took effect. */
+  date: PartialDate | null;
+  reason: NameReason;
+  /** Encoded link to the causing event: "none" | `marriage:<relId>` | `event:<eventId>`. */
+  cause: string;
+  /** Source document id, or "". */
+  source: string;
+  prov: ProvenanceStatus;
+  note: string;
+}
+
+let nameKeySeq = 0;
+const newNameRow = (): NameRowState => ({
+  key: `name-${nameKeySeq++}`,
+  id: null,
+  given: "",
+  surname: "",
+  date: null,
+  reason: "marriage",
+  cause: "none",
+  source: "",
+  prov: "unverified",
+  note: "",
+});
+
+const NAME_REASON_CHOICES: NameReason[] = [
+  "marriage",
+  "immigration",
+  "naturalization",
+  "religious",
+  "personal",
+  "other",
+];
+const PROV_CHOICES: ProvenanceStatus[] = ["unverified", "verified", "estimated", "disputed"];
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+
+/**
+ * One row of the Names editor: a full given+surname pair the person took on, with
+ * its effective date, reason, the event that caused it, a cited source, and
+ * confidence. Module-scoped (like RelRow) so React keeps it mounted across the
+ * parent's re-renders. Inputs are controlled — their value lives in NameRowState.
+ */
+function NameRow({
+  row,
+  causeOptions,
+  mediaOptions,
+  onUpdate,
+  onRemove,
+}: {
+  row: NameRowState;
+  causeOptions: { value: string; label: string }[];
+  mediaOptions: { id: string; title: string }[];
+  onUpdate: (patch: Partial<NameRowState>) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gap: "var(--space-sm)",
+        padding: "var(--space-md)",
+        border: "1px solid var(--color-border)",
+        borderRadius: "var(--radius-md)",
+      }}
+    >
+      <div className="app-field-row" style={{ alignItems: "flex-end" }}>
+        <div style={{ flex: 1 }}>
+          <Input label="Given names" placeholder="e.g. Eleanor Margaret" value={row.given} onChange={(e) => onUpdate({ given: e.target.value })} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <Input label="Surname" placeholder="e.g. Reed" value={row.surname} onChange={(e) => onUpdate({ surname: e.target.value })} />
+        </div>
+        <Button type="button" variant="ghost" size="sm" iconStart={<Icon name="close" size={16} />} aria-label="Remove name" onClick={onRemove} />
+      </div>
+      <div className="app-field-row" style={{ alignItems: "flex-end" }}>
+        <div style={{ flex: 1 }}>
+          <DateField label="Took effect" value={row.date} onChange={(d) => onUpdate({ date: d })} />
+        </div>
+        <div style={{ width: 180, flex: "none" }}>
+          <Select label="Reason" value={row.reason} onChange={(e) => onUpdate({ reason: e.target.value as NameReason })}>
+            {NAME_REASON_CHOICES.map((r) => (
+              <option key={r} value={r}>
+                {NAME_REASON_LABEL[r]}
+              </option>
+            ))}
+          </Select>
+        </div>
+      </div>
+      <div className="app-field-row" style={{ alignItems: "flex-end" }}>
+        <div style={{ flex: 1 }}>
+          <Select label="Linked to (optional)" value={row.cause} onChange={(e) => onUpdate({ cause: e.target.value })}>
+            {causeOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div style={{ flex: 1 }}>
+          <Select label="Source document (optional)" value={row.source} onChange={(e) => onUpdate({ source: e.target.value })}>
+            <option value="">No source on file</option>
+            {mediaOptions.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.title}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div style={{ width: 150, flex: "none" }}>
+          <Select label="Confidence" value={row.prov} onChange={(e) => onUpdate({ prov: e.target.value as ProvenanceStatus })}>
+            {PROV_CHOICES.map((s) => (
+              <option key={s} value={s}>
+                {cap(s)}
+              </option>
+            ))}
+          </Select>
+        </div>
+      </div>
     </div>
   );
 }
@@ -224,12 +363,31 @@ export function AddPerson({
   onNavigate: (screen: Screen, personId?: string) => void;
   onToast: (message: string) => void;
 }) {
-  const { media, people, graph, relationships } = useDataset();
+  const { media, people, graph, relationships, events } = useDataset();
   const router = useRouter();
   const person = editId ? people[editId] ?? null : null;
   const isEdit = Boolean(editId);
   const [prov, setProv] = useState<Record<string, ProvState>>(() => initialProv(person));
   const [bornDate, setBornDate] = useState<PartialDate | null>(person?.bornDate ?? null);
+
+  // The Identity card edits the *birth* name (the first in the person's history);
+  // the Names section below manages every later name. Seed both from person.names.
+  const sortedNames = useMemo(() => (person ? sortNames(person.names ?? []) : []), [person]);
+  const birth = sortedNames[0] ?? null;
+  const [names, setNames] = useState<NameRowState[]>(() =>
+    sortedNames.slice(1).map((n) => ({
+      key: `name-${nameKeySeq++}`,
+      id: n.id,
+      given: n.given,
+      surname: n.surname,
+      date: n.date,
+      reason: n.reason === "birth" ? "other" : n.reason,
+      cause: n.relationshipId ? `marriage:${n.relationshipId}` : n.eventId ? `event:${n.eventId}` : "none",
+      source: n.source?.id ?? "",
+      prov: n.prov,
+      note: n.note ?? "",
+    })),
+  );
   const [diedDate, setDiedDate] = useState<PartialDate | null>(person?.diedDate ?? null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   // Editing starts with a blank slate (you add connections as needed); adding a
@@ -346,6 +504,54 @@ export function AddPerson({
     }
     return out;
   })();
+  // Events a name change can attach to: this person's marriages (by edge id) and
+  // their stored events (immigration, …). Only available when editing — a brand-new
+  // person has no persisted edges/events yet to link to.
+  const causeOptions = useMemo(() => {
+    const opts = [{ value: "none", label: "— Not linked to an event —" }];
+    if (!editId) return opts;
+    for (const r of relationships) {
+      if (r.kind === "spouse" && (r.personId === editId || r.relatedId === editId)) {
+        const otherId = r.personId === editId ? r.relatedId : r.personId;
+        const other = people[otherId];
+        opts.push({ value: `marriage:${r.id}`, label: `Marriage${other ? ` to ${fullName(other)}` : ""}` });
+      }
+    }
+    for (const ev of events) {
+      if (!ev.auto && ev.id.startsWith("ev-") && ev.people.includes(editId)) {
+        opts.push({ value: `event:${ev.id.slice(3)}`, label: ev.title });
+      }
+    }
+    return opts;
+  }, [relationships, events, people, editId]);
+  const mediaOptions = useMemo(() => media.map((m) => ({ id: m.id, title: m.title })), [media]);
+
+  const updateName = (key: string, patch: Partial<NameRowState>) =>
+    setNames((ns) => ns.map((n) => (n.key === key ? { ...n, ...patch } : n)));
+  const removeName = (key: string) => setNames((ns) => ns.filter((n) => n.key !== key));
+  const addName = () => setNames((ns) => [...ns, newNameRow()]);
+
+  // Only rows with both name parts filled are submitted; ordinal 0 is the birth
+  // name (composed server-side from the Identity fields), so these start at 1.
+  const nameDrafts: NameDraft[] = names
+    .filter((n) => n.given.trim() && n.surname.trim())
+    .map((n, i) => {
+      const [kind, cid] = n.cause === "none" ? ["none", null] : n.cause.split(":");
+      return {
+        id: n.id,
+        given: n.given.trim(),
+        surname: n.surname.trim(),
+        effectiveDate: serializePartialDate(n.date),
+        reason: n.reason,
+        causeRelationshipId: kind === "marriage" ? cid : null,
+        causeEventId: kind === "event" ? cid : null,
+        mediaId: n.source || null,
+        prov: n.prov,
+        note: n.note.trim() || null,
+        ordinal: i + 1,
+      };
+    });
+
   const stOf = (k: string): ProvenanceStatus => prov[k]?.status ?? "unverified";
   const setP = (k: string, status: ProvenanceStatus, source?: string) =>
     setProv((s) => ({ ...s, [k]: { status, source } }));
@@ -444,6 +650,7 @@ export function AddPerson({
           <input type="hidden" name="deathDate" value={serializePartialDate(diedDate) ?? ""} />
           <input type="hidden" name="relationships" value={JSON.stringify(relationDrafts)} />
           <input type="hidden" name="relationshipOps" value={JSON.stringify(relationshipOps)} />
+          <input type="hidden" name="names" value={JSON.stringify(nameDrafts)} />
           {errors.form && (
             <div
               role="alert"
@@ -466,15 +673,15 @@ export function AddPerson({
           <div style={{ display: "grid", gap: "var(--space-xl)" }}>
             <Card title="Identity">
               <div className="app-muted" style={{ fontSize: "var(--text-body-sm)", marginBottom: "var(--space-md)" }}>
-                Tap the mark by any field to set its confidence — verified (cite a source), estimated, or disputed.
+                The name recorded at birth. Later names — taken at marriage, immigration, or by choice — go in
+                “Names &amp; name changes” below. Tap a confidence mark to record how sure you are.
               </div>
               <div style={{ display: "grid", gap: "var(--space-lg)" }}>
                 <div className="app-field-row">
-                  <ProvField label="Given names" placeholder="e.g. Eleanor Margaret" required defaultValue={person?.given} {...provProps("given")} />
-                  <ProvField label="Surname" placeholder="e.g. Clarke" required defaultValue={person?.surname} {...provProps("surname")} />
+                  <ProvField label="Given names" placeholder="e.g. Eleanor Margaret" required defaultValue={birth?.given ?? person?.given} {...provProps("given")} />
+                  <ProvField label="Surname at birth" placeholder="e.g. Clarke" required defaultValue={birth?.surname ?? person?.surname} {...provProps("surname")} />
                 </div>
                 <div className="app-field-row" style={{ alignItems: "flex-end" }}>
-                  <ProvField label="Maiden name (optional)" placeholder="e.g. Hartley" defaultValue={person?.maiden ?? undefined} {...provProps("maiden")} />
                   <div style={{ width: 160, flex: "none" }}>
                     <Select label="Sex" name="sex" defaultValue={person?.sex ?? ""} required error={errors.sex}>
                       <option value="">—</option>
@@ -525,6 +732,30 @@ export function AddPerson({
                     </div>
                     <ProvField label="Place" placeholder="City, country" defaultValue={person?.diedPlace ?? undefined} {...provProps("deathPlace")} />
                   </div>
+                </div>
+              </div>
+            </Card>
+
+            <Card title="Names &amp; name changes">
+              <div className="app-muted" style={{ fontSize: "var(--text-body-sm)", marginBottom: "var(--space-md)" }}>
+                Record every name this person was known by after birth — each becomes a dated entry on their
+                timeline. Link one to the marriage or event that caused it and it shows nested inside that event.
+              </div>
+              <div style={{ display: "grid", gap: "var(--space-md)" }}>
+                {names.map((row) => (
+                  <NameRow
+                    key={row.key}
+                    row={row}
+                    causeOptions={causeOptions}
+                    mediaOptions={mediaOptions}
+                    onUpdate={(patch) => updateName(row.key, patch)}
+                    onRemove={() => removeName(row.key)}
+                  />
+                ))}
+                <div>
+                  <Button type="button" variant="ghost" size="sm" iconStart={<Icon name="plus" size={16} />} onClick={addName}>
+                    Add a name
+                  </Button>
                 </div>
               </div>
             </Card>

@@ -14,8 +14,9 @@ import { revalidatePath } from "next/cache";
 import { and, eq, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/db/client";
-import { person, relationship, event, eventPerson } from "@/db/schema";
-import { provStatuses } from "./prov";
+import { person, personName, relationship, event, eventPerson, media } from "@/db/schema";
+import { provStatuses, type ProvStatus } from "./prov";
+import { sortNames, type NameReason } from "./family-data";
 import { parsePartialDate, serializePartialDate } from "./dates";
 import { indexPerson } from "./search/index-doc";
 
@@ -118,9 +119,11 @@ const partialDateFromString = z
   .catch(null);
 
 const createPersonSchema = z.object({
+  // given/surname are the *birth* name (the first name in the person's history);
+  // later names live in `person_name`, edited via the form's Names section. The
+  // current-name cache on `person` is recomputed from the whole history on save.
   given: z.string().trim().min(1, "Given names are required"),
   surname: z.string().trim().min(1, "A surname is required"),
-  maiden: optionalText,
   sex: z.enum(["f", "m", "o"], { message: "Select a sex" }),
   birthDate: partialDateFromString,
   bornPlace: optionalText,
@@ -374,7 +377,6 @@ function personFieldsFromForm(formData: FormData) {
   return {
     given: formData.get("given") ?? "",
     surname: formData.get("surname") ?? "",
-    maiden: formData.get("maiden") ?? "",
     sex: formData.get("sex") ?? "",
     birthDate: formData.get("birthDate") ?? "",
     bornPlace: formData.get("birthPlace") ?? "",
@@ -397,12 +399,15 @@ function mapPersonErrors(error: z.ZodError): Record<string, string> {
   return errors;
 }
 
-/** Map validated person data onto the `person` table's column shape. */
+/**
+ * Map validated person data onto the `person` table's column shape. `given`/
+ * `surname` here are the birth name; `maiden` is owned by syncPersonNames (it
+ * derives née from the name history), so it isn't written here.
+ */
 function personColumns(data: z.infer<typeof createPersonSchema>) {
   return {
     given: data.given,
     surname: data.surname,
-    maiden: data.maiden,
     sex: data.sex,
     bornYear: data.birthDate?.year ?? null,
     bornDate: serializePartialDate(data.birthDate),
@@ -413,6 +418,199 @@ function personColumns(data: z.infer<typeof createPersonSchema>) {
     living: data.living,
     notes: data.notes,
   };
+}
+
+// ── Names ─────────────────────────────────────────────────────────────────────
+// A person's name history lives in `person_name`. The form submits the *later*
+// names (the birth name comes from the Identity fields); syncPersonNames is the
+// single chokepoint that reconciles the rows and rewrites the current-name cache
+// on `person`, so the graph node / record header / search never fall out of sync.
+
+const NAME_REASON_VALUES = [
+  "birth",
+  "marriage",
+  "immigration",
+  "naturalization",
+  "religious",
+  "personal",
+  "other",
+] as const;
+
+/** One name the form drafts (a `person_name` row to upsert). */
+export type NameDraft = {
+  /** Existing row id (preserved across edits), or null/absent for a new name. */
+  id?: string | null;
+  given: string;
+  surname: string;
+  /** Canonical partial-date string when this name took effect, or null. */
+  effectiveDate?: string | null;
+  reason: NameReason;
+  /** Optional causing event — at most one is set. */
+  causeRelationshipId?: string | null;
+  causeEventId?: string | null;
+  mediaId?: string | null;
+  prov?: string;
+  note?: string | null;
+  ordinal?: number;
+};
+
+const nameDraftSchema = z
+  .array(
+    z.object({
+      id: z
+        .string()
+        .nullish()
+        .transform((v) => v ?? null),
+      given: z.string().trim().min(1),
+      surname: z.string().trim().min(1),
+      effectiveDate: z
+        .string()
+        .nullish()
+        .transform((v) => serializePartialDate(parsePartialDate(v ?? null))),
+      reason: z.enum(NAME_REASON_VALUES).catch("other"),
+      causeRelationshipId: z
+        .string()
+        .nullish()
+        .transform((v) => (v && v.length ? v : null)),
+      causeEventId: z
+        .string()
+        .nullish()
+        .transform((v) => (v && v.length ? v : null)),
+      mediaId: z
+        .string()
+        .nullish()
+        .transform((v) => (v && v.length ? v : null)),
+      prov: z.enum(provStatuses).catch("unverified"),
+      note: optionalText,
+      ordinal: z
+        .number()
+        .nullish()
+        .transform((v) => v ?? undefined),
+    }),
+  )
+  .catch([]);
+
+function parseNames(raw: FormDataEntryValue | null): NameDraft[] {
+  if (typeof raw !== "string" || !raw.length) return [];
+  try {
+    return nameDraftSchema.parse(JSON.parse(raw));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Reconcile a person's `person_name` rows to exactly `drafts` (upsert by id,
+ * insert new, delete the rest), then rewrite the current-name cache on `person`
+ * (given/surname = the most recent name; maiden = the birth surname when it
+ * differs). This is the ONLY writer of that cache — every name mutation flows
+ * through here, so the cache can never drift from the history.
+ *
+ * `drafts` must be ordered earliest → latest (birth first); the caller composes
+ * the birth name from the Identity fields and appends the form's later names.
+ */
+async function syncPersonNames(db: DB, personId: string, drafts: NameDraft[]): Promise<void> {
+  if (drafts.length === 0) return;
+
+  const existing = await db
+    .select({ id: personName.id })
+    .from(personName)
+    .where(eq(personName.personId, personId));
+  const existingIds = new Set(existing.map((r) => r.id));
+
+  // Validate optional FK references so a stale/tampered id can't break the insert.
+  const relIds = [...new Set(drafts.map((d) => d.causeRelationshipId).filter((x): x is string => !!x))];
+  const evIds = [...new Set(drafts.map((d) => d.causeEventId).filter((x): x is string => !!x))];
+  const medIds = [...new Set(drafts.map((d) => d.mediaId).filter((x): x is string => !!x))];
+  const validRel = relIds.length
+    ? new Set((await db.select({ id: relationship.id }).from(relationship).where(inArray(relationship.id, relIds))).map((r) => r.id))
+    : new Set<string>();
+  const validEv = evIds.length
+    ? new Set((await db.select({ id: event.id }).from(event).where(inArray(event.id, evIds))).map((r) => r.id))
+    : new Set<string>();
+  const validMed = medIds.length
+    ? new Set((await db.select({ id: media.id }).from(media).where(inArray(media.id, medIds))).map((r) => r.id))
+    : new Set<string>();
+
+  const kept = new Set<string>();
+  const rows = drafts.map((d, idx) => {
+    const id = d.id && existingIds.has(d.id) ? d.id : randomUUID();
+    kept.add(id);
+    const date = parsePartialDate(d.effectiveDate ?? null);
+    return {
+      id,
+      personId,
+      given: d.given.trim(),
+      surname: d.surname.trim(),
+      effectiveDate: serializePartialDate(date),
+      effectiveYear: date?.year ?? null,
+      reason: ((NAME_REASON_VALUES as readonly string[]).includes(d.reason) ? d.reason : "other") as NameReason,
+      relationshipId: d.causeRelationshipId && validRel.has(d.causeRelationshipId) ? d.causeRelationshipId : null,
+      eventId: d.causeEventId && validEv.has(d.causeEventId) ? d.causeEventId : null,
+      mediaId: d.mediaId && validMed.has(d.mediaId) ? d.mediaId : null,
+      prov: ((provStatuses as readonly string[]).includes(d.prov ?? "") ? d.prov : "unverified") as ProvStatus,
+      note: d.note ?? null,
+      ordinal: d.ordinal ?? idx,
+    };
+  });
+
+  const toDelete = [...existingIds].filter((id) => !kept.has(id));
+  if (toDelete.length > 0) await db.delete(personName).where(inArray(personName.id, toDelete));
+
+  for (const row of rows) {
+    if (existingIds.has(row.id)) {
+      await db.update(personName).set(row).where(eq(personName.id, row.id));
+    } else {
+      await db.insert(personName).values(row);
+    }
+  }
+
+  // Recompute the cache from the freshly-written set (same sort as the read model).
+  const sorted = sortNames(
+    rows.map((r) => ({
+      id: r.id,
+      given: r.given,
+      surname: r.surname,
+      date: parsePartialDate(r.effectiveDate),
+      reason: r.reason as NameReason,
+      relationshipId: r.relationshipId,
+      eventId: r.eventId,
+      source: null,
+      prov: "unverified" as const,
+      note: r.note,
+      ordinal: r.ordinal,
+    })),
+  );
+  const current = sorted[sorted.length - 1];
+  const birth = sorted[0];
+  if (current) {
+    const maiden = birth && birth.surname !== current.surname ? birth.surname : null;
+    await db
+      .update(person)
+      .set({ given: current.given, surname: current.surname, maiden })
+      .where(eq(person.id, personId));
+  }
+}
+
+/** Compose the full name history from the validated birth name + the form's later names. */
+function composeNameDrafts(
+  data: z.infer<typeof createPersonSchema>,
+  later: NameDraft[],
+): NameDraft[] {
+  const birth: NameDraft = {
+    id: null,
+    given: data.given,
+    surname: data.surname,
+    effectiveDate: serializePartialDate(data.birthDate),
+    reason: "birth",
+    causeRelationshipId: null,
+    causeEventId: null,
+    mediaId: null,
+    prov: "unverified",
+    note: null,
+    ordinal: 0,
+  };
+  return [birth, ...later.map((d, i) => ({ ...d, ordinal: i + 1 }))];
 }
 
 export async function createPerson(formData: FormData): Promise<CreatePersonResult> {
@@ -430,6 +628,11 @@ export async function createPerson(formData: FormData): Promise<CreatePersonResu
   });
 
   const { unlinkedSiblings } = await persistRelationships(db, id, relationships);
+
+  // Record the name history (birth name + any later names), which also rewrites
+  // the current-name cache. Runs after relationships so a name change linked to an
+  // existing marriage resolves; links to brand-new edges drafted here are dropped.
+  await syncPersonNames(db, id, composeNameDrafts(parsed.data, parseNames(formData.get("names"))));
 
   // Best-effort: index the new person for search. A failure here (embedding
   // server down, etc.) must never fail the create — the boot/`db:reindex`
@@ -602,6 +805,10 @@ export async function updatePerson(
     id,
     parseRelationships(formData.get("relationships")),
   );
+
+  // Reconcile the name history (birth name from the Identity fields + later names),
+  // which also rewrites the current-name cache the person UPDATE above seeded.
+  await syncPersonNames(db, id, composeNameDrafts(parsed.data, parseNames(formData.get("names"))));
 
   // Best-effort re-index so edits to names/places/notes surface in search.
   try {

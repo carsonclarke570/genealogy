@@ -131,6 +131,20 @@ function EventRow({
               Edit
             </button>
           )}
+          {ev.nested && ev.nested.length > 0 && (
+            <span style={{ flexBasis: "100%", display: "grid", gap: 2, marginTop: 2 }}>
+              {ev.nested.map((n) => (
+                <span
+                  key={n.id}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "var(--text-body-sm)", color: "var(--color-muted)" }}
+                >
+                  <Icon name="edit" size={12} />
+                  {n.title}
+                  <ProvenanceMark status={n.prov} source={n.prov === "verified" ? n.source?.title : undefined} size={12} />
+                </span>
+              ))}
+            </span>
+          )}
         </>
       }
     />

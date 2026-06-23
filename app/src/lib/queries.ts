@@ -11,7 +11,8 @@ import "server-only";
 import { z } from "zod";
 import { getDb } from "@/db/client";
 import * as schema from "@/db/schema";
-import type { Person, MediaItem, Dataset, EventType } from "./family-data";
+import type { Person, MediaItem, Dataset, EventType, NameReason } from "./family-data";
+import { assemblePersonNames } from "./family-data";
 import { buildFamilyGraph, type RelationshipEdge } from "./family-graph";
 import { buildTimeline, type StoredEvent } from "./timeline";
 import { provStatuses, type ProvStatus } from "./prov";
@@ -49,6 +50,7 @@ export async function getDataset(): Promise<Dataset> {
   const links = await db.select().from(schema.personMedia);
   const eventRows = await db.select().from(schema.event);
   const eventLinks = await db.select().from(schema.eventPerson);
+  const nameRows = await db.select().from(schema.personName);
 
   // Real attached-media count per person, derived from the link table.
   const mediaCountByPerson = new Map<string, number>();
@@ -56,15 +58,40 @@ export async function getDataset(): Promise<Dataset> {
     mediaCountByPerson.set(l.personId, (mediaCountByPerson.get(l.personId) ?? 0) + 1);
   }
 
+  // Names: the per-person history, with cited sources resolved from media rows.
+  const mediaById = new Map(mediaRows.map((m) => [m.id, { id: m.id, title: m.title, type: m.type }]));
+  const namesByPerson = assemblePersonNames(
+    nameRows.map((r) => ({
+      id: r.id,
+      personId: r.personId,
+      given: r.given,
+      surname: r.surname,
+      effectiveDate: r.effectiveDate,
+      reason: r.reason as NameReason,
+      relationshipId: r.relationshipId,
+      eventId: r.eventId,
+      mediaId: r.mediaId,
+      prov: ((provStatuses as readonly string[]).includes(r.prov) ? r.prov : "unverified") as ProvStatus,
+      note: r.note,
+      ordinal: r.ordinal,
+    })),
+    mediaById,
+  );
+
   const people: Record<string, Person> = {};
   for (const r of personRows) {
     const bornDate = parsePartialDate(r.bornDate);
     const diedDate = parsePartialDate(r.diedDate);
+    const names = namesByPerson.get(r.id) ?? [];
+    // Re-derive the current-name cache on read as a safety net, so a stale
+    // person.given/surname can never surface a name the history doesn't hold.
+    const current = names.length > 0 ? names[names.length - 1] : null;
     people[r.id] = {
       id: r.id,
-      given: r.given,
-      surname: r.surname,
+      given: current?.given ?? r.given,
+      surname: current?.surname ?? r.surname,
       maiden: r.maiden,
+      names,
       sex: r.sex,
       born: bornDate?.year ?? r.bornYear,
       bornDate,

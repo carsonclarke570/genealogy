@@ -23,6 +23,8 @@ import {
   provSourceOf,
   provSummary,
   relationsOf,
+  sortNames,
+  NAME_REASON_LABEL,
   type Person,
   type Relation,
   type MediaItem,
@@ -166,6 +168,38 @@ export function PersonRecord({
     ) : null;
 
   const bio = bioParas(p);
+  // The full name history (earliest → latest). Shown only when there's a change
+  // to surface — a single birth name is already the record's headline.
+  const nameHistory = sortNames(p.names ?? []);
+  const NamesBlock =
+    nameHistory.length > 1 ? (
+      <div>
+        <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
+          Names
+        </div>
+        <div style={{ display: "grid", gap: "var(--space-sm)" }}>
+          {nameHistory.map((n, i) => {
+            const date = formatPartialDate(n.date ?? null);
+            return (
+              <div key={n.id} style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", flexWrap: "wrap" }}>
+                <span style={{ fontFamily: "var(--font-serif)", fontSize: "var(--text-body)", color: "var(--color-ink)" }}>
+                  {n.given} {n.surname}
+                </span>
+                <Chip dot={undefined} selected={i === nameHistory.length - 1}>
+                  {NAME_REASON_LABEL[n.reason]}
+                </Chip>
+                {date && (
+                  <span className="app-muted tnum" style={{ fontSize: "var(--text-body-sm)" }}>
+                    {date}
+                  </span>
+                )}
+                <ProvenanceMark status={n.prov} source={n.prov === "verified" ? n.source?.title : undefined} size={13} />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    ) : null;
   const Overview = (
     <div style={{ display: "grid", gap: "var(--space-2xl)", paddingTop: "var(--space-lg)" }}>
       <div>
@@ -189,6 +223,7 @@ export function PersonRecord({
           ))}
         </div>
       </div>
+      {NamesBlock}
       {EventStrip}
       <div className="app-grid-rels">
         <RelGroup title="Parents" items={rel.parents} />

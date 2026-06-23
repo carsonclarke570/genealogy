@@ -14,7 +14,7 @@ import type { Person, MediaItem } from "@/lib/family-data";
 // Seed-authoring shapes omit fields the read model *derives* at query time
 // (`mediaCount`) or that only exist once a real file is uploaded (`mimeType`,
 // `hasFile`) — the seed leaves the media file columns null.
-type SeedPerson = Omit<Person, "mediaCount">;
+type SeedPerson = Omit<Person, "mediaCount" | "names">;
 type SeedMedia = Omit<MediaItem, "mimeType" | "hasFile" | "description">;
 
 /**

@@ -7,7 +7,7 @@ import {
   yearSpan,
   type StoredEvent,
 } from "./timeline";
-import type { Person, MediaItem } from "./family-data";
+import type { Person, MediaItem, PersonName } from "./family-data";
 import type { RelationshipEdge } from "./family-graph";
 
 // ── factories ──────────────────────────────────────────────────────────────
@@ -28,6 +28,7 @@ const person = (id: string, over: Partial<Person> = {}): Person => ({
   docs: {},
   mediaCount: over.mediaCount ?? 0,
   prov: over.prov,
+  names: over.names ?? [],
   ...over,
 });
 
@@ -68,6 +69,20 @@ const stored = (over: Partial<StoredEvent> = {}): StoredEvent => ({
   prov: over.prov ?? "unverified",
   mediaId: over.mediaId ?? null,
   people: over.people ?? [],
+});
+
+const pname = (id: string, surname: string, over: Partial<PersonName> = {}): PersonName => ({
+  id,
+  given: over.given ?? "Meg",
+  surname,
+  date: over.date ?? null,
+  reason: over.reason ?? "birth",
+  relationshipId: over.relationshipId ?? null,
+  eventId: over.eventId ?? null,
+  source: over.source ?? null,
+  prov: over.prov ?? "unverified",
+  note: over.note ?? null,
+  ordinal: over.ordinal ?? 0,
 });
 
 const empty = { people: {}, relationships: [], media: [], events: [] as StoredEvent[] };
@@ -174,6 +189,81 @@ describe("buildTimeline — stored events", () => {
     expect(stored1.type).toBe("immigration");
     expect(stored1.auto).toBe(false);
     expect(eventsOf(evs, "tom").map((x) => x.id)).toContain("ev-imm1");
+  });
+});
+
+describe("buildTimeline — name changes", () => {
+  it("emits no event for a person with only their birth name", () => {
+    const p = person("meg", { born: 1946, names: [pname("n0", "Bain", { date: { precision: "year", year: 1946, month: null, day: null }, ordinal: 0 })] });
+    const evs = buildTimeline({ ...empty, people: peopleMap(p) });
+    expect(evs.some((e) => e.type === "namechange")).toBe(false);
+  });
+
+  it("emits a standalone namechange for an unlinked later name", () => {
+    const p = person("meg", {
+      born: 1946,
+      names: [
+        pname("n0", "Bain", { given: "Meg", date: { precision: "year", year: 1946, month: null, day: null }, ordinal: 0 }),
+        pname("n1", "Reed", { given: "Meg", reason: "marriage", date: { precision: "year", year: 1969, month: null, day: null }, ordinal: 1 }),
+      ],
+    });
+    const evs = buildTimeline({ ...empty, people: peopleMap(p) });
+    const nm = evs.find((e) => e.id === "nm-n1")!;
+    expect(nm.type).toBe("namechange");
+    expect(nm.title).toBe("Meg Bain became Meg Reed");
+    expect(fmtDate(nm)).toBe("1969");
+    expect(eventsOf(evs, "meg").map((e) => e.id)).toContain("nm-n1");
+  });
+
+  it("nests a marriage-linked name change inside the marriage event (no standalone)", () => {
+    const p = person("meg", {
+      born: 1946,
+      names: [
+        pname("n0", "Bain", { given: "Meg", date: { precision: "year", year: 1946, month: null, day: null }, ordinal: 0 }),
+        pname("n1", "Reed", { given: "Meg", reason: "marriage", relationshipId: "R1", date: { precision: "year", year: 1969, month: null, day: null }, ordinal: 1 }),
+      ],
+    });
+    const q = person("don", { born: 1944 });
+    const evs = buildTimeline({
+      ...empty,
+      people: peopleMap(p, q),
+      relationships: [spouse("meg", "don", { id: "R1", marriedDate: "1969" })],
+    });
+    // no standalone namechange row…
+    expect(evs.some((e) => e.id === "nm-n1")).toBe(false);
+    // …it hangs nested under the marriage event instead
+    const marriage = evs.find((e) => e.id === "m-don__meg")!;
+    expect(marriage.nested?.map((n) => n.id)).toEqual(["nm-n1"]);
+    expect(marriage.nested?.[0].title).toBe("Meg Bain became Meg Reed");
+  });
+
+  it("nests an event-linked name change inside the stored event", () => {
+    const p = person("tom", {
+      born: 1888,
+      names: [
+        pname("n0", "Schmidt", { given: "Tom", date: { precision: "year", year: 1888, month: null, day: null }, ordinal: 0 }),
+        pname("n1", "Smith", { given: "Tom", reason: "immigration", eventId: "imm1", date: { precision: "month", year: 1911, month: 4, day: null }, ordinal: 1 }),
+      ],
+    });
+    const e = stored({ id: "imm1", type: "immigration", title: "Sailed for America", date: "1911-04", people: ["tom"] });
+    const evs = buildTimeline({ ...empty, people: peopleMap(p), events: [e] });
+    expect(evs.some((e) => e.id === "nm-n1")).toBe(false);
+    const imm = evs.find((e) => e.id === "ev-imm1")!;
+    expect(imm.nested?.map((n) => n.id)).toEqual(["nm-n1"]);
+  });
+
+  it("falls back to standalone when the linked event was not emitted", () => {
+    // marriage with no date emits no marriage event, so the name change must not vanish
+    const p = person("meg", {
+      born: 1946,
+      names: [
+        pname("n0", "Bain", { given: "Meg", date: { precision: "year", year: 1946, month: null, day: null }, ordinal: 0 }),
+        pname("n1", "Reed", { given: "Meg", reason: "marriage", relationshipId: "R1", date: { precision: "year", year: 1969, month: null, day: null }, ordinal: 1 }),
+      ],
+    });
+    const q = person("don", { born: 1944 });
+    const evs = buildTimeline({ ...empty, people: peopleMap(p, q), relationships: [spouse("meg", "don", { id: "R1" })] });
+    expect(evs.some((e) => e.id === "nm-n1")).toBe(true);
   });
 });
 
