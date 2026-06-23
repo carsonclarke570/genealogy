@@ -9,13 +9,15 @@ import {
   Dialog,
   IconBadge,
   Input,
+  LocationField,
   MultiSelect,
   Select,
 } from "@family-archive/ui";
-import type { PartialDate, ProvenanceStatus } from "@family-archive/ui";
+import type { LocationValue, PartialDate, ProvenanceStatus } from "@family-archive/ui";
 import { fullName, lifeDates, type TimelineEvent } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import { serializePartialDate } from "@/lib/dates";
+import { locationFromLabel, locationLabel } from "@/lib/locations";
 import { provStatuses } from "@/lib/prov";
 import { EVENT_META, STORED_EVENT_TYPES, meta } from "@/lib/timeline";
 import { createEvent, updateEvent, deleteEvent, type EventInput } from "@/lib/actions";
@@ -60,7 +62,7 @@ export function AddEventDialog({
   const [type, setType] = useState<string>("immigration");
   const [title, setTitle] = useState("");
   const [date, setDate] = useState<PartialDate | null>(null);
-  const [place, setPlace] = useState("");
+  const [place, setPlace] = useState<LocationValue | null>(null);
   const [prov, setProv] = useState<ProvenanceStatus>("unverified");
   const [mediaId, setMediaId] = useState<string>("");
   const [persons, setPersons] = useState<string[]>([]);
@@ -74,7 +76,7 @@ export function AddEventDialog({
       setType(editEvent.type);
       setTitle(editEvent.title);
       setDate(editEvent.date);
-      setPlace(editEvent.place ?? "");
+      setPlace(locationFromLabel(editEvent.place));
       setProv(editEvent.prov);
       setMediaId(editEvent.source?.id ?? "");
       setPersons(editEvent.people);
@@ -82,7 +84,7 @@ export function AddEventDialog({
       setType("immigration");
       setTitle("");
       setDate(null);
-      setPlace("");
+      setPlace(null);
       setProv("unverified");
       setMediaId("");
       setPersons(presetPersonId ? [presetPersonId] : []);
@@ -106,7 +108,7 @@ export function AddEventDialog({
         type,
         title,
         date: serializePartialDate(date),
-        place: place.trim() || null,
+        place: locationLabel(place) || null,
         prov,
         mediaId: mediaId || null,
         people: persons,
@@ -192,7 +194,17 @@ export function AddEventDialog({
             />
           </div>
           <div style={{ flex: 1 }}>
-            <Input label="Place" placeholder="City, country" value={place} onChange={(e) => setPlace(e.target.value)} />
+            <LocationField
+              label="Place"
+              placeholder="City, country"
+              value={place}
+              onChange={setPlace}
+              onSearch={(q) =>
+                fetch("/api/geocode?q=" + encodeURIComponent(q))
+                  .then((r) => r.json())
+                  .then((d) => d.suggestions)
+              }
+            />
           </div>
         </div>
 
