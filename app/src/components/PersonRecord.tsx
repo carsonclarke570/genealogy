@@ -14,7 +14,7 @@ import {
   Tabs,
 } from "@family-archive/ui";
 import type { ChipDot } from "@family-archive/ui";
-import { formatPartialDate } from "@family-archive/ui";
+import { formatPartialDate, formatLocation } from "@family-archive/ui";
 import {
   fullName,
   lifeDates,
@@ -23,10 +23,13 @@ import {
   provSourceOf,
   provSummary,
   relationsOf,
+  residencesOf,
+  residenceSpan,
   NAME_REASON_LABEL,
   type Person,
   type Relation,
   type MediaItem,
+  type Residence,
 } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import { eventsOf, fmtDate, meta } from "@/lib/timeline";
@@ -35,6 +38,7 @@ import { PersonTimeline } from "./Timeline";
 import { MiniNode, DocDot, MediaThumb, ClickableCard } from "./shared";
 import { MediaUpload } from "./MediaUpload";
 import { MediaDetail } from "./MediaDetail";
+import { AddResidenceDialog } from "./AddResidenceDialog";
 import type { Screen } from "./AppShell";
 
 function bioParas(p: Person): string[] {
@@ -89,12 +93,14 @@ export function PersonRecord({
   onNavigate: (screen: Screen) => void;
   onToast: (msg: string) => void;
 }) {
-  const { people, media: allMedia, graph, events: allEvents } = useDataset();
+  const { people, media: allMedia, graph, events: allEvents, residences: allResidences } = useDataset();
   const p = people[id];
   const [docFilter, setDocFilter] = useState<string>("all");
   const [tab, setTab] = useState<string>("overview");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [openMedia, setOpenMedia] = useState<MediaItem | null>(null);
+  // null = closed; { residence } where residence is null for "add" or a row to edit.
+  const [residenceEdit, setResidenceEdit] = useState<{ residence: Residence | null } | null>(null);
 
   // The person may be absent from the current dataset — most commonly in the
   // brief window after creating someone, before router.refresh() pulls the new
@@ -116,6 +122,7 @@ export function PersonRecord({
   const rel = relationsOf(graph, id);
   const media = allMedia.filter((m) => m.people.includes(id));
   const events = eventsOf(allEvents, id);
+  const residences = residencesOf(allResidences, id);
 
   const summary = provSummary(p);
 
@@ -284,6 +291,98 @@ export function PersonRecord({
     </div>
   );
 
+  const Residences = (
+    <div style={{ paddingTop: "var(--space-lg)" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "var(--space-md)",
+          marginBottom: "var(--space-lg)",
+        }}
+      >
+        <p className="app-muted" style={{ margin: 0, fontSize: "var(--text-body-sm)", maxWidth: "52ch" }}>
+          Where {p.given.split(" ")[0]} lived, and for how long. Each span carries its own provenance.
+        </p>
+        <span style={{ flex: "none" }}>
+          <Button
+            variant="secondary"
+            size="sm"
+            iconStart={<Icon name="plus" size={16} />}
+            onClick={() => setResidenceEdit({ residence: null })}
+          >
+            Add residence
+          </Button>
+        </span>
+      </div>
+
+      {residences.length === 0 ? (
+        <div className="app-muted" style={{ fontSize: "var(--text-body)" }}>
+          No residencies recorded yet.
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: "var(--space-sm)", maxWidth: "68ch" }}>
+          {residences.map((r) => {
+            const detail = formatLocation(r.location);
+            const secondary = detail && detail !== r.place.trim() ? detail : null;
+            return (
+              <div
+                key={r.id}
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "var(--space-md)",
+                  padding: "var(--space-md) 0",
+                  borderBottom: "1px solid var(--color-border)",
+                }}
+              >
+                <span style={{ flex: "none", paddingTop: 2, color: "var(--color-muted)" }}>
+                  <Icon name="pin" size={18} />
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", flexWrap: "wrap" }}>
+                    <span style={{ fontFamily: "var(--font-serif)", fontSize: "var(--text-body)", color: "var(--color-ink)" }}>
+                      {r.place}
+                    </span>
+                    <ProvenanceMark status={r.prov} source={r.source?.title} size={13} />
+                  </div>
+                  {secondary && (
+                    <div className="app-muted" style={{ fontSize: "var(--text-body-sm)", marginTop: 1 }}>
+                      {secondary}
+                    </div>
+                  )}
+                  {r.note && (
+                    <div style={{ fontSize: "var(--text-body-sm)", color: "var(--color-ink)", marginTop: 4, lineHeight: 1.45 }}>
+                      {r.note}
+                    </div>
+                  )}
+                </div>
+                <span
+                  className="app-muted tnum"
+                  style={{ flex: "none", fontSize: "var(--text-body-sm)", whiteSpace: "nowrap", paddingTop: 2 }}
+                >
+                  {residenceSpan(r)}
+                </span>
+                <span style={{ flex: "none" }}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconStart={<Icon name="edit" size={15} />}
+                    aria-label={`Edit residence in ${r.place}`}
+                    onClick={() => setResidenceEdit({ residence: r })}
+                  >
+                    Edit
+                  </Button>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
   const Notes = (
     <div style={{ paddingTop: "var(--space-lg)", display: "grid", gap: "var(--space-lg)", maxWidth: "68ch" }}>
       {(
@@ -439,6 +538,7 @@ export function PersonRecord({
                 label: `Timeline (${events.length})`,
                 content: <PersonTimeline id={id} onOpen={onOpen} onNavigate={onNavigate} />,
               },
+              { value: "residences", label: `Residences (${residences.length})`, content: Residences },
               { value: "documents", label: `Documents (${media.length})`, content: Documents },
               { value: "notes", label: "Notes (2)", content: Notes },
             ]}
@@ -453,6 +553,13 @@ export function PersonRecord({
         preselectPersonId={id}
       />
       <MediaDetail media={openMedia} onClose={() => setOpenMedia(null)} onOpen={onOpen} onToast={onToast} />
+      <AddResidenceDialog
+        open={residenceEdit !== null}
+        onClose={() => setResidenceEdit(null)}
+        personId={id}
+        editResidence={residenceEdit?.residence ?? null}
+        onSaved={onToast}
+      />
     </div>
   );
 }
