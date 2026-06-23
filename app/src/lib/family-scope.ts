@@ -236,7 +236,18 @@ export function detectLayoutConflicts(
     const [n0, n1] = u.partners.map((p) => layout.nodes[p]);
     if (!n0 || !n1 || n0.gen !== n1.gen) continue;
     if (Math.abs(n0.x - n1.x) > WIDE) {
-      out.push({ kind: "wide-union", candidates: [...u.partners, ...u.children] });
+      // What stretches a union wide is usually a partner pulled toward *another*
+      // spouse (a remarriage): the union's own slot can't sit adjacent because the
+      // partner is flanked by a competing union, forcing a sibling between them.
+      // The union's own partners/children may all be the focus's protected nuclear
+      // kin, so offering only them leaves resolveByLayout no one to fog. Add the
+      // competing spouses (each partner's *other* spouses) — fogging one collapses
+      // the remarriage and lets the row reflow adjacent.
+      const competing: string[] = [];
+      for (const p of u.partners) {
+        for (const s of graph.spouses[p] ?? []) if (!u.partners.includes(s.id)) competing.push(s.id);
+      }
+      out.push({ kind: "wide-union", candidates: [...u.partners, ...u.children, ...competing] });
     }
   }
 

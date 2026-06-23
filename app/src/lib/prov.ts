@@ -7,3 +7,11 @@
 export const provStatuses = ["verified", "unverified", "estimated", "disputed"] as const;
 
 export type ProvStatus = (typeof provStatuses)[number];
+
+/** Human label for each confidence level, for confidence selects across the UI. */
+export const PROV_LABEL: Record<ProvStatus, string> = {
+  verified: "Verified",
+  unverified: "Unverified",
+  estimated: "Estimated",
+  disputed: "Disputed",
+};

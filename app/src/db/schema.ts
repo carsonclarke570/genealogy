@@ -139,6 +139,50 @@ export const eventPerson = pgTable(
 );
 
 /**
+ * A name a person held, with the date it took effect — the durable source of
+ * truth for a person's name history. The birth name is the first row; the most
+ * recent is their current name (`person.given`/`surname`/`maiden` are kept as a
+ * denormalised cache of it, rewritten by the write path on every name change).
+ *
+ * A change can be linked to the event that caused it — a marriage (`relationshipId`)
+ * or a stored event such as immigration (`eventId`) — so the timeline renders it
+ * nested inside that event (lib/timeline.ts) rather than as a duplicate.
+ */
+export const personName = pgTable(
+  "person_name",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id")
+      .notNull()
+      .references(() => person.id, { onDelete: "cascade" }),
+    given: text("given").notNull(),
+    surname: text("surname").notNull(),
+    // Canonical partial-date string ("YYYY" / "YYYY-MM" / "YYYY-MM-DD") for when
+    // this name took effect, plus the derived 4-digit year for sort — mirrors
+    // person.bornDate/bornYear. Null when unknown (sorts as the most recent).
+    effectiveDate: text("effective_date"),
+    effectiveYear: integer("effective_year"),
+    reason: text("reason", {
+      enum: ["birth", "marriage", "immigration", "naturalization", "religious", "personal", "other"],
+    })
+      .notNull()
+      .default("birth"),
+    // Optional causing event — at most one is set (model B): a marriage edge or a
+    // stored event. Cleared (not deleted) if that event/relationship is removed.
+    relationshipId: text("relationship_id").references(() => relationship.id, { onDelete: "set null" }),
+    eventId: text("event_id").references(() => event.id, { onDelete: "set null" }),
+    // Optional cited source document + per-name confidence + free note.
+    mediaId: text("media_id").references(() => media.id, { onDelete: "set null" }),
+    prov: text("prov", { enum: [...provStatuses] }).notNull().default("unverified"),
+    note: text("note"),
+    // Tiebreak when two names share an effective date (or both are undated).
+    ordinal: integer("ordinal").notNull().default(0),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => ({ personIdx: index("person_name_person_idx").on(t.personId) }),
+);
+
+/**
  * Search index — a decoupled, denormalised view of the searchable corpus
  * (people + media), one row per indexed entity, kept in sync by the indexing
  * pipeline (lib/search/index-doc.ts). Hybrid search (lib/search/query.ts) ranks
@@ -167,6 +211,7 @@ export const searchDoc = pgTable(
 );
 
 export type PersonRow = typeof person.$inferSelect;
+export type PersonNameRow = typeof personName.$inferSelect;
 export type RelationshipRow = typeof relationship.$inferSelect;
 export type MediaRow = typeof media.$inferSelect;
 export type PersonMediaRow = typeof personMedia.$inferSelect;

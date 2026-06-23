@@ -15,6 +15,7 @@ import type {
   PartialDate,
 } from "@family-archive/ui";
 import type { FamilyGraph, RelationshipEdge } from "./family-graph";
+import { parsePartialDate } from "./dates";
 
 export type { FamilyGraph, RelationshipEdge } from "./family-graph";
 // relationsOf is derived straight from the raw edges; it lives with the graph
@@ -22,6 +23,52 @@ export type { FamilyGraph, RelationshipEdge } from "./family-graph";
 export { relationsOf } from "./family-graph";
 
 export type Sex = "m" | "f" | "o";
+
+/** Why a person took a new name — drives the name-change event's framing. */
+export type NameReason =
+  | "birth"
+  | "marriage"
+  | "immigration"
+  | "naturalization"
+  | "religious"
+  | "personal"
+  | "other";
+
+export const NAME_REASON_LABEL: Record<NameReason, string> = {
+  birth: "At birth",
+  marriage: "Marriage",
+  immigration: "Immigration",
+  naturalization: "Naturalization",
+  religious: "Religious",
+  personal: "Personal",
+  other: "Other",
+};
+
+/**
+ * One name a person held, with the date it took effect. A person carries an
+ * ordered history of these (earliest → latest); the most recent is their current
+ * name. The birth name is the first entry. A change can be linked to the event
+ * that caused it (a marriage `relationshipId` or a stored `eventId`), so the
+ * timeline shows it nested inside that event rather than as a floating duplicate.
+ */
+export interface PersonName {
+  id: string;
+  given: string;
+  surname: string;
+  /** When this name took effect, or null if unknown. */
+  date: PartialDate | null;
+  reason: NameReason;
+  /** The marriage edge that caused this name (model B), or null. */
+  relationshipId: string | null;
+  /** The stored event (immigration, …) that caused this name (model B), or null. */
+  eventId: string | null;
+  /** A cited source document for this name, or null. */
+  source: { id: string; title: string; type: DocType } | null;
+  prov: ProvenanceStatus;
+  note: string | null;
+  /** Tiebreak when two names share an effective date (or both are undated). */
+  ordinal: number;
+}
 
 /** A recorded fact's confidence, plus the source cited when it's verified. */
 export interface ProvFact {
@@ -49,6 +96,12 @@ export interface Person {
   /** Real count of attached media (derived from person_media in queries.ts). */
   mediaCount: number;
   prov?: Partial<Record<string, ProvFact>>;
+  /**
+   * The person's name history (earliest → latest). The last entry is the current
+   * name — `given`/`surname` above are a denormalised cache of it. Always holds at
+   * least the birth name for any person read through queries.ts.
+   */
+  names: PersonName[];
 }
 
 export interface MediaItem {
@@ -91,6 +144,7 @@ export type EventType =
   | "death"
   | "marriage"
   | "divorce"
+  | "namechange"
   | "document"
   // stored in the `event` table
   | "immigration"
@@ -118,6 +172,11 @@ export interface TimelineEvent {
   source: { id: string; title: string; type: DocType } | null;
   /** True for derived events (birth/death/marriage/divorce/document); false for stored ones. */
   auto: boolean;
+  /**
+   * Name changes attached to this event (a marriage/immigration that caused one),
+   * rendered nested inside it instead of as standalone timeline events.
+   */
+  nested?: TimelineEvent[];
 }
 
 /** The full in-memory snapshot the UI renders from (assembled in lib/queries.ts). */
@@ -139,6 +198,89 @@ export function fullName(p: Person): string {
 /** "Eleanor Margaret Rivers" → "Eleanor Rivers"; first given + surname for tree cells. */
 export function shortName(p: Person): string {
   return `${p.given.split(" ")[0]} ${p.surname}`;
+}
+
+/**
+ * Numeric sort key for a precision-aware partial date; a missing date sorts last
+ * (`+Infinity`). Shared by the timeline ordering and the name history so both
+ * agree on how an undated event/name ranks.
+ */
+export function dateSortKey(date: PartialDate | null): number {
+  if (!date || date.year == null) return Number.POSITIVE_INFINITY;
+  return date.year * 10000 + (date.month ?? 1) * 100 + (date.day ?? 1);
+}
+
+// ── Names (pure, unit-tested) ────────────────────────────────────────────────
+
+/** A person's names in effect order (earliest → latest), ties broken by ordinal then id. */
+export function sortNames(names: PersonName[]): PersonName[] {
+  return [...names].sort((a, b) => {
+    const ka = dateSortKey(a.date);
+    const kb = dateSortKey(b.date);
+    if (ka !== kb) return ka - kb;
+    if (a.ordinal !== b.ordinal) return a.ordinal - b.ordinal;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+}
+
+/** The most recent name a person held (the last in effect order), or null if none. */
+export function currentName(names: PersonName[]): PersonName | null {
+  if (names.length === 0) return null;
+  const sorted = sortNames(names);
+  return sorted[sorted.length - 1];
+}
+
+/** The birth/first name a person held (the earliest in effect order), or null. */
+export function birthName(names: PersonName[]): PersonName | null {
+  if (names.length === 0) return null;
+  return sortNames(names)[0];
+}
+
+/** The raw DB-row shape `assemblePersonNames` consumes (one `person_name` row). */
+export interface PersonNameRecord {
+  id: string;
+  personId: string;
+  given: string;
+  surname: string;
+  effectiveDate: string | null;
+  reason: NameReason;
+  relationshipId: string | null;
+  eventId: string | null;
+  mediaId: string | null;
+  prov: ProvenanceStatus;
+  note: string | null;
+  ordinal: number;
+}
+
+/**
+ * Group raw `person_name` rows by person and map each to a sorted `PersonName[]`,
+ * resolving the cited source from `mediaById`. Pure so it's unit-testable without
+ * a database (lib/queries.ts feeds it real rows).
+ */
+export function assemblePersonNames(
+  rows: PersonNameRecord[],
+  mediaById: Map<string, { id: string; title: string; type: DocType }>,
+): Map<string, PersonName[]> {
+  const byPerson = new Map<string, PersonName[]>();
+  for (const r of rows) {
+    const list = byPerson.get(r.personId) ?? [];
+    list.push({
+      id: r.id,
+      given: r.given,
+      surname: r.surname,
+      date: parsePartialDate(r.effectiveDate),
+      reason: r.reason,
+      relationshipId: r.relationshipId,
+      eventId: r.eventId,
+      source: r.mediaId ? mediaById.get(r.mediaId) ?? null : null,
+      prov: r.prov,
+      note: r.note,
+      ordinal: r.ordinal,
+    });
+    byPerson.set(r.personId, list);
+  }
+  for (const [k, list] of byPerson) byPerson.set(k, sortNames(list));
+  return byPerson;
 }
 
 export function lifeDates(p: Person): string {

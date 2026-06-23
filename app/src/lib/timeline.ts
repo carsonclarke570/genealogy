@@ -20,6 +20,7 @@
  */
 import type { PartialDate, ProvenanceStatus, DocType } from "@family-archive/ui";
 import type { Person, MediaItem, EventType, TimelineEvent } from "./family-data";
+import { sortNames, dateSortKey } from "./family-data";
 import type { RelationshipEdge } from "./family-graph";
 import { parsePartialDate } from "./dates";
 
@@ -42,6 +43,7 @@ export const EVENT_META: Record<EventType, { label: string; icon: string; color:
   death: { label: "Death", icon: "death", color: "var(--color-muted)" },
   marriage: { label: "Marriage", icon: "heart", color: "var(--color-primary)" },
   divorce: { label: "Divorce", icon: "divorce", color: "var(--color-danger)" },
+  namechange: { label: "Name change", icon: "edit", color: "var(--color-accent)" },
   document: { label: "Document", icon: "gallery", color: "var(--color-accent)" },
   immigration: { label: "Immigration", icon: "ship", color: "var(--color-accent)" },
   military: { label: "Military", icon: "shield", color: "var(--color-warning)" },
@@ -58,6 +60,7 @@ export const TIMELINE_TYPE_ORDER: EventType[] = [
   "death",
   "marriage",
   "divorce",
+  "namechange",
   "immigration",
   "military",
   "education",
@@ -88,16 +91,9 @@ const typeRank = (t: EventType): number => {
   return i === -1 ? TIMELINE_TYPE_ORDER.length : i;
 };
 
-const firstName = (p: Person): string => p.given.split(" ")[0];
+const firstWord = (given: string): string => given.split(" ")[0];
 
 const yearDate = (year: number): PartialDate => ({ precision: "year", year, month: null, day: null });
-
-/** Numeric sort key; missing components pad to the low end so a year-only date
- *  sorts at the start of its year, before any fully-dated event that year. */
-function sortKeyOf(date: PartialDate | null): number {
-  if (!date || date.year == null) return Number.POSITIVE_INFINITY; // undated → last
-  return date.year * 10000 + (date.month ?? 1) * 100 + (date.day ?? 1);
-}
 
 /** Chronological order, with a deterministic tiebreak so the same input is stable. */
 export function byDate(a: TimelineEvent, b: TimelineEvent): number {
@@ -110,7 +106,7 @@ export function byDate(a: TimelineEvent, b: TimelineEvent): number {
 function mk(
   partial: Omit<TimelineEvent, "sortKey"> & { sortKey?: number },
 ): TimelineEvent {
-  return { ...partial, sortKey: partial.sortKey ?? sortKeyOf(partial.date) };
+  return { ...partial, sortKey: partial.sortKey ?? dateSortKey(partial.date) };
 }
 
 /**
@@ -145,7 +141,7 @@ export function buildTimeline(input: {
           id: `b-${p.id}`,
           type: "birth",
           date: p.bornDate ?? yearDate(p.born),
-          title: `${firstName(p)} ${p.surname} was born`,
+          title: `${firstWord(p.given)} ${p.surname} was born`,
           place: p.bornPlace,
           people: [p.id],
           prov: factProv(p, "born"),
@@ -162,7 +158,7 @@ export function buildTimeline(input: {
           id: `d-${p.id}`,
           type: "death",
           date: p.diedDate ?? yearDate(p.died),
-          title: `${firstName(p)} ${p.surname} died`,
+          title: `${firstWord(p.given)} ${p.surname} died`,
           place: p.diedPlace,
           people: [p.id],
           prov: factProv(p, "died"),
@@ -198,7 +194,7 @@ export function buildTimeline(input: {
           id: `m-${pairKey}`,
           type: "marriage",
           date: marr,
-          title: `${firstName(pa)} & ${firstName(pb)} married`,
+          title: `${firstWord(pa.given)} & ${firstWord(pb.given)} married`,
           place: null,
           people: [a, b],
           prov: src ? "verified" : "unverified",
@@ -214,7 +210,7 @@ export function buildTimeline(input: {
           id: `dv-${pairKey}`,
           type: "divorce",
           date: div,
-          title: `${firstName(pa)} & ${firstName(pb)} divorced`,
+          title: `${firstWord(pa.given)} & ${firstWord(pb.given)} divorced`,
           place: null,
           people: [a, b],
           prov: "unverified",
@@ -254,8 +250,8 @@ export function buildTimeline(input: {
       mk({
         id: `ev-${e.id}`,
         type: e.type,
-        date: parsePartialDate(e.date),
         title: e.title,
+        date: parsePartialDate(e.date),
         place: e.place,
         people: e.people,
         prov: e.prov,
@@ -263,6 +259,44 @@ export function buildTimeline(input: {
         auto: false,
       }),
     );
+  }
+
+  // ── 5. Name changes — derived per person_name row, skipping the birth name ──
+  // Runs last so the marriage/immigration events a change can attach to already
+  // exist in `out`. A change linked to its causing event nests inside it (no
+  // standalone row); an unlinked one — or a link whose event wasn't emitted —
+  // becomes its own `namechange` event so it never disappears.
+  const byId = new Map(out.map((e) => [e.id, e]));
+  const pairByRelId = new Map<string, string>();
+  for (const r of relationships) {
+    if (r.kind === "spouse") pairByRelId.set(r.id, [r.personId, r.relatedId].sort().join("__"));
+  }
+  for (const p of Object.values(people)) {
+    const sorted = sortNames(p.names ?? []);
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1];
+      const cur = sorted[i];
+      const ev = mk({
+        id: `nm-${cur.id}`,
+        type: "namechange",
+        date: cur.date,
+        title: `${firstWord(prev.given)} ${prev.surname} became ${firstWord(cur.given)} ${cur.surname}`,
+        place: null,
+        people: [p.id],
+        prov: cur.prov,
+        source: cur.source,
+        auto: true,
+      });
+      let target: TimelineEvent | undefined;
+      if (cur.relationshipId) {
+        const pair = pairByRelId.get(cur.relationshipId);
+        if (pair) target = byId.get(`m-${pair}`);
+      } else if (cur.eventId) {
+        target = byId.get(`ev-${cur.eventId}`);
+      }
+      if (target) (target.nested ??= []).push(ev);
+      else out.push(ev);
+    }
   }
 
   return out.sort(byDate);

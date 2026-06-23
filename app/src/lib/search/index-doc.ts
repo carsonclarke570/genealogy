@@ -17,7 +17,7 @@
  */
 import { eq, sql } from "drizzle-orm";
 import type { DB } from "@/db/client";
-import { person, media, personMedia, searchDoc } from "@/db/schema";
+import { person, personName, media, personMedia, searchDoc } from "@/db/schema";
 import type { PersonRow, MediaRow } from "@/db/schema";
 import { getEmbedder } from "./embed";
 
@@ -25,11 +25,16 @@ type Kind = "person" | "media";
 
 const docId = (kind: Kind, refId: string) => `${kind}:${refId}`;
 
-/** Free-text corpus for a person: names, places, years, notes. */
-export function personContent(p: PersonRow): string {
+/**
+ * Free-text corpus for a person: names, places, years, notes. `otherNames` are
+ * any historical names the person held (from `person_name`) beyond the current
+ * one, so search finds them by a maiden/former name too.
+ */
+export function personContent(p: PersonRow, otherNames: string[] = []): string {
   return [
     `${p.given} ${p.surname}`,
     p.maiden ? `née ${p.maiden}` : null,
+    ...otherNames,
     p.bornPlace ? `born in ${p.bornPlace}` : null,
     p.bornYear ? `born ${p.bornYear}` : null,
     p.diedPlace ? `died in ${p.diedPlace}` : null,
@@ -94,7 +99,14 @@ export async function upsertDoc(
 export async function indexPerson(db: DB, personId: string): Promise<void> {
   const [row] = await db.select().from(person).where(eq(person.id, personId));
   if (!row) return;
-  const content = personContent(row);
+  // Every distinct name the person held, so a maiden/former name still finds them.
+  const nameRows = await db
+    .select({ given: personName.given, surname: personName.surname })
+    .from(personName)
+    .where(eq(personName.personId, personId));
+  const current = `${row.given} ${row.surname}`;
+  const otherNames = [...new Set(nameRows.map((n) => `${n.given} ${n.surname}`))].filter((n) => n !== current);
+  const content = personContent(row, otherNames);
   await upsertDoc(db, "person", row.id, content, personPlace(row), await embedContent(content));
 }
 
