@@ -57,6 +57,11 @@ export interface SeedResidence {
   locality?: string | null;
   region?: string | null;
   country?: string | null;
+  /**
+   * "range" (default): a span — `start` = moved in, `end` = moved out (null =
+   * onward). "point": a single known date (in `start`), span unknown.
+   */
+  dateKind?: "range" | "point";
   /** Canonical partial-date strings; `end` null means they lived there onward. */
   start: string | null;
   end?: string | null;
@@ -143,6 +148,9 @@ export const residences: SeedResidence[] = [
   { id: "R-sarah-cambridge", personId: "sarah", place: "Cambridge, MA", locality: "Cambridge", region: "Massachusetts", country: "United States", start: "2003", prov: "unverified" },
   { id: "R-michael-cambridge", personId: "michael", place: "Cambridge, MA", locality: "Cambridge", region: "Massachusetts", country: "United States", start: "2003", prov: "unverified" },
   { id: "R-olivia-cambridge", personId: "olivia", place: "Cambridge, MA", locality: "Cambridge", region: "Massachusetts", country: "United States", start: "2003", end: "2020", prov: "unverified", note: "Family home through high school" },
+  // A "known date" residence — the SS Carmania manifest places Thomas & Alice in
+  // Liverpool in 1911, but we don't know when they arrived or left.
+  { id: "R-thomas-liverpool", personId: "thomas", place: "Liverpool, England", locality: "Liverpool", country: "England", dateKind: "point", start: "1911", prov: "verified", mediaId: "M-112", note: "Departure port on the passage manifest" },
 ];
 
 export const media: SeedMedia[] = [

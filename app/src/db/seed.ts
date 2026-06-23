@@ -159,6 +159,7 @@ export async function seed(db: DB): Promise<{ seeded: boolean }> {
         locality: r.locality ?? null,
         address: null,
         placeLabel: r.place,
+        dateKind: r.dateKind ?? "range",
         startDate: r.start,
         startYear: parsePartialDate(r.start)?.year ?? null,
         endDate: r.end ?? null,

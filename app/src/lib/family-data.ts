@@ -17,6 +17,7 @@ import type {
 } from "@family-archive/ui";
 import type { FamilyGraph, RelationshipEdge } from "./family-graph";
 import { parsePartialDate } from "./dates";
+import type { ResidenceDateKind } from "./dates";
 
 export type { FamilyGraph, RelationshipEdge } from "./family-graph";
 export type { LocationValue } from "@family-archive/ui";
@@ -181,6 +182,12 @@ export interface Residence {
   location: LocationValue;
   /** Display label for the location (mirrors `location.label`). */
   place: string;
+  /**
+   * Whether the dates describe a span ("range": start = moved in, end = moved
+   * out / null = onward) or a single known date ("point": `start` holds the one
+   * date we know they lived here, `end` unused). See {@link ResidenceDateKind}.
+   */
+  dateKind: ResidenceDateKind;
   start: PartialDate | null;
   end: PartialDate | null;
   /** 4-digit start year, derived; kept for sort/compact display. */
@@ -378,8 +385,16 @@ export function residencesOf(residences: Residence[], personId: string): Residen
     .sort((a, b) => dateSortKey(a.start) - dateSortKey(b.start));
 }
 
-/** "1952 – 1968" / "1952 – present" / "1952" for a residence span. */
+/**
+ * Compact date label for a residence:
+ *   - range: "1952 – 1968" / "1952 – present" / "1952"
+ *   - point: "c. 1952" (a single known date — not a move-in, no "present")
+ */
 export function residenceSpan(r: Residence): string {
+  if (r.dateKind === "point") {
+    if (r.startYear != null) return `c. ${r.startYear}`;
+    return r.start ? "c. ?" : "Dates unknown";
+  }
   const start = r.startYear != null ? String(r.startYear) : r.start ? "?" : "";
   if (r.endYear != null) return start ? `${start} – ${r.endYear}` : String(r.endYear);
   if (r.end) return start ? `${start} – ?` : "";

@@ -15,6 +15,20 @@
  */
 import type { PartialDate } from "@family-archive/ui";
 
+/**
+ * How a residence's dates are meant to be read — the single source of truth
+ * shared by the schema (residence.date_kind), the read model, and the write path.
+ *   - "range": a span — `start` is when they moved in, `end` when they moved out
+ *              (null end = lived there onward / "present").
+ *   - "point": a single *known* date — we only know they lived there around then,
+ *              not the move-in/move-out. `start` holds that date; `end` is unused.
+ * The distinction can't be inferred from the data ("a start with no end" is
+ * genuinely ambiguous between "still there" and "only known then"), so it is
+ * stored explicitly.
+ */
+export const residenceDateKinds = ["range", "point"] as const;
+export type ResidenceDateKind = (typeof residenceDateKinds)[number];
+
 const pad = (n: number, len: number) => String(n).padStart(len, "0");
 
 /**

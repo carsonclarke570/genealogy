@@ -8,6 +8,7 @@ import {
   Dialog,
   LocationField,
   ProvenanceMark,
+  SegmentedControl,
   Textarea,
 } from "@family-archive/ui";
 import type {
@@ -17,7 +18,7 @@ import type {
 } from "@family-archive/ui";
 import { sourceOptions, type Residence } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
-import { serializePartialDate } from "@/lib/dates";
+import { serializePartialDate, type ResidenceDateKind } from "@/lib/dates";
 import { PROV_LABEL } from "@/lib/prov";
 import {
   createResidence,
@@ -63,6 +64,7 @@ export function AddResidenceDialog({
   const editingId = editResidence?.id ?? null;
 
   const [location, setLocation] = useState<LocationValue | null>(null);
+  const [dateKind, setDateKind] = useState<ResidenceDateKind>("range");
   const [start, setStart] = useState<PartialDate | null>(null);
   const [end, setEnd] = useState<PartialDate | null>(null);
   const [prov, setProv] = useState<ProvenanceStatus>("unverified");
@@ -76,6 +78,7 @@ export function AddResidenceDialog({
     setErrors({});
     if (editResidence) {
       setLocation(editResidence.location);
+      setDateKind(editResidence.dateKind);
       setStart(editResidence.start);
       setEnd(editResidence.end);
       setProv(editResidence.prov);
@@ -83,6 +86,7 @@ export function AddResidenceDialog({
       setNote(editResidence.note ?? "");
     } else {
       setLocation(null);
+      setDateKind("range");
       setStart(null);
       setEnd(null);
       setProv("unverified");
@@ -102,8 +106,10 @@ export function AddResidenceDialog({
       const input: ResidenceInput = {
         personId,
         location,
+        dateKind,
         start: serializePartialDate(start),
-        end: serializePartialDate(end),
+        // A "point" residence has no end — only the single known date in `start`.
+        end: dateKind === "point" ? null : serializePartialDate(end),
         prov,
         mediaId: mediaId || null,
         note: note.trim() || null,
@@ -133,7 +139,7 @@ export function AddResidenceDialog({
       open={open}
       onClose={onClose}
       title={editingId ? "Edit residence" : "Add a residence"}
-      description="Where they lived, and for how long. Leave the end blank if they lived there onward — and cite a document if you have one."
+      description="Where they lived, and when. Record a date range, or just a single date you know they lived there — and cite a document if you have one."
       footer={
         <>
           {editingId && (
@@ -171,23 +177,45 @@ export function AddResidenceDialog({
           error={errors.location}
         />
 
-        <div className="app-field-row">
-          <div style={{ flex: 1 }}>
+        <div style={{ display: "grid", gap: "var(--space-sm)" }}>
+          <span className="app-label">Dates</span>
+          <SegmentedControl
+            aria-label="What the dates mean"
+            size="sm"
+            value={dateKind}
+            onValueChange={(v) => setDateKind(v as ResidenceDateKind)}
+            items={[
+              { value: "range", label: "Date range" },
+              { value: "point", label: "Known date" },
+            ]}
+          />
+          {dateKind === "range" ? (
+            <div className="app-field-row">
+              <div style={{ flex: 1 }}>
+                <DateField
+                  label="Moved in"
+                  hint="A year is enough — add the month or day if you know them."
+                  value={start}
+                  onChange={setStart}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <DateField
+                  label="Moved out"
+                  hint="Leave blank if they lived there onward."
+                  value={end}
+                  onChange={setEnd}
+                />
+              </div>
+            </div>
+          ) : (
             <DateField
-              label="Moved in"
-              hint="A year is enough — add the month or day if you know them."
+              label="Known to live here"
+              hint="A date you know they lived here — not necessarily when they moved in or out."
               value={start}
               onChange={setStart}
             />
-          </div>
-          <div style={{ flex: 1 }}>
-            <DateField
-              label="Moved out"
-              hint="Leave blank if they lived there onward."
-              value={end}
-              onChange={setEnd}
-            />
-          </div>
+          )}
         </div>
 
         <Textarea
