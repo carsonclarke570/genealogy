@@ -8,6 +8,7 @@ import {
   Button,
   Card,
   Chip,
+  EmptyState,
   IconBadge,
   Menu,
   ProvenanceMark,
@@ -26,7 +27,6 @@ import {
   residencesOf,
   residenceSpan,
   NAME_REASON_LABEL,
-  type Person,
   type Relation,
   type MediaItem,
   type Residence,
@@ -41,45 +41,16 @@ import { MediaDetail } from "./MediaDetail";
 import { AddResidenceDialog } from "./AddResidenceDialog";
 import type { Screen } from "./AppShell";
 
-function bioParas(p: Person): string[] {
-  const name = p.given.split(" ")[0];
-  // Build each clause only from facts that are actually recorded, so a sparse
-  // record never reads "born in null in null".
-  const birthBits = [
-    p.bornPlace ? `in ${p.bornPlace}` : null,
-    p.born != null ? `in ${p.born}` : null,
-  ]
-    .filter(Boolean)
-    .join(" ");
-  const deathBits = [
-    p.diedPlace ? `in ${p.diedPlace}` : null,
-    p.died != null ? `in ${p.died}` : null,
-  ]
-    .filter(Boolean)
-    .join(" ");
-  let first: string;
-  if (birthBits && (p.living || deathBits)) {
-    first = `${name} was born ${birthBits}, ${p.living ? "and is living" : `and died ${deathBits}`}.`;
-  } else if (birthBits) {
-    first = `${name} was born ${birthBits}.`;
-  } else if (p.living) {
-    first = `${name} is living.`;
-  } else if (deathBits) {
-    first = `${name} died ${deathBits}.`;
-  } else {
-    first = `${name}'s biographical details haven't been recorded yet.`;
-  }
-  const second = p.maiden
-    ? `Recorded under the family name ${p.surname} (née ${p.maiden}), ${name} appears across several family photographs and certificates in the archive.`
-    : `${name}'s record draws on the photographs, certificates and articles attached below.`;
-  return [first, second];
-}
-
-function sourceFor(p: Person, field: string): string {
-  if (field === "name") return p.docs?.certificate ? "birth certificate" : p.docs?.obituary ? "obituary" : "census record";
-  if (field === "born" || field === "bornPlace") return p.docs?.certificate ? "birth certificate" : "family record";
-  if (field === "died" || field === "diedPlace") return p.docs?.obituary ? "obituary" : "death record";
-  return "source on file";
+/**
+ * Split the single free-text `notes` field into paragraphs. Blank lines (or any
+ * run of newlines) start a new paragraph; we never synthesise prose — what the
+ * curator recorded is all that shows.
+ */
+function notesParagraphs(notes: string | null | undefined): string[] {
+  return (notes ?? "")
+    .split(/\n+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 export function PersonRecord({
@@ -124,6 +95,9 @@ export function PersonRecord({
   const events = eventsOf(allEvents, id);
   const residences = residencesOf(allResidences, id);
 
+  const firstName = p.given.split(" ")[0];
+  const hasRels =
+    rel.parents.length + rel.spouse.length + rel.children.length + rel.siblings.length > 0;
   const summary = provSummary(p);
 
   // A compact, horizontally-scrolling preview of this person's life events; the
@@ -173,7 +147,7 @@ export function PersonRecord({
       </div>
     ) : null;
 
-  const bio = bioParas(p);
+  const bio = notesParagraphs(p.notes);
   // The full name history (earliest → latest, already sorted by the read model).
   // Shown only when there's a change to surface — a single birth name is already
   // the record's headline.
@@ -213,31 +187,57 @@ export function PersonRecord({
         <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
           Biography
         </div>
-        <div
-          style={{
-            maxWidth: "68ch",
-            fontSize: "var(--text-body)",
-            lineHeight: 1.55,
-            color: "var(--color-ink)",
-            display: "grid",
-            gap: "0.75em",
-          }}
-        >
-          {bio.map((para, i) => (
-            <p key={i} style={{ margin: 0 }}>
-              {para}
-            </p>
-          ))}
-        </div>
+        {bio.length > 0 ? (
+          <div
+            style={{
+              maxWidth: "68ch",
+              fontSize: "var(--text-body)",
+              lineHeight: 1.55,
+              color: "var(--color-ink)",
+              display: "grid",
+              gap: "0.75em",
+              textWrap: "pretty",
+            }}
+          >
+            {bio.map((para, i) => (
+              <p key={i} style={{ margin: 0 }}>
+                {para}
+              </p>
+            ))}
+          </div>
+        ) : (
+          <p className="app-muted" style={{ margin: 0, maxWidth: "68ch", fontSize: "var(--text-body)" }}>
+            No biography recorded yet.{" "}
+            <button type="button" className="app-link" onClick={() => onOpen(id, "edit")}>
+              Add one
+            </button>
+            .
+          </p>
+        )}
       </div>
       {NamesBlock}
       {EventStrip}
-      <div className="app-grid-rels">
-        <RelGroup title="Parents" items={rel.parents} />
-        <RelGroup title="Spouse" items={rel.spouse} />
-        <RelGroup title="Children" items={rel.children} />
-        <RelGroup title="Siblings" items={rel.siblings} />
-      </div>
+      {hasRels ? (
+        <div className="app-grid-rels">
+          <RelGroup title="Parents" items={rel.parents} />
+          <RelGroup title="Spouse" items={rel.spouse} />
+          <RelGroup title="Children" items={rel.children} />
+          <RelGroup title="Siblings" items={rel.siblings} />
+        </div>
+      ) : (
+        <div>
+          <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
+            Relationships
+          </div>
+          <p className="app-muted" style={{ margin: 0, maxWidth: "68ch", fontSize: "var(--text-body)" }}>
+            No relationships recorded yet.{" "}
+            <button type="button" className="app-link" onClick={() => onOpen(id, "edit")}>
+              Link a parent, spouse, child or sibling
+            </button>
+            .
+          </p>
+        </div>
+      )}
     </div>
   );
 
@@ -249,6 +249,7 @@ export function PersonRecord({
     ["obituary", "Obituaries", "obituary"],
   ];
   const shownDocs = media.filter((m) => docFilter === "all" || m.type === docFilter);
+  const activeDocLabel = (docTypes.find(([k]) => k === docFilter)?.[1] ?? "documents").toLowerCase();
   const Documents = (
     <div style={{ paddingTop: "var(--space-lg)" }}>
       <div style={{ display: "flex", gap: "var(--space-sm)", flexWrap: "wrap", marginBottom: "var(--space-lg)", alignItems: "center" }}>
@@ -263,6 +264,31 @@ export function PersonRecord({
           </Button>
         </span>
       </div>
+      {shownDocs.length === 0 ? (
+        media.length === 0 ? (
+          <EmptyState
+            icon={<Icon name="gallery" size={24} />}
+            title="No documents yet"
+            description={`Attach a photo, certificate, article or obituary to ${firstName}'s record.`}
+            action={
+              <Button variant="secondary" iconStart={<Icon name="upload" size={16} />} onClick={() => setUploadOpen(true)}>
+                Add document
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState
+            icon={<Icon name="gallery" size={24} />}
+            title={`No ${activeDocLabel} yet`}
+            description="Nothing matches this filter."
+            action={
+              <Button variant="secondary" onClick={() => setDocFilter("all")}>
+                Show all documents
+              </Button>
+            }
+          />
+        )
+      ) : (
       <div className="app-grid-docs">
         {shownDocs.map((m) => (
           <ClickableCard key={m.id} ariaLabel={`Open ${m.title}`} onOpen={() => setOpenMedia(m)}>
@@ -288,6 +314,7 @@ export function PersonRecord({
           </ClickableCard>
         ))}
       </div>
+      )}
     </div>
   );
 
@@ -383,38 +410,6 @@ export function PersonRecord({
     </div>
   );
 
-  const Notes = (
-    <div style={{ paddingTop: "var(--space-lg)", display: "grid", gap: "var(--space-lg)", maxWidth: "68ch" }}>
-      {(
-        [
-          ["Curator", "Mar 2024", "Cross-checked the 1940 census against the parish record; birthplace confirmed."],
-          ["Aunt Margaret", "Jan 2024", "She always told the story of the crossing on the SS Carmania — added the manifest to documents."],
-        ] as const
-      ).map(([who, when, text]) => (
-        <Card key={who}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: "var(--text-body-sm)",
-              color: "var(--color-muted)",
-              marginBottom: "var(--space-sm)",
-            }}
-          >
-            <strong style={{ color: "var(--color-ink)" }}>{who}</strong>
-            <span className="tnum">{when}</span>
-          </div>
-          <div style={{ fontSize: "var(--text-body)", lineHeight: 1.55 }}>{text}</div>
-        </Card>
-      ))}
-      <div>
-        <Button variant="ghost" size="sm" iconStart={<Icon name="plus" size={16} />}>
-          Add note
-        </Button>
-      </div>
-    </div>
-  );
-
   const fmtFact = (field: string, raw: string | number) => {
     const st = provOf(p, field);
     const v = st === "estimated" && /^\d/.test(String(raw)) ? "c. " + raw : String(raw);
@@ -458,7 +453,7 @@ export function PersonRecord({
                 <span>{fullName(p)}</span>
                 <ProvenanceMark
                   status={provOf(p, "name")}
-                  source={provOf(p, "name") === "verified" ? sourceFor(p, "name") : undefined}
+                  source={provOf(p, "name") === "verified" ? provSourceOf(p, "name") ?? undefined : undefined}
                   size={16}
                 />
               </div>
@@ -540,7 +535,6 @@ export function PersonRecord({
               },
               { value: "residences", label: `Residences (${residences.length})`, content: Residences },
               { value: "documents", label: `Documents (${media.length})`, content: Documents },
-              { value: "notes", label: "Notes (2)", content: Notes },
             ]}
           />
         </div>
