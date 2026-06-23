@@ -687,9 +687,39 @@ body {
   }
 }
 
+/* tabs: let the bar scroll horizontally on phones rather than overflow the
+   viewport — the person record carries up to four counted tabs. Scoped narrow
+   so the tab underline's 1px overlap is never clipped where there's no overflow. */
+@media (max-width: 480px) {
+  .fa-tablist {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .fa-tablist::-webkit-scrollbar {
+    display: none;
+  }
+  .fa-tab {
+    flex: none;
+    white-space: nowrap;
+  }
+}
+
 @media (max-width: 420px) {
   .app-grid-docs {
     grid-template-columns: 1fr;
+  }
+  /* person record: drop the header actions to a full-width row under the
+     identity once the inline row gets too tight (Edit grows, menu stays square). */
+  .app-person-head {
+    flex-wrap: wrap;
+  }
+  .app-person-actions {
+    width: 100%;
+  }
+  .app-person-actions > :first-child {
+    flex: 1;
   }
 }
 

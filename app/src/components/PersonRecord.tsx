@@ -485,7 +485,7 @@ export function PersonRecord({
         </div>
 
         <Card>
-          <div style={{ display: "flex", gap: "var(--space-lg)", alignItems: "flex-start" }}>
+          <div className="app-person-head" style={{ display: "flex", gap: "var(--space-lg)", alignItems: "flex-start" }}>
             <Avatar name={fullName(p)} size="lg" />
             <div style={{ flex: 1, minWidth: 0 }}>
               <h1
@@ -524,7 +524,7 @@ export function PersonRecord({
                 )}
               </div>
             </div>
-            <div style={{ display: "flex", gap: "var(--space-sm)", flex: "none" }}>
+            <div className="app-person-actions" style={{ display: "flex", gap: "var(--space-sm)", flex: "none" }}>
               <Button variant="primary" iconStart={<Icon name="edit" size={16} />} onClick={() => onOpen(id, "edit")}>
                 Edit
               </Button>
