@@ -511,7 +511,9 @@ body {
 /* ---- responsive grid helpers (overridable by media query) ------------- */
 .app-grid-facts {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* Auto-fit so the row stays evenly distributed whatever the fact count
+     (born / birthplace / died-or-status); empty tracks collapse. */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: var(--space-lg);
 }
 .app-grid-docs {

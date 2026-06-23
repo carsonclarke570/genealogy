@@ -182,7 +182,7 @@ export function PersonRecord({
       </div>
     ) : null;
   const Overview = (
-    <div style={{ display: "grid", gap: "var(--space-2xl)", paddingTop: "var(--space-lg)" }}>
+    <div style={{ display: "grid", gap: "var(--space-2xl)" }}>
       <div>
         <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
           Biography
@@ -251,7 +251,7 @@ export function PersonRecord({
   const shownDocs = media.filter((m) => docFilter === "all" || m.type === docFilter);
   const activeDocLabel = (docTypes.find(([k]) => k === docFilter)?.[1] ?? "documents").toLowerCase();
   const Documents = (
-    <div style={{ paddingTop: "var(--space-lg)" }}>
+    <div>
       <div style={{ display: "flex", gap: "var(--space-sm)", flexWrap: "wrap", marginBottom: "var(--space-lg)", alignItems: "center" }}>
         {docTypes.map(([k, label, dot]) => (
           <Chip key={k} selected={docFilter === k} dot={dot} onClick={() => setDocFilter(k)}>
@@ -319,7 +319,7 @@ export function PersonRecord({
   );
 
   const Residences = (
-    <div style={{ paddingTop: "var(--space-lg)" }}>
+    <div>
       <div
         style={{
           display: "flex",
@@ -423,7 +423,6 @@ export function PersonRecord({
     p.living
       ? { k: "Status", field: null as string | null, v: "Living", st: provOf(p, "name") }
       : { k: "Died", field: "died", ...fmtFact("died", diedText) },
-    { k: "Documents", field: null as string | null, v: String(docCount(p)), st: provOf(p, "name") },
   ];
 
   return (
@@ -484,7 +483,7 @@ export function PersonRecord({
               </Button>
               <Menu
                 align="end"
-                trigger={<Button variant="secondary" iconStart={<Icon name="dots" size={16} />} aria-label="More actions" />}
+                trigger={<Button variant="secondary" iconOnly iconStart={<Icon name="dots" size={16} />} aria-label="More actions" />}
                 items={[
                   { label: "Share" },
                   { label: "Merge with…" },

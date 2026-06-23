@@ -55,6 +55,20 @@
   width: 100%;
 }
 
+/* Icon-only — a lone glyph, no label. Drop the label-side padding and lock the
+   box to 1:1 so it reads as a square at the same height as a normal button,
+   instead of a lopsided wide rectangle. */
+.fa-btn--icon {
+  padding-inline: 0;
+  aspect-ratio: 1;
+}
+@media (pointer: coarse) {
+  .fa-btn--icon {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 /* Primary — the one sienna voice */
 .fa-btn--primary {
   background-color: var(--color-primary);

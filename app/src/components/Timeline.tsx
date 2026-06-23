@@ -643,7 +643,7 @@ export function PersonTimeline({ id, onOpen, onNavigate }: { id: string; onOpen:
   const shown = filter === "all" ? events : events.filter((e) => e.type === filter);
 
   return (
-    <div style={{ paddingTop: "var(--space-lg)" }}>
+    <div>
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", flexWrap: "wrap", marginBottom: "var(--space-lg)" }}>
         <button className="app-typechip" aria-pressed={filter === "all"} onClick={() => setFilter("all")} style={{ opacity: filter === "all" ? 1 : 0.5 }}>
           All ({events.length})
