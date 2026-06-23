@@ -34,3 +34,6 @@ spike/**/*.png
 # misc
 .DS_Store
 *.log
+
+# Ephemeral git worktrees created by background agents (auto-cleaned)
+.claude/worktrees/
