@@ -516,6 +516,32 @@ button.fa-chip:hover {
   color: var(--color-ink);
 }
 
+/* On phones a centred modal is cramped; dock it to the bottom as a full-width
+   sheet (the pattern the explorer peek already uses). The slide-up is zeroed by
+   the global prefers-reduced-motion block. */
+@media (max-width: 640px) {
+  .fa-dialog-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .fa-dialog {
+    max-width: none;
+    max-height: 90vh;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-bottom: none;
+    padding-bottom: calc(var(--space-xl) + env(safe-area-inset-bottom, 0px));
+    animation: fa-sheet-up var(--dur-base) var(--ease-out-quart);
+  }
+}
+@keyframes fa-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
 /* ── Select ──────────────────────────────────────────────────────────── */
 .fa-select-wrap {
   position: relative;

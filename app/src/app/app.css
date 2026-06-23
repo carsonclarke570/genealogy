@@ -357,7 +357,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-faint, var(--color-muted));
+  /* Informational label ("PDF document", "scanned certificate") — muted, not
+     faint: faint (3.66:1) is below the 4.5:1 bar for small text. */
+  color: var(--color-muted);
   font-size: var(--text-body-sm);
   border-radius: var(--radius-sm);
 }
