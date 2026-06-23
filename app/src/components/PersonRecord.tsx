@@ -12,6 +12,7 @@ import {
   IconBadge,
   Menu,
   ProvenanceMark,
+  Skeleton,
   Tabs,
 } from "@family-archive/ui";
 import type { ChipDot } from "@family-archive/ui";
@@ -19,7 +20,6 @@ import { formatPartialDate, formatLocation } from "@family-archive/ui";
 import {
   fullName,
   lifeDates,
-  docCount,
   provOf,
   provSourceOf,
   provSummary,
@@ -78,13 +78,49 @@ export function PersonRecord({
   // row into context (also guards against a stale/broken link). Render a light
   // placeholder rather than dereferencing undefined.
   if (!p) {
+    // Content-shaped skeleton mirroring the loaded record (breadcrumb → header
+    // card with portrait, name, dates, badges, facts → tab bar), so arrival
+    // causes no layout shift. Decorative shapes are aria-hidden; the region is
+    // marked busy with an off-screen status message for assistive tech.
     return (
       <div
         className="app-scroll"
         style={{ height: "100%", overflow: "auto", padding: "var(--space-xl) var(--space-2xl) var(--space-4xl)" }}
+        aria-busy="true"
       >
-        <div style={{ maxWidth: 940, margin: "0 auto" }} className="app-muted">
+        <span role="status" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" }}>
           Loading record…
+        </span>
+        <div style={{ maxWidth: 940, margin: "0 auto" }}>
+          <Skeleton variant="text" width={220} style={{ marginBottom: "var(--space-lg)" }} />
+          <Card>
+            <div style={{ display: "flex", gap: "var(--space-lg)", alignItems: "flex-start" }}>
+              <Skeleton variant="circle" width={64} height={64} />
+              <div style={{ flex: 1, minWidth: 0, display: "grid", gap: "var(--space-sm)" }}>
+                <Skeleton variant="text" width="46%" height={28} />
+                <Skeleton variant="text" width="30%" height={18} />
+                <div style={{ display: "flex", gap: "var(--space-sm)", marginTop: "var(--space-xs)" }}>
+                  <Skeleton width={86} height={22} style={{ borderRadius: "var(--radius-full)" }} />
+                  <Skeleton width={108} height={22} style={{ borderRadius: "var(--radius-full)" }} />
+                </div>
+              </div>
+              <Skeleton width={96} height={38} />
+            </div>
+            <hr className="app-divider" style={{ margin: "var(--space-lg) 0 var(--space-md)" }} />
+            <div className="app-grid-facts">
+              {[0, 1, 2].map((i) => (
+                <div key={i} style={{ display: "grid", gap: 6 }}>
+                  <Skeleton variant="text" width="55%" />
+                  <Skeleton variant="text" width="80%" height={18} />
+                </div>
+              ))}
+            </div>
+          </Card>
+          <div style={{ display: "flex", gap: "var(--space-lg)", marginTop: "var(--space-xl)" }}>
+            {[64, 92, 104, 96].map((w, i) => (
+              <Skeleton key={i} variant="text" width={w} height={16} />
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -481,7 +517,11 @@ export function PersonRecord({
                 <Badge tone={summary.tone} dot>
                   {summary.label}
                 </Badge>
-                <Badge tone="info">{docCount(p)} documents</Badge>
+                {media.length > 0 && (
+                  <Badge tone="info">
+                    {media.length} {media.length === 1 ? "document" : "documents"}
+                  </Badge>
+                )}
               </div>
             </div>
             <div style={{ display: "flex", gap: "var(--space-sm)", flex: "none" }}>
