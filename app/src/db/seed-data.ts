@@ -15,7 +15,7 @@ import type { Person, MediaItem } from "@/lib/family-data";
 // (`mediaCount`) or that only exist once a real file is uploaded (`mimeType`,
 // `hasFile`) — the seed leaves the media file columns null.
 type SeedPerson = Omit<Person, "mediaCount">;
-type SeedMedia = Omit<MediaItem, "mimeType" | "hasFile">;
+type SeedMedia = Omit<MediaItem, "mimeType" | "hasFile" | "description">;
 
 /**
  * Seed-authoring shape only: the demo family is written as couple "units" for

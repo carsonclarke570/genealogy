@@ -90,6 +90,7 @@ export async function getDataset(): Promise<Dataset> {
     title: m.title,
     year: m.year ?? 0,
     people: peopleByMedia.get(m.id) ?? [],
+    description: m.description ?? null,
     mimeType: m.mimeType,
     hasFile: m.filePath != null,
   }));

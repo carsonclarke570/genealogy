@@ -57,12 +57,15 @@ function EventRow({
   contextId,
   onOpen,
   onOpenDoc,
+  onEdit,
   last,
 }: {
   ev: TimelineEvent;
   contextId?: string;
   onOpen?: (id: string) => void;
   onOpenDoc?: () => void;
+  /** Edit a stored event. Only offered for non-derived (`auto: false`) events. */
+  onEdit?: (ev: TimelineEvent) => void;
   last?: boolean;
 }) {
   const { people } = useDataset();
@@ -116,6 +119,18 @@ function EventRow({
               <DocChip type={ev.source.type}>{ev.source.title}</DocChip>
             </button>
           )}
+          {!ev.auto && onEdit && (
+            <button
+              type="button"
+              className="app-link"
+              style={{ marginLeft: ev.source ? "var(--space-sm)" : "auto", display: "inline-flex", alignItems: "center", gap: 4, fontSize: "var(--text-body-sm)" }}
+              onClick={() => onEdit(ev)}
+              title="Edit this event"
+            >
+              <Icon name="edit" size={14} />
+              Edit
+            </button>
+          )}
         </>
       }
     />
@@ -123,7 +138,7 @@ function EventRow({
 }
 
 // ── River: one chronological column with year dividers ──────────────────────
-function RiverView({ events, onOpen, onOpenDoc }: { events: TimelineEvent[]; onOpen: (id: string) => void; onOpenDoc: () => void }) {
+function RiverView({ events, onOpen, onOpenDoc, onEdit }: { events: TimelineEvent[]; onOpen: (id: string) => void; onOpenDoc: () => void; onEdit?: (ev: TimelineEvent) => void }) {
   const rows: React.ReactNode[] = [];
   let lastYear: number | null = null;
   events.forEach((ev, i) => {
@@ -136,13 +151,13 @@ function RiverView({ events, onOpen, onOpenDoc }: { events: TimelineEvent[]; onO
       );
       lastYear = y;
     }
-    rows.push(<EventRow key={ev.id} ev={ev} onOpen={onOpen} onOpenDoc={onOpenDoc} last={i === events.length - 1} />);
+    rows.push(<EventRow key={ev.id} ev={ev} onOpen={onOpen} onOpenDoc={onOpenDoc} onEdit={onEdit} last={i === events.length - 1} />);
   });
   return <div className="app-timeline app-timeline-river">{rows}</div>;
 }
 
 // ── Decades: grouped sections ───────────────────────────────────────────────
-function DecadesView({ events, onOpen, onOpenDoc }: { events: TimelineEvent[]; onOpen: (id: string) => void; onOpenDoc: () => void }) {
+function DecadesView({ events, onOpen, onOpenDoc, onEdit }: { events: TimelineEvent[]; onOpen: (id: string) => void; onOpenDoc: () => void; onEdit?: (ev: TimelineEvent) => void }) {
   const groups = new Map<number, TimelineEvent[]>();
   for (const e of events) {
     const d = decadeOf(e);
@@ -165,7 +180,7 @@ function DecadesView({ events, onOpen, onOpenDoc }: { events: TimelineEvent[]; o
             </div>
             <div className="app-timeline">
               {list.map((ev, i) => (
-                <EventRow key={ev.id} ev={ev} onOpen={onOpen} onOpenDoc={onOpenDoc} last={i === list.length - 1} />
+                <EventRow key={ev.id} ev={ev} onOpen={onOpen} onOpenDoc={onOpenDoc} onEdit={onEdit} last={i === list.length - 1} />
               ))}
             </div>
           </section>
@@ -278,6 +293,7 @@ export function Timeline({
   const { people, events: allEvents } = useDataset();
   const [layout, setLayout] = useState<Layout>("river");
   const [dialog, setDialog] = useState(false);
+  const [editEvent, setEditEvent] = useState<TimelineEvent | null>(null);
 
   const [span] = useMemo(() => [yearSpan(allEvents)] as const, [allEvents]);
   const decadeMin = Math.floor(span[0] / 10) * 10;
@@ -435,15 +451,22 @@ export function Timeline({
             />
           </div>
         ) : layout === "river" ? (
-          <RiverView events={filtered} onOpen={onOpen} onOpenDoc={openDoc} />
+          <RiverView events={filtered} onOpen={onOpen} onOpenDoc={openDoc} onEdit={setEditEvent} />
         ) : layout === "decades" ? (
-          <DecadesView events={filtered} onOpen={onOpen} onOpenDoc={openDoc} />
+          <DecadesView events={filtered} onOpen={onOpen} onOpenDoc={openDoc} onEdit={setEditEvent} />
         ) : (
           <LanesView events={filtered} people={persons} from={from} to={to} onOpen={onOpen} />
         )}
       </div>
 
-      <AddEventDialog open={dialog} onClose={() => setDialog(false)} />
+      <AddEventDialog
+        open={dialog || !!editEvent}
+        editEvent={editEvent}
+        onClose={() => {
+          setDialog(false);
+          setEditEvent(null);
+        }}
+      />
     </div>
   );
 }
@@ -456,6 +479,7 @@ export function PersonTimeline({ id, onOpen, onNavigate }: { id: string; onOpen:
   const { events: allEvents } = useDataset();
   const [filter, setFilter] = useState<string>("all");
   const [dialog, setDialog] = useState(false);
+  const [editEvent, setEditEvent] = useState<TimelineEvent | null>(null);
 
   const events = useMemo(() => eventsOf(allEvents, id), [allEvents, id]);
   const present = useMemo(() => TIMELINE_TYPE_ORDER.filter((k) => events.some((e) => e.type === k)), [events]);
@@ -485,12 +509,20 @@ export function PersonTimeline({ id, onOpen, onNavigate }: { id: string; onOpen:
       ) : (
         <div className="app-timeline">
           {shown.map((ev, i) => (
-            <EventRow key={ev.id} ev={ev} contextId={id} onOpen={onOpen} onOpenDoc={() => onNavigate("gallery")} last={i === shown.length - 1} />
+            <EventRow key={ev.id} ev={ev} contextId={id} onOpen={onOpen} onOpenDoc={() => onNavigate("gallery")} onEdit={setEditEvent} last={i === shown.length - 1} />
           ))}
         </div>
       )}
 
-      <AddEventDialog open={dialog} onClose={() => setDialog(false)} presetPersonId={id} />
+      <AddEventDialog
+        open={dialog || !!editEvent}
+        editEvent={editEvent}
+        presetPersonId={id}
+        onClose={() => {
+          setDialog(false);
+          setEditEvent(null);
+        }}
+      />
     </div>
   );
 }

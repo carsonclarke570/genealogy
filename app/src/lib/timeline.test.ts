@@ -54,6 +54,7 @@ const media = (id: string, over: Partial<MediaItem> = {}): MediaItem => ({
   title: over.title ?? "A photo",
   year: over.year ?? 1950,
   people: over.people ?? [],
+  description: over.description ?? null,
   mimeType: over.mimeType ?? null,
   hasFile: over.hasFile ?? false,
 });
