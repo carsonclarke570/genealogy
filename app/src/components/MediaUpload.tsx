@@ -79,6 +79,8 @@ function DocViewer({ url, name }: { url: string; name: string }) {
   // A replaced file is a fresh document — start from a clean transform.
   useEffect(() => reset(), [url, reset]);
 
+  const clamp = (s: number) => Math.min(6, Math.max(0.25, s));
+
   // Wheel-to-zoom needs a non-passive listener: React registers `wheel` at the
   // root as passive, so an onWheel handler can't call preventDefault to stop the
   // page from scrolling. Attach it natively instead.
@@ -87,13 +89,12 @@ function DocViewer({ url, name }: { url: string; name: string }) {
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      setScale((s) => Math.min(6, Math.max(0.25, s * (e.deltaY < 0 ? 1.12 : 0.89))));
+      setScale((s) => clamp(s * (e.deltaY < 0 ? 1.12 : 0.89)));
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
-  const clamp = (s: number) => Math.min(6, Math.max(0.25, s));
   const zoomBy = (f: number) => setScale((s) => clamp(s * f));
 
   const onDown = (e: React.PointerEvent) => {
@@ -254,7 +255,6 @@ export function MediaUpload({
   );
 
   const lockedName = preselectPersonId && people[preselectPersonId] ? fullName(people[preselectPersonId]) : null;
-  const showPlace = type === "census" || type === "grave";
 
   return (
     <div className="app-upload">
