@@ -633,7 +633,7 @@ function UnplacedShelf({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className={"app-float app-shelf" + (open ? " open" : "")}>
+    <div className={"fa-float app-shelf" + (open ? " open" : "")}>
       <button
         type="button"
         className="app-shelf-pill"
@@ -732,7 +732,7 @@ export function Explorer({
         controlsRef={controls}
       />
 
-      <div className="app-float app-canvas-title" style={{ position: "absolute", top: 16, left: 16, padding: "12px 16px", zIndex: 4 }}>
+      <div className="fa-float app-canvas-title" style={{ position: "absolute", top: 16, left: 16, padding: "12px 16px", zIndex: 4 }}>
         <div className="app-display" style={{ fontSize: "var(--text-headline)" }}>
           Our Family
         </div>
@@ -764,7 +764,7 @@ export function Explorer({
         />
       </div>
 
-      <div className="app-float app-zoomctl" style={{ ...segWrap, display: "flex", gap: 3, bottom: 16, left: 16 }}>
+      <div className="fa-float app-zoomctl" style={{ ...segWrap, display: "flex", gap: 3, bottom: 16, left: 16 }}>
         {!overview && focusTrail.length > 0 && (
           <IconButton onClick={onBack} aria-label="Back" title="Back to previous person">
             <Icon name="chevron" size={18} style={{ transform: "rotate(180deg)" }} />

@@ -124,6 +124,12 @@ export type { MediaPreviewProps, MediaPreviewVariant } from "./components/MediaP
 export { ClickableCard, CARD_RAISE_CLASS } from "./components/ClickableCard";
 export type { ClickableCardProps } from "./components/ClickableCard";
 
+export { AnchoredPopover } from "./components/AnchoredPopover";
+export type { AnchoredPopoverProps } from "./components/AnchoredPopover";
+
+export { Icon, GLYPHS } from "./components/Icon";
+export type { IconProps, GlyphName } from "./components/Icon";
+
 export { ToastViewport } from "./components/ToastViewport";
 export type { ToastViewportProps, ToastViewportPosition } from "./components/ToastViewport";
 

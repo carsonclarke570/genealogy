@@ -1470,6 +1470,17 @@ button.fa-chip:hover {
   outline-offset: var(--focus-ring-offset);
 }
 
+/* ── Float ────────────────────────────────────────────────────────────────
+   A floating surface for clusters that hover over content (canvas chrome,
+   panels positioned by AnchoredPopover): page background, a hairline, and the
+   low overlay shadow. Pair with positioning of your own. */
+.fa-float {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-overlay-low);
+}
+
 /* ── AvatarStack ─────────────────────────────────────────────────────────
    Overlapping avatars reading as one cluster, each ringed in the surface
    colour so the overlap stays legible. */

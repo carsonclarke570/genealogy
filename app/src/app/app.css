@@ -203,13 +203,7 @@ body {
   transition: opacity 0.15s;
 }
 
-/* floating clusters on the canvas */
-.app-float {
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-overlay-low);
-}
+/* The floating-surface base (.fa-float) now comes from the design system. */
 /* The on-canvas segmented toggles and icon buttons now come from the design
    system (SegmentedControl + IconButton). */
 
