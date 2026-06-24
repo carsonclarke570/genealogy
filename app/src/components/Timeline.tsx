@@ -12,6 +12,7 @@ import {
   SegmentedControl,
   TimelineItem,
   Tooltip,
+  formatPartialDate,
 } from "@family-archive/ui";
 import type { DocType } from "@family-archive/ui";
 import { fullName, lifeDates, shortName, type Person, type TimelineEvent } from "@/lib/family-data";
@@ -38,6 +39,7 @@ const DOC_LABEL: Record<DocType, string> = {
   article: "Article",
   obituary: "Obituary",
   census: "Census",
+  grave: "Grave",
   other: "Document",
 };
 
@@ -144,6 +146,46 @@ function EventSource({ ev, onOpenDoc }: { ev: TimelineEvent; onOpenDoc?: () => v
   );
 }
 
+/**
+ * Burial details merged into a death event from a Grave (headstone): the burial
+ * place, the headstone as a source, and — when the stone's date disagrees with the
+ * recorded death date — a flagged note of what the stone records.
+ */
+function EventBurial({ ev, onOpenDoc }: { ev: TimelineEvent; onOpenDoc?: () => void }) {
+  const b = ev.burial;
+  if (!b) return null;
+  return (
+    <>
+      {b.place && (
+        <span className="app-evplace">
+          <Icon name="pin" size={13} />
+          Buried at {b.place}
+        </span>
+      )}
+      {b.conflictsWithRecorded && b.date && (
+        <span
+          className="app-evplace"
+          style={{ color: "var(--color-warning)" }}
+          title="The headstone records a different date than the recorded death date"
+        >
+          <Icon name="death" size={13} />
+          Headstone: {formatPartialDate(b.date)}
+        </span>
+      )}
+      {b.source && (
+        <button
+          type="button"
+          className="app-evsource"
+          onClick={onOpenDoc}
+          title={`Source · ${b.source.title}`}
+        >
+          <DocChip type={b.source.type}>{b.source.title}</DocChip>
+        </button>
+      )}
+    </>
+  );
+}
+
 function EventEdit({ ev, onEdit }: { ev: TimelineEvent; onEdit: (ev: TimelineEvent) => void }) {
   return (
     <button
@@ -213,6 +255,7 @@ function EventRow({
         <>
           {ev.place && <EventPlace place={ev.place} />}
           {isSpan(ev) && <EventSpan ev={ev} color={color} />}
+          <EventBurial ev={ev} onOpenDoc={onOpenDoc} />
           {others.length > 0 && (
             <EventPeople ids={others} people={people} contextId={contextId} onOpen={onOpen} />
           )}

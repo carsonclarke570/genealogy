@@ -2,12 +2,13 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Avatar, Button, Dialog, Input, LocationField, MultiCombobox, Select, Textarea } from "@family-archive/ui";
-import type { LocationValue } from "@family-archive/ui";
+import { Avatar, Button, DateField, Dialog, Input, LocationField, MultiCombobox, Select, Textarea } from "@family-archive/ui";
+import type { LocationValue, PartialDate } from "@family-archive/ui";
 import { fullName, lifeDates } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import { uploadMedia } from "@/lib/media-client";
 import { MAX_UPLOAD_BYTES, MEDIA_TYPES } from "@/lib/media-validation";
+import { serializePartialDate } from "@/lib/dates";
 import { Icon } from "./Icon";
 
 const ACCEPT = "image/jpeg,image/png,image/webp,image/gif,application/pdf";
@@ -19,6 +20,7 @@ const TYPE_LABELS: [(typeof MEDIA_TYPES)[number], string][] = [
   ["article", "Article"],
   ["obituary", "Obituary"],
   ["census", "Census"],
+  ["grave", "Grave"],
   ["other", "Other"],
 ];
 
@@ -61,6 +63,7 @@ export function MediaUpload({
   const [year, setYear] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState<LocationValue | null>(null);
+  const [graveDates, setGraveDates] = useState<Record<string, PartialDate | null>>({});
   const [selectedPeople, setSelectedPeople] = useState<string[]>(
     preselectPersonId ? [preselectPersonId] : [],
   );
@@ -74,6 +77,7 @@ export function MediaUpload({
     setYear("");
     setDescription("");
     setLocation(null);
+    setGraveDates({});
     setSelectedPeople(preselectPersonId ? [preselectPersonId] : []);
     setErrors({});
   };
@@ -113,6 +117,14 @@ export function MediaUpload({
     form.set("description", description);
     form.set("personIds", JSON.stringify(selectedPeople));
     if (location) form.set("location", JSON.stringify(location));
+    if (type === "grave") {
+      const dates: Record<string, string> = {};
+      for (const pid of selectedPeople) {
+        const s = serializePartialDate(graveDates[pid]);
+        if (s) dates[pid] = s;
+      }
+      form.set("personDates", JSON.stringify(dates));
+    }
 
     const result = await uploadMedia(form);
     setBusy(false);
@@ -240,6 +252,17 @@ export function MediaUpload({
           />
         )}
 
+        {type === "grave" && (
+          <LocationField
+            label="Burial location (optional)"
+            hint="Where they’re buried — shown on their death event."
+            value={location}
+            onChange={setLocation}
+            onSearch={searchPlaces}
+            error={errors.location}
+          />
+        )}
+
         <div>
           <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
             People in this record
@@ -258,6 +281,22 @@ export function MediaUpload({
             />
           )}
         </div>
+
+        {type === "grave" && selectedPeople.length > 0 && (
+          <div style={{ display: "grid", gap: "var(--space-md)" }}>
+            <div className="app-label">Date on the headstone (optional, per person)</div>
+            {selectedPeople.map((pid) =>
+              people[pid] ? (
+                <DateField
+                  key={pid}
+                  label={fullName(people[pid])}
+                  value={graveDates[pid] ?? null}
+                  onChange={(d) => setGraveDates((prev) => ({ ...prev, [pid]: d }))}
+                />
+              ) : null,
+            )}
+          </div>
+        )}
 
         <Textarea
           label="Description (optional)"

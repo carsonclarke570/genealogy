@@ -65,6 +65,7 @@ export async function POST(req: Request): Promise<Response> {
   };
   const personIds = parseJsonField("personIds") ?? [];
   const location = parseJsonField("location") ?? null;
+  const personDates = parseJsonField("personDates") ?? {};
 
   const parsed = mediaMetaSchema.safeParse({
     title: form.get("title") ?? "",
@@ -74,6 +75,7 @@ export async function POST(req: Request): Promise<Response> {
     prov: form.get("prov") ?? undefined,
     personIds,
     location,
+    personDates,
   });
   if (!parsed.success) {
     const errors: Record<string, string> = {};
@@ -117,11 +119,20 @@ export async function POST(req: Request): Promise<Response> {
         mimeType,
         originalFilename,
         description: meta.description,
+        // A Grave stores its burial place on the row; other types derive/ignore it.
+        location: meta.type === "grave" && meta.location ? JSON.stringify(meta.location) : null,
         prov: meta.prov,
       });
 
       if (validPeople.length > 0) {
-        await tx.insert(personMedia).values(validPeople.map((personId) => ({ personId, mediaId: id })));
+        await tx.insert(personMedia).values(
+          validPeople.map((personId) => ({
+            personId,
+            mediaId: id,
+            // Per-person grave date (the headstone's date for this person); null otherwise.
+            date: meta.type === "grave" ? meta.personDates?.[personId] ?? null : null,
+          })),
+        );
       }
 
       // A Census auto-generates a residence + event for the household it records.

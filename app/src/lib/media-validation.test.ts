@@ -73,6 +73,26 @@ describe("mediaMetaSchema", () => {
     const r = mediaMetaSchema.safeParse({ title: "x", type: "photo", personIds: "nope" });
     expect(r.success && r.data.personIds).toEqual([]);
   });
+
+  it("accepts the grave type and re-canonicalises per-person dates", () => {
+    const r = mediaMetaSchema.safeParse({
+      title: "Rivers headstone",
+      type: "grave",
+      personIds: ["tom", "ele"],
+      personDates: { tom: "1971", ele: "2001-03-04", bad: "not-a-date" },
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.type).toBe("grave");
+      // valid dates survive (canonical), the unparseable one is dropped
+      expect(r.data.personDates).toEqual({ tom: "1971", ele: "2001-03-04" });
+    }
+  });
+
+  it("tolerates a missing/garbage personDates field", () => {
+    const r = mediaMetaSchema.safeParse({ title: "x", type: "grave", personIds: [], personDates: "nope" });
+    expect(r.success && r.data.personDates).toEqual({});
+  });
 });
 
 describe("MAX_UPLOAD_BYTES", () => {

@@ -22,7 +22,8 @@ import type { PartialDate, ProvenanceStatus, DocType } from "@family-archive/ui"
 import type { Person, MediaItem, EventType, TimelineEvent, Residence } from "./family-data";
 import { sortNames, dateSortKey } from "./family-data";
 import type { RelationshipEdge } from "./family-graph";
-import { parsePartialDate } from "./dates";
+import { parsePartialDate, serializePartialDate } from "./dates";
+import { locationLabel } from "./locations";
 import { censusResidenceId, censusEventId } from "./census-ids";
 
 /** A stored `event` row plus its linked people — the builder's input shape. */
@@ -174,20 +175,45 @@ export function buildTimeline(input: {
         }),
       );
     }
-    if (!p.living && p.died != null) {
+    // A grave (headstone) records a death/burial date per person plus a burial
+    // place. It merges into the death event rather than standing on its own: the
+    // person's recorded death date stays primary (it may cite a death certificate
+    // that disagrees with the stone), the headstone rides along as a burial source,
+    // and a differing date is flagged. A grave also *manufactures* a death event for
+    // someone with none recorded — a headstone implies death.
+    const graves = media.filter((m) => m.type === "grave" && m.people.includes(p.id));
+    const grave = graves.find((g) => g.personDates?.[p.id]) ?? graves[0] ?? null;
+    const graveDate = grave ? parsePartialDate(grave.personDates?.[p.id] ?? null) : null;
+    const recordedDate = p.diedDate ?? (p.died != null ? yearDate(p.died) : null);
+
+    if ((!p.living && p.died != null) || graveDate) {
       const src = media.find((m) => m.people.includes(p.id) && m.type === "obituary") ?? null;
       if (src) consumed.add(src.id);
+      if (grave) consumed.add(grave.id);
+      const burial = grave
+        ? {
+            place: locationLabel(grave.location) || null,
+            date: graveDate,
+            source: { id: grave.id, title: grave.title, type: grave.type },
+            conflictsWithRecorded:
+              recordedDate != null &&
+              graveDate != null &&
+              serializePartialDate(recordedDate) !== serializePartialDate(graveDate),
+          }
+        : null;
       out.push(
         mk({
           id: `d-${p.id}`,
           type: "death",
-          date: p.diedDate ?? yearDate(p.died),
+          // Recorded death date stays authoritative; fall back to the headstone's.
+          date: recordedDate ?? graveDate,
           title: `${firstWord(p.given)} ${p.surname} died`,
           place: p.diedPlace,
           people: [p.id],
           prov: factProv(p, "died"),
           source: src ? { id: src.id, title: src.title, type: src.type } : null,
           auto: true,
+          burial,
         }),
       );
     }

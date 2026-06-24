@@ -90,7 +90,7 @@ export const relationship = pgTable("relationship", {
 export const media = pgTable("media", {
   id: text("id").primaryKey(),
   type: text("type", {
-    enum: ["photo", "certificate", "article", "obituary", "census", "other"],
+    enum: ["photo", "certificate", "article", "obituary", "census", "grave", "other"],
   }).notNull(),
   title: text("title").notNull(),
   year: integer("year"),
@@ -99,6 +99,10 @@ export const media = pgTable("media", {
   mimeType: text("mime_type"),
   originalFilename: text("original_filename"),
   description: text("description"),
+  // A structured location stored as JSON (a LocationValue). Only meaningful for a
+  // "grave" item — the burial place, surfaced on the person's derived death event
+  // (a headstone has no residence of its own). JSON-on-text matches person.prov.
+  location: text("location"),
   // How confident we are this item is what it claims to be (the unified
   // provenance status); the document itself is the source, so no mediaId here.
   prov: text("prov", { enum: [...provStatuses] }).notNull().default("unverified"),
@@ -114,6 +118,11 @@ export const personMedia = pgTable(
     mediaId: text("media_id")
       .notNull()
       .references(() => media.id, { onDelete: "cascade" }),
+    // The date this person is recorded with *on this document* — a canonical
+    // partial-date string ("YYYY" / "YYYY-MM" / "YYYY-MM-DD"). Only meaningful for
+    // a "grave" item (the death/burial date the headstone records, per person); it
+    // merges into the person's derived death event on the timeline.
+    date: text("date"),
   },
   (t) => ({ pk: primaryKey({ columns: [t.personId, t.mediaId] }) }),
 );

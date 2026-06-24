@@ -130,6 +130,54 @@ describe("buildTimeline — derived birth/death", () => {
   });
 });
 
+describe("buildTimeline — grave merges into the death event", () => {
+  const grave = (id: string, over: Partial<MediaItem> = {}): MediaItem => ({
+    ...media(id, { type: "grave", title: over.title ?? "Headstone", year: over.year ?? 0, people: over.people }),
+    location: over.location ?? null,
+    personDates: over.personDates ?? {},
+  });
+  const loc = { label: "Mount Auburn Cemetery, Cambridge" };
+
+  it("attaches the burial place + headstone source to a recorded death, no standalone event", () => {
+    const p = person("tom", { born: 1888, died: 1971, diedDate: { precision: "year", year: 1971, month: null, day: null } });
+    const g = grave("M-grave", { people: ["tom"], location: loc, personDates: { tom: "1971" } });
+    const evs = buildTimeline({ ...empty, people: peopleMap(p), media: [g] });
+    // birth + death only — the grave did NOT become a document event
+    expect(evs.map((e) => e.id)).toEqual(["b-tom", "d-tom"]);
+    const death = evs.find((e) => e.id === "d-tom")!;
+    expect(death.burial?.place).toBe("Mount Auburn Cemetery, Cambridge");
+    expect(death.burial?.source?.id).toBe("M-grave");
+    expect(death.burial?.conflictsWithRecorded).toBe(false);
+  });
+
+  it("flags a conflict when the headstone date differs from the recorded death date", () => {
+    const p = person("art", { born: 1918, died: 1944, diedDate: { precision: "year", year: 1944, month: null, day: null } });
+    const g = grave("M-g2", { people: ["art"], location: loc, personDates: { art: "1945" } });
+    const death = buildTimeline({ ...empty, people: peopleMap(p), media: [g] }).find((e) => e.id === "d-art")!;
+    // recorded date stays primary; the stone's differing date is flagged
+    expect(death.date).toEqual({ precision: "year", year: 1944, month: null, day: null });
+    expect(death.burial?.conflictsWithRecorded).toBe(true);
+    expect(death.burial?.date).toEqual({ precision: "year", year: 1945, month: null, day: null });
+  });
+
+  it("derives a death event from the grave when none is recorded (even if marked living)", () => {
+    const p = person("liv", { born: 1990, living: true, died: null });
+    const g = grave("M-g3", { people: ["liv"], location: loc, personDates: { liv: "2020" } });
+    const evs = buildTimeline({ ...empty, people: peopleMap(p), media: [g] });
+    const death = evs.find((e) => e.id === "d-liv");
+    expect(death).toBeDefined();
+    expect(death!.date).toEqual({ precision: "year", year: 2020, month: null, day: null });
+    expect(death!.burial?.conflictsWithRecorded).toBe(false);
+  });
+
+  it("does not manufacture a death when the grave carries no date for the person", () => {
+    const p = person("liv", { born: 1990, living: true, died: null });
+    const g = grave("M-g4", { people: ["liv"], location: loc, year: 0, personDates: {} });
+    const evs = buildTimeline({ ...empty, people: peopleMap(p), media: [g] });
+    expect(evs.some((e) => e.type === "death")).toBe(false);
+  });
+});
+
 describe("buildTimeline — media / source dedup", () => {
   it("attaches a birth certificate as the birth event's source, not a standalone event", () => {
     const p = person("ele", { born: 1915, bornDate: { precision: "year", year: 1915, month: null, day: null } });

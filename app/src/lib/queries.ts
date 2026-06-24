@@ -18,6 +18,7 @@ import { buildTimeline, type StoredEvent } from "./timeline";
 import { provStatuses, type ProvStatus } from "./prov";
 import { parsePartialDate } from "./dates";
 import { locationFromColumns } from "./locations";
+import { locationSchema } from "./media-validation";
 
 // Keys are validated structurally (string); values carry the real constraints.
 const docsSchema = z.record(z.string(), z.number()).catch({});
@@ -153,9 +154,24 @@ export async function getDataset(): Promise<Dataset> {
   }
 
   const peopleByMedia = new Map<string, string[]>();
+  // Per-person dates a media item records (a Grave's date per person), keyed
+  // mediaId → { personId: canonical date string }.
+  const datesByMedia = new Map<string, Record<string, string | null>>();
   for (const l of links) {
     (peopleByMedia.get(l.mediaId) ?? peopleByMedia.set(l.mediaId, []).get(l.mediaId)!).push(l.personId);
+    if (l.date != null) {
+      (datesByMedia.get(l.mediaId) ?? datesByMedia.set(l.mediaId, {}).get(l.mediaId)!)[l.personId] = l.date;
+    }
   }
+  /** Parse a media row's JSON `location` column back into a LocationValue (or null). */
+  const parseMediaLocation = (raw: string | null): ReturnType<typeof locationSchema.parse> => {
+    if (!raw) return null;
+    try {
+      return locationSchema.parse(JSON.parse(raw));
+    } catch {
+      return null;
+    }
+  };
   const normProv = (raw: string | null | undefined): ProvStatus =>
     ((provStatuses as readonly string[]).includes(raw ?? "") ? raw : "unverified") as ProvStatus;
 
@@ -169,6 +185,8 @@ export async function getDataset(): Promise<Dataset> {
     prov: normProv(m.prov),
     mimeType: m.mimeType,
     hasFile: m.filePath != null,
+    location: parseMediaLocation(m.location),
+    personDates: datesByMedia.get(m.id) ?? {},
   }));
 
   const relationships: RelationshipEdge[] = relationshipRows.map((r) => ({
