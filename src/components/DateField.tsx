@@ -597,7 +597,7 @@ export function DateField({
           )}
         </button>
 
-        <AnchoredPopover anchorRef={triggerRef} open={open} matchWidth={false} popRef={popRef}>
+        <AnchoredPopover anchorRef={triggerRef} open={open} matchWidth={false} popRef={popRef} className="fa-cal-pop">
           <div
             id={dialogId}
             className="fa-cal"

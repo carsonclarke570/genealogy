@@ -39,11 +39,14 @@ export function Gallery({
   onOpen,
   onToast,
   onUpload,
+  onEditMedia,
 }: {
   onOpen: (id: string) => void;
   onToast: (msg: string) => void;
   /** Open the full-screen upload screen. */
   onUpload: () => void;
+  /** Open the full-screen edit screen for a media item. */
+  onEditMedia: (mediaId: string) => void;
 }) {
   const { people, media } = useDataset();
   const [filter, setFilter] = useState<string>("all");
@@ -187,7 +190,7 @@ export function Gallery({
         )}
       </div>
 
-      <MediaDetail media={openMedia} onClose={() => setOpenMedia(null)} onOpen={onOpen} onToast={onToast} />
+      <MediaDetail media={openMedia} onClose={() => setOpenMedia(null)} onOpen={onOpen} onToast={onToast} onEdit={onEditMedia} />
     </div>
   );
 }
