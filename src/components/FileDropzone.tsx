@@ -8,14 +8,10 @@ export type FileDropzoneShape = "rect" | "round";
 export interface FileDropzoneProps {
   /** The affordance content — typically an upload glyph + a short label. */
   children: ReactNode;
-  /** Called with the first chosen/dropped file. */
+  /** Called with the chosen/dropped file. */
   onFile?: (file: File) => void;
-  /** Called with every chosen/dropped file (pair with `multiple`). */
-  onFiles?: (files: File[]) => void;
   /** MIME accept list for the native picker (e.g. "image/png,application/pdf"). */
   accept?: string;
-  /** Allow selecting more than one file. @default false */
-  multiple?: boolean;
   disabled?: boolean;
   /** `round` crops to a circle for a portrait drop target. @default "rect" */
   shape?: FileDropzoneShape;
@@ -29,8 +25,8 @@ export interface FileDropzoneProps {
  *
  * Owns only the affordance and the file plumbing (a hidden picker, drag-over
  * highlight, and drop handling); it deliberately does **no** validation — wire
- * an `onFile`/`onFiles` handler that checks type and size and surfaces its own
- * error, so each form keeps its own rules. Pass the glyph + label as children
+ * an `onFile` handler that checks type and size and surfaces its own error, so
+ * each form keeps its own rules. Pass the glyph + label as children
  * (the library ships no icon set). With no handler it renders as a static,
  * non-interactive placeholder.
  *
@@ -43,9 +39,7 @@ export interface FileDropzoneProps {
 export function FileDropzone({
   children,
   onFile,
-  onFiles,
   accept,
-  multiple = false,
   disabled = false,
   shape = "rect",
   className,
@@ -54,13 +48,11 @@ export function FileDropzone({
 }: FileDropzoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
-  const interactive = Boolean(onFile || onFiles) && !disabled;
+  const interactive = Boolean(onFile) && !disabled;
 
   const emit = (list: FileList | null) => {
-    if (!list || list.length === 0) return;
-    const files = Array.from(list);
-    onFiles?.(files);
-    if (onFile && files[0]) onFile(files[0]);
+    const file = list?.[0];
+    if (file) onFile?.(file);
   };
 
   const classes = [
@@ -85,7 +77,6 @@ export function FileDropzone({
           ref={inputRef}
           type="file"
           accept={accept}
-          multiple={multiple}
           hidden
           onChange={(e) => {
             emit(e.target.files);

@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { Icon } from "./Icon";
 import { Spinner } from "./Spinner";
 
 export interface SearchInputProps {
@@ -9,9 +10,6 @@ export interface SearchInputProps {
   placeholder?: string;
   /** Swap the clear button for a spinner while a query is in flight. */
   loading?: boolean;
-  /** Override the clear (✕) behaviour. Defaults to clearing the value. */
-  onClear?: () => void;
-  autoFocus?: boolean;
   "aria-label"?: string;
   className?: string;
   style?: CSSProperties;
@@ -34,8 +32,6 @@ export function SearchInput({
   onChange,
   placeholder,
   loading = false,
-  onClear,
-  autoFocus,
   "aria-label": ariaLabel,
   className,
   style,
@@ -44,9 +40,7 @@ export function SearchInput({
   return (
     <div className={classes} style={style}>
       <span className="fa-search__icon" aria-hidden="true">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.3-4.3" />
-        </svg>
+        <Icon name="search" size={20} />
       </span>
       <input
         className="fa-search__input"
@@ -55,7 +49,6 @@ export function SearchInput({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={ariaLabel ?? placeholder}
-        autoFocus={autoFocus}
       />
       {loading && <Spinner size="sm" />}
       {!loading && value && (
@@ -63,11 +56,9 @@ export function SearchInput({
           type="button"
           className="fa-search__clear"
           aria-label="Clear"
-          onClick={() => (onClear ? onClear() : onChange(""))}
+          onClick={() => onChange("")}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M6 6l12 12M18 6L6 18" />
-          </svg>
+          <Icon name="close" size={18} />
         </button>
       )}
     </div>

@@ -5,8 +5,6 @@ export interface DetailRowProps {
   label: ReactNode;
   /** The value on the right. */
   children: ReactNode;
-  /** Fixed label-column width in px, so a stack of rows aligns. @default 76 */
-  labelWidth?: number;
   className?: string;
   style?: CSSProperties;
 }
@@ -22,12 +20,10 @@ export interface DetailRowProps {
  * <DetailRow label="Uploaded">12 May 2024</DetailRow>
  * <DetailRow label="Type">Certificate</DetailRow>
  */
-export function DetailRow({ label, children, labelWidth = 76, className, style }: DetailRowProps) {
+export function DetailRow({ label, children, className, style }: DetailRowProps) {
   return (
     <div className={["fa-detailrow", className].filter(Boolean).join(" ")} style={style}>
-      <span className="fa-detailrow__label" style={{ width: labelWidth }}>
-        {label}
-      </span>
+      <span className="fa-detailrow__label">{label}</span>
       <span className="fa-detailrow__value">{children}</span>
     </div>
   );

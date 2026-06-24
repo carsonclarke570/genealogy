@@ -22,14 +22,12 @@ import { MediaEdit } from "./MediaEdit";
  * branching); this just maps the MediaItem to URLs and a placeholder label.
  */
 function Preview({ media }: { media: MediaItem }) {
-  const fileUrl = media.hasFile ? mediaFileUrl(media.id) : null;
   return (
     <MediaPreview
       variant="detail"
-      src={fileUrl}
+      src={media.hasFile ? mediaFileUrl(media.id) : null}
       mimeType={media.mimeType}
       alt={media.title}
-      pdfHref={fileUrl ?? undefined}
       placeholder={media.type === "photo" ? "photo" : "scanned " + media.type}
     />
   );

@@ -1,7 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
-export type IconButtonSize = "sm" | "md";
-
 export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** The lone glyph to render (an icon node). */
   children: ReactNode;
@@ -10,8 +8,6 @@ export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>
    * Pair it with the action ("Zoom in", "Close", "Recenter").
    */
   "aria-label": string;
-  /** Compact box for dense toolbars. @default "md" */
-  size?: IconButtonSize;
 }
 
 /**
@@ -28,14 +24,11 @@ export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>
  */
 export function IconButton({
   children,
-  size = "md",
   className,
   type = "button",
   ...rest
 }: IconButtonProps) {
-  const classes = ["fa-iconbtn", size === "sm" && "fa-iconbtn--sm", className]
-    .filter(Boolean)
-    .join(" ");
+  const classes = ["fa-iconbtn", className].filter(Boolean).join(" ");
 
   return (
     <button type={type} className={classes} {...rest}>

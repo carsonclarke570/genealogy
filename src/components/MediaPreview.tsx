@@ -17,8 +17,6 @@ export interface MediaPreviewProps {
   variant?: MediaPreviewVariant;
   /** What to show when there's no displayable image (e.g. a "PDF document" label). */
   placeholder?: ReactNode;
-  /** Link used in the `detail` PDF fallback when the embed can't render. */
-  pdfHref?: string;
   className?: string;
   style?: CSSProperties;
 }
@@ -40,7 +38,6 @@ export function MediaPreview({
   alt,
   variant = "detail",
   placeholder,
-  pdfHref,
   className,
   style,
 }: MediaPreviewProps) {
@@ -61,13 +58,9 @@ export function MediaPreview({
     return (
       <object data={src} type="application/pdf" className="fa-mediaprev__pdf" style={style}>
         <div className="fa-mediaprev__ph" style={{ height: 200 }}>
-          {pdfHref ? (
-            <a href={pdfHref} target="_blank" rel="noreferrer">
-              Open PDF
-            </a>
-          ) : (
-            placeholder
-          )}
+          <a href={src} target="_blank" rel="noreferrer">
+            Open PDF
+          </a>
         </div>
       </object>
     );
