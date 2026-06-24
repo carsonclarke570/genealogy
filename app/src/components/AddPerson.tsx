@@ -10,6 +10,7 @@ import {
   Checkbox,
   Combobox,
   DateField,
+  FileDropzone,
   Input,
   LocationField,
   ProvenanceMark,
@@ -1069,16 +1070,16 @@ export function AddPerson({
 
           <div style={{ display: "grid", gap: "var(--space-lg)", position: "sticky", top: 0 }}>
             <Card title="Portrait">
-              <button className="app-dropzone" style={{ height: 150, borderRadius: "var(--radius-full)" }}>
+              <FileDropzone shape="round" style={{ height: 150 }} aria-label="Drop a portrait photo">
                 <Icon name="upload" />
                 <span style={{ fontSize: "var(--text-body-sm)" }}>Drop a photo</span>
-              </button>
+              </FileDropzone>
             </Card>
             <Card title="Documents">
-              <button className="app-dropzone" style={{ height: 96 }}>
+              <FileDropzone style={{ height: 96 }} aria-label="Drop documents">
                 <Icon name="upload" />
                 <span style={{ fontSize: "var(--text-body-sm)" }}>Certificates, articles, PDFs</span>
-              </button>
+              </FileDropzone>
             </Card>
             <Card title="Visibility">
               <RadioGroup

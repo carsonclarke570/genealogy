@@ -99,6 +99,9 @@ export type { IconBadgeProps } from "./components/IconBadge";
 export { IconButton } from "./components/IconButton";
 export type { IconButtonProps, IconButtonSize } from "./components/IconButton";
 
+export { FileDropzone } from "./components/FileDropzone";
+export type { FileDropzoneProps, FileDropzoneShape } from "./components/FileDropzone";
+
 export { ToastViewport } from "./components/ToastViewport";
 export type { ToastViewportProps, ToastViewportPosition } from "./components/ToastViewport";
 

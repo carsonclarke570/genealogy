@@ -1369,6 +1369,51 @@ button.fa-chip:hover {
   }
 }
 
+/* ── FileDropzone ────────────────────────────────────────────────────────
+   A dashed drop target that doubles as a click-to-browse button. The border
+   warms to the primary on hover and while a file is dragged over it. */
+.fa-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  border: 1.5px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+  color: var(--color-muted);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard);
+}
+.fa-dropzone:hover:not(:disabled),
+.fa-dropzone--over {
+  border-color: var(--color-primary);
+  color: var(--color-ink);
+}
+.fa-dropzone--over {
+  background: color-mix(in oklab, var(--color-primary) 7%, var(--color-surface-sunken));
+}
+.fa-dropzone:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+.fa-dropzone:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.fa-dropzone--round {
+  border-radius: var(--radius-full);
+}
+.fa-dropzone svg {
+  width: 22px;
+  height: 22px;
+}
+
 /* ── IconBadge ───────────────────────────────────────────────────────── */
 .fa-iconbadge {
   display: inline-flex;
