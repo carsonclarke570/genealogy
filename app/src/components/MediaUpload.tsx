@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Avatar, Button, DateField, Dialog, Input, LocationField, MultiCombobox, Select, Textarea } from "@family-archive/ui";
+import { Avatar, Button, DateField, Dialog, FileDropzone, Input, LocationField, MultiCombobox, Select, Textarea } from "@family-archive/ui";
 import type { LocationValue, PartialDate } from "@family-archive/ui";
 import { fullName, lifeDates } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
@@ -55,7 +55,6 @@ export function MediaUpload({
 }) {
   const router = useRouter();
   const { people } = useDataset();
-  const fileInput = useRef<HTMLInputElement>(null);
 
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
@@ -170,23 +169,11 @@ export function MediaUpload({
     >
       <div style={{ display: "grid", gap: "var(--space-lg)" }}>
         <div>
-          <input
-            ref={fileInput}
-            type="file"
+          <FileDropzone
             accept={ACCEPT}
-            hidden
-            onChange={(e) => chooseFile(e.target.files?.[0] ?? null)}
-          />
-          <button
-            type="button"
-            className="app-dropzone"
+            onFile={chooseFile}
+            aria-label="Upload a file"
             style={{ minHeight: 110, padding: "var(--space-lg)" }}
-            onClick={() => fileInput.current?.click()}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              chooseFile(e.dataTransfer.files?.[0] ?? null);
-            }}
           >
             <Icon name="upload" />
             {file ? (
@@ -198,7 +185,7 @@ export function MediaUpload({
                 Drop a file or click to browse · JPEG, PNG, WebP, GIF, PDF
               </span>
             )}
-          </button>
+          </FileDropzone>
           {errors.file && (
             <div role="alert" style={{ color: "var(--color-danger)", fontSize: "var(--text-body-sm)", marginTop: 6 }}>
               {errors.file}

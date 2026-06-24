@@ -203,73 +203,9 @@ body {
   transition: opacity 0.15s;
 }
 
-/* floating clusters on the canvas */
-.app-float {
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-overlay-low);
-}
-.app-seg {
-  display: flex;
-  padding: 4px;
-  gap: 3px;
-}
-.app-iconbtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 32px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-  color: var(--color-muted);
-  transition: background-color 0.12s, color 0.12s;
-}
-.app-iconbtn:hover {
-  background: var(--color-surface-sunken);
-  color: var(--color-ink);
-}
-.app-iconbtn svg {
-  width: 18px;
-  height: 18px;
-}
-.app-segbtn {
-  border: none;
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--text-label);
-  font-weight: 500;
-  padding: 6px 11px;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-muted);
-  transition: background-color 0.12s, color 0.12s;
-}
-.app-segbtn:hover:not(.on) {
-  background: var(--color-surface-sunken);
-  color: var(--color-ink);
-}
-.app-segbtn.on {
-  background: var(--color-primary);
-  color: #fff;
-}
-
-/* view toolbar: orientation + scope grouped in one bar, split by a hairline */
-.app-viewbar {
-  display: flex;
-  align-items: stretch;
-  flex-wrap: wrap;
-}
-.app-view-divider {
-  flex: none;
-  width: 1px;
-  align-self: stretch;
-  margin: 6px 0;
-  background: var(--color-border);
-}
+/* The floating-surface base (.fa-float) now comes from the design system. */
+/* The on-canvas segmented toggles and icon buttons now come from the design
+   system (SegmentedControl + IconButton). */
 
 /* fog-of-war frontier markers — hidden kin in a given direction off a node */
 .app-fog-chip {
@@ -363,32 +299,8 @@ body {
   font-size: var(--text-body-sm);
   border-radius: var(--radius-sm);
 }
-/* Stretched-button overlay that makes a whole Card keyboard-operable without
-   nesting interactive elements. Secondary controls inside the card raise above
-   it with .app-above-overlay. */
-.app-card-open {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  border: 0;
-  background: transparent;
-  border-radius: inherit;
-  cursor: pointer;
-  transition: box-shadow 0.12s;
-}
-/* Subtle inner ring on hover signals the whole card is clickable — flat by
-   default (a border, not a lifting drop shadow). */
-.app-card-open:hover {
-  box-shadow: inset 0 0 0 1px var(--color-border-strong);
-}
-.app-card-open:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: -2px;
-}
-.app-above-overlay {
-  position: relative;
-  z-index: 2;
-}
+/* ClickableCard's stretched-button overlay (.fa-card-open) and the raise helper
+   (.fa-card-raise) now come from the design system. */
 
 /* Clickable "person in this record" row in the media-detail dialog. */
 .app-mediaperson {
@@ -418,27 +330,7 @@ body {
   }
 }
 
-.app-dropzone {
-  border: 1.5px dashed var(--color-border-strong);
-  background: var(--color-surface-sunken);
-  border-radius: var(--radius-md);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  color: var(--color-muted);
-  cursor: pointer;
-  width: 100%;
-}
-.app-dropzone:hover {
-  border-color: var(--color-primary);
-  color: var(--color-ink);
-}
-.app-dropzone svg {
-  width: 22px;
-  height: 22px;
-}
+/* The file drop target now comes from the design system (FileDropzone). */
 
 /* doc-type dot */
 .app-docdot {
@@ -915,15 +807,6 @@ body {
   gap: var(--space-sm);
   font-size: var(--text-body-sm);
 }
-.app-avstack {
-  display: inline-flex;
-}
-.app-avstack-item {
-  display: inline-flex;
-  border-radius: 50%;
-  outline: 2px solid var(--color-surface);
-  cursor: pointer;
-}
 .app-evsource {
   display: inline-flex;
   align-items: center;
@@ -1217,13 +1100,6 @@ body {
    markers (lane dots, fog chips) grow an invisible tap zone via a pseudo so
    the visual timeline stays unchanged. */
 @media (pointer: coarse) {
-  .app-iconbtn {
-    width: 44px;
-    height: 44px;
-  }
-  .app-segbtn {
-    min-height: 40px;
-  }
   .app-typechip,
   .app-periodsel {
     min-height: 40px;

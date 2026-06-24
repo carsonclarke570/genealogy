@@ -2,13 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Avatar, Button, Dialog, DocChip, ProvenanceMark } from "@family-archive/ui";
+import { Avatar, Button, DetailRow, Dialog, DocChip, MediaPreview, ProvenanceMark } from "@family-archive/ui";
 import {
   fullName,
   lifeDates,
   mediaFileUrl,
   mediaDownloadUrl,
-  isImageMime,
   type MediaItem,
 } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
@@ -17,49 +16,20 @@ import { PROV_LABEL } from "@/lib/prov";
 import { Icon } from "./Icon";
 import { MediaEdit } from "./MediaEdit";
 
-/** A label/value row in the detail metadata list. */
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div style={{ display: "flex", gap: "var(--space-md)", alignItems: "baseline", fontSize: "var(--text-body-sm)" }}>
-      <span className="app-muted" style={{ width: 76, flex: "none" }}>
-        {label}
-      </span>
-      <span style={{ color: "var(--color-ink)" }}>{children}</span>
-    </div>
-  );
-}
-
-/** The file preview area — a real image, an embedded PDF, or a placeholder. */
+/**
+ * The file preview area — a real image, an embedded PDF, or a placeholder. A
+ * thin adapter over the design-system MediaPreview (which owns the render
+ * branching); this just maps the MediaItem to URLs and a placeholder label.
+ */
 function Preview({ media }: { media: MediaItem }) {
-  if (media.hasFile && isImageMime(media.mimeType)) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={mediaFileUrl(media.id)}
-        alt={media.title}
-        loading="lazy"
-        // A fixed 4:3 box (capped at 360px) reserves space up-front so the dialog
-        // doesn't reflow when the image loads; objectFit:contain letterboxes any
-        // aspect into it.
-        style={{ width: "100%", aspectRatio: "4 / 3", maxHeight: 360, objectFit: "contain", borderRadius: "var(--radius-sm)", background: "var(--color-surface-sunken)" }}
-      />
-    );
-  }
-  if (media.hasFile && media.mimeType === "application/pdf") {
-    return (
-      <object data={mediaFileUrl(media.id)} type="application/pdf" style={{ width: "100%", height: 360, borderRadius: "var(--radius-sm)" }}>
-        <div className="app-ph" style={{ height: 200 }}>
-          <a href={mediaFileUrl(media.id)} target="_blank" rel="noreferrer">
-            Open PDF
-          </a>
-        </div>
-      </object>
-    );
-  }
   return (
-    <div className="app-ph" style={{ height: 240 }}>
-      {media.type === "photo" ? "photo" : "scanned " + media.type}
-    </div>
+    <MediaPreview
+      variant="detail"
+      src={media.hasFile ? mediaFileUrl(media.id) : null}
+      mimeType={media.mimeType}
+      alt={media.title}
+      placeholder={media.type === "photo" ? "photo" : "scanned " + media.type}
+    />
   );
 }
 
@@ -176,21 +146,21 @@ export function MediaDetail({
       </div>
 
       <div style={{ display: "grid", gap: "var(--space-sm)", marginBottom: "var(--space-lg)" }}>
-        <Row label="Record ID">
+        <DetailRow label="Record ID">
           <span className="text-mono">{media.id}</span>
-        </Row>
-        <Row label="Type">
+        </DetailRow>
+        <DetailRow label="Type">
           <span style={{ textTransform: "capitalize" }}>{media.type}</span>
-        </Row>
-        <Row label="Date">
+        </DetailRow>
+        <DetailRow label="Date">
           <span className="tnum">{media.year}</span>
-        </Row>
-        <Row label="Confidence">
+        </DetailRow>
+        <DetailRow label="Confidence">
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
             <ProvenanceMark status={media.prov} />
             {PROV_LABEL[media.prov]}
           </span>
-        </Row>
+        </DetailRow>
       </div>
 
       {media.people.length > 0 && (

@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import type { KeyboardEvent, ReactNode } from "react";
+import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
 
 export interface SegmentItem {
   /** Stable identifier for this segment. */
@@ -24,6 +24,10 @@ export interface SegmentedControlProps {
   size?: "sm" | "md";
   /** Accessible name for the group (e.g. "Tree layout"). */
   "aria-label"?: string;
+  /** Extra class names merged onto the root, for positioning/floating chrome. */
+  className?: string;
+  /** Inline style on the root (e.g. a shadow when floating over a canvas). */
+  style?: CSSProperties;
 }
 
 /**
@@ -53,6 +57,8 @@ export function SegmentedControl({
   onValueChange,
   size = "md",
   "aria-label": ariaLabel,
+  className,
+  style,
 }: SegmentedControlProps) {
   const [internal, setInternal] = useState(defaultValue ?? items[0]?.value);
   const active = value ?? internal;
@@ -84,12 +90,12 @@ export function SegmentedControl({
     }
   };
 
-  const classes = ["fa-seg", size === "sm" && "fa-seg--sm"]
+  const classes = ["fa-seg", size === "sm" && "fa-seg--sm", className]
     .filter(Boolean)
     .join(" ");
 
   return (
-    <div className={classes} role="radiogroup" aria-label={ariaLabel} onKeyDown={onKeyDown}>
+    <div className={classes} style={style} role="radiogroup" aria-label={ariaLabel} onKeyDown={onKeyDown}>
       {items.map((it) => {
         const on = it.value === active;
         return (

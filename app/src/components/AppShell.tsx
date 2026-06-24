@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Avatar, Button, Toast } from "@family-archive/ui";
+import { Avatar, Button, IconButton, Toast } from "@family-archive/ui";
 import { getResolvedTheme, toggleTheme, type Theme } from "@/lib/theme";
 import { DatasetProvider } from "@/lib/dataset";
 import type { Dataset } from "@/lib/family-data";
@@ -134,14 +134,14 @@ export function AppShell({ data }: { data: Dataset }) {
             <Icon name="search" />
             <span>Search people &amp; docs</span>
           </button>
-          <button
-            className="app-iconbtn app-only-mobile"
+          <IconButton
+            className="app-only-mobile"
             style={{ marginLeft: "auto" }}
             aria-label={theme === "light" ? "Dark mode" : "Light mode"}
             onClick={() => setThemeState(toggleTheme())}
           >
             <Icon name={theme === "light" ? "moon" : "sun"} size={18} />
-          </button>
+          </IconButton>
           <span className="app-hide-mobile">
             <Button variant="primary" iconStart={<Icon name="plus" size={16} />} onClick={() => navigate("add")}>
               Add person

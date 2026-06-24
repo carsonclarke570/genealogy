@@ -1,0 +1,112 @@
+"use client";
+
+import { useRef, useState } from "react";
+import type { CSSProperties, DragEvent, ReactNode } from "react";
+
+export type FileDropzoneShape = "rect" | "round";
+
+export interface FileDropzoneProps {
+  /** The affordance content — typically an upload glyph + a short label. */
+  children: ReactNode;
+  /** Called with the chosen/dropped file. */
+  onFile?: (file: File) => void;
+  /** MIME accept list for the native picker (e.g. "image/png,application/pdf"). */
+  accept?: string;
+  disabled?: boolean;
+  /** `round` crops to a circle for a portrait drop target. @default "rect" */
+  shape?: FileDropzoneShape;
+  className?: string;
+  style?: CSSProperties;
+  "aria-label"?: string;
+}
+
+/**
+ * FileDropzone — a dashed drop target that doubles as a click-to-browse button.
+ *
+ * Owns only the affordance and the file plumbing (a hidden picker, drag-over
+ * highlight, and drop handling); it deliberately does **no** validation — wire
+ * an `onFile` handler that checks type and size and surfaces its own error, so
+ * each form keeps its own rules. Pass the glyph + label as children
+ * (the library ships no icon set). With no handler it renders as a static,
+ * non-interactive placeholder.
+ *
+ * @example
+ * <FileDropzone accept="image/*,application/pdf" onFile={chooseFile} aria-label="Upload a file">
+ *   <UploadIcon />
+ *   <span>Drop a file or click to browse</span>
+ * </FileDropzone>
+ */
+export function FileDropzone({
+  children,
+  onFile,
+  accept,
+  disabled = false,
+  shape = "rect",
+  className,
+  style,
+  "aria-label": ariaLabel,
+}: FileDropzoneProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [over, setOver] = useState(false);
+  const interactive = Boolean(onFile) && !disabled;
+
+  const emit = (list: FileList | null) => {
+    const file = list?.[0];
+    if (file) onFile?.(file);
+  };
+
+  const classes = [
+    "fa-dropzone",
+    shape === "round" && "fa-dropzone--round",
+    over && "fa-dropzone--over",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const onDrop = (e: DragEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    setOver(false);
+    emit(e.dataTransfer.files);
+  };
+
+  // With no handler the dropzone is a static placeholder, not a control — render
+  // a plain div so keyboard/AT users don't tab to a button that does nothing.
+  // (A wired-but-disabled dropzone still renders a proper disabled button.)
+  if (!onFile) {
+    return (
+      <div className={classes} style={style}>
+        {children}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        hidden
+        onChange={(e) => {
+          emit(e.target.files);
+          // Reset so re-picking the same file still fires onChange.
+          e.target.value = "";
+        }}
+      />
+      <button
+        type="button"
+        className={classes}
+        style={style}
+        disabled={disabled}
+        aria-label={ariaLabel}
+        onClick={interactive ? () => inputRef.current?.click() : undefined}
+        onDragOver={interactive ? (e) => { e.preventDefault(); setOver(true); } : undefined}
+        onDragLeave={interactive ? () => setOver(false) : undefined}
+        onDrop={interactive ? onDrop : undefined}
+      >
+        {children}
+      </button>
+    </>
+  );
+}

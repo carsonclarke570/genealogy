@@ -156,7 +156,7 @@ export function Gallery({
                     <button
                       key={pid}
                       type="button"
-                      className="app-above-overlay"
+                      className="fa-card-raise"
                       aria-label={`Open ${fullName(people[pid])}`}
                       onClick={() => onOpen(pid)}
                       style={{

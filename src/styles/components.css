@@ -1318,6 +1318,270 @@ button.fa-chip:hover {
   padding: 0.25rem 0.5rem;
 }
 
+/* ── IconButton ──────────────────────────────────────────────────────────
+   A quiet, label-less control for a lone glyph — the toolbar/chrome
+   workhorse. Transparent until hovered, then the sunken surface fills in and
+   the glyph warms from muted to ink. */
+.fa-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  transition: background-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+.fa-iconbtn:hover:not(:disabled) {
+  background: var(--color-surface-sunken);
+  color: var(--color-ink);
+}
+.fa-iconbtn:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+.fa-iconbtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.fa-iconbtn svg {
+  width: 18px;
+  height: 18px;
+}
+/* Touch pointers need a ≥44px hit area (WCAG 2.5.5) without changing the
+   desktop look. */
+@media (pointer: coarse) {
+  .fa-iconbtn {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* ── FileDropzone ────────────────────────────────────────────────────────
+   A dashed drop target that doubles as a click-to-browse button. The border
+   warms to the primary on hover and while a file is dragged over it. */
+.fa-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  border: 1.5px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+  color: var(--color-muted);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard);
+}
+.fa-dropzone:hover:not(:disabled),
+.fa-dropzone--over {
+  border-color: var(--color-primary);
+  color: var(--color-ink);
+}
+.fa-dropzone--over {
+  background: color-mix(in oklab, var(--color-primary) 7%, var(--color-surface-sunken));
+}
+.fa-dropzone:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+.fa-dropzone:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.fa-dropzone--round {
+  border-radius: var(--radius-full);
+}
+.fa-dropzone svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* ── SearchInput ─────────────────────────────────────────────────────────
+   A sunken query pill: leading magnifier, borderless input, trailing
+   spinner-or-clear. The border warms on focus-within. */
+.fa-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 12px 16px;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--dur-fast) var(--ease-standard);
+}
+.fa-search:focus-within {
+  border-color: var(--color-primary);
+}
+.fa-search__icon {
+  flex: none;
+  display: inline-flex;
+  color: var(--color-muted);
+}
+.fa-search__input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: var(--font-sans);
+  font-size: var(--text-title);
+  color: var(--color-ink);
+  appearance: none;
+}
+/* Suppress the browser's native search ✕ — we render our own clear button. */
+.fa-search__input::-webkit-search-cancel-button {
+  display: none;
+}
+.fa-search__clear {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-muted);
+  border-radius: var(--radius-sm);
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+.fa-search__clear:hover {
+  color: var(--color-ink);
+}
+.fa-search__clear:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* ── Float ────────────────────────────────────────────────────────────────
+   A floating surface for clusters that hover over content (canvas chrome,
+   panels positioned by AnchoredPopover): page background, a hairline, and the
+   low overlay shadow. Pair with positioning of your own. */
+.fa-float {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-overlay-low);
+}
+
+/* ── AvatarStack ─────────────────────────────────────────────────────────
+   Overlapping avatars reading as one cluster, each ringed in the surface
+   colour so the overlap stays legible. */
+.fa-avstack {
+  display: inline-flex;
+}
+.fa-avstack__item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-full);
+  outline: 2px solid var(--color-surface);
+}
+.fa-avstack__item + .fa-avstack__item {
+  margin-left: -7px;
+}
+button.fa-avstack__item {
+  cursor: pointer;
+}
+
+/* ── DetailRow ───────────────────────────────────────────────────────────
+   A muted fixed-width label paired with an ink value, for metadata panels. */
+.fa-detailrow {
+  display: flex;
+  gap: var(--space-md);
+  align-items: baseline;
+  font-size: var(--text-body-sm);
+}
+.fa-detailrow__label {
+  flex: none;
+  width: 76px;
+  color: var(--color-muted);
+}
+.fa-detailrow__value {
+  color: var(--color-ink);
+}
+
+/* ── MediaPreview ────────────────────────────────────────────────────────
+   Shared image / PDF / placeholder rendering for archived files. Callers
+   typically pass a height (and border) via style. */
+.fa-mediaprev {
+  display: block;
+  width: 100%;
+}
+.fa-mediaprev--thumb {
+  object-fit: cover;
+}
+.fa-mediaprev--detail {
+  aspect-ratio: 4 / 3;
+  max-height: 360px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+}
+.fa-mediaprev__pdf {
+  width: 100%;
+  height: 360px;
+  border-radius: var(--radius-sm);
+}
+.fa-mediaprev__ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  /* Informational label ("PDF document", "scanned certificate") — muted, not
+     faint: faint sits below the 4.5:1 contrast bar for small text. */
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+/* In a detail view the placeholder fills the same 4:3 box an image would, so
+   the dialog doesn't jump between a real preview and a fileless one. Thumbs
+   take their height from the caller's style instead. */
+.fa-mediaprev__ph--detail {
+  aspect-ratio: 4 / 3;
+  max-height: 360px;
+}
+
+/* ── ClickableCard ───────────────────────────────────────────────────────
+   A stretched transparent button makes the whole card keyboard-operable
+   without nesting interactive elements. Secondary controls raise above it. */
+.fa-card-open {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: 0;
+  background: transparent;
+  border-radius: inherit;
+  cursor: pointer;
+  transition: box-shadow var(--dur-fast) var(--ease-standard);
+}
+/* Flat at rest (a border, not a lift) — the inner ring just signals clickable. */
+.fa-card-open:hover {
+  box-shadow: inset 0 0 0 1px var(--color-border-strong);
+}
+.fa-card-open:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: calc(-1 * var(--focus-ring-width));
+}
+.fa-card-raise {
+  position: relative;
+  z-index: 2;
+}
+
 /* ── IconBadge ───────────────────────────────────────────────────────── */
 .fa-iconbadge {
   display: inline-flex;
@@ -2136,6 +2400,7 @@ button.fa-chip:hover {
   .fa-dialog__close,
   .fa-toast__dismiss,
   .fa-combobox__clear,
+  .fa-search__clear,
   .fa-datefield__clear {
     width: 44px;
     height: 44px;

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Avatar,
+  AvatarStack,
   Button,
   DocChip,
   EmptyState,
@@ -116,19 +117,9 @@ function EventPeople({
 }) {
   return (
     <span className="app-evwith">
-      <span className="app-avstack">
-        {ids.slice(0, 3).map((id, i) => (
-          <Tooltip key={id} label={fullName(people[id])}>
-            <span
-              className="app-avstack-item"
-              style={{ marginLeft: i ? -7 : 0 }}
-              onClick={() => onOpen?.(id)}
-            >
-              <Avatar name={fullName(people[id])} size="sm" />
-            </span>
-          </Tooltip>
-        ))}
-      </span>
+      <AvatarStack
+        items={ids.map((id) => ({ name: fullName(people[id]), onClick: () => onOpen?.(id) }))}
+      />
       <span className="app-muted">
         {contextId ? "with " : ""}
         {ids.map((id) => people[id].given.split(" ")[0]).join(", ")}

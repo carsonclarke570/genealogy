@@ -10,9 +10,11 @@ import {
   Checkbox,
   Combobox,
   DateField,
+  FileDropzone,
   Input,
-  LocationField,
-  ProvenanceMark,
+  ProvField,
+  ProvLabel,
+  ProvLocationField,
   RadioGroup,
   Select,
   Switch,
@@ -21,7 +23,6 @@ import {
 import type {
   ProvenanceStatus,
   PartialDate,
-  SourceOption,
   LocationValue,
   LocationSuggestion,
 } from "@family-archive/ui";
@@ -37,7 +38,7 @@ import {
 } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import { serializePartialDate, parsePartialDate } from "@/lib/dates";
-import { locationFromLabel, locationLabel } from "@/lib/locations";
+import { locationFromLabel } from "@/lib/locations";
 import { PROV_LABEL } from "@/lib/prov";
 import { createPerson, updatePerson, type NameDraft, type RelationDraft, type RelationOp } from "@/lib/actions";
 import { Icon } from "./Icon";
@@ -320,128 +321,8 @@ function initialProv(person: Person | null): Record<string, ProvState> {
   return out;
 }
 
-/**
- * A field label with its confidence mark inline. Defined at module scope (not
- * inside AddPerson) so React keeps it mounted across the parent's re-renders —
- * inlining it would give the component a new identity each render, remounting the
- * uncontrolled <Input> below it and wiping whatever the user had typed.
- */
-function ProvLabel({
-  label,
-  status,
-  sources,
-  onChange,
-}: {
-  label: string;
-  status: ProvenanceStatus;
-  sources: SourceOption[];
-  onChange: (status: ProvenanceStatus, sourceLabel?: string, sourceId?: string) => void;
-}) {
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-      {label}
-      <ProvenanceMark status={status} sources={sources} onChange={onChange} size={13} />
-    </span>
-  );
-}
-
-/**
- * A text field carrying its provenance mark. Module-scoped for the same reason as
- * ProvLabel: keeping a stable component identity is what stops the uncontrolled
- * input from resetting to its defaultValue every time sibling form state changes.
- */
-function ProvField({
-  label,
-  placeholder,
-  fieldKey,
-  required,
-  defaultValue,
-  error,
-  status,
-  sources,
-  onProvChange,
-}: {
-  label: string;
-  placeholder: string;
-  fieldKey: string;
-  required?: boolean;
-  defaultValue?: string;
-  error?: string;
-  status: ProvenanceStatus;
-  sources: SourceOption[];
-  onProvChange: (k: string, status: ProvenanceStatus, sourceLabel?: string, sourceId?: string) => void;
-}) {
-  return (
-    <div style={{ flex: 1 }}>
-      <Input
-        name={fieldKey}
-        placeholder={placeholder}
-        required={required}
-        defaultValue={defaultValue}
-        error={error}
-        label={
-          <ProvLabel
-            label={label}
-            status={status}
-            sources={sources}
-            onChange={(s, srcLabel, srcId) => onProvChange(fieldKey, s, srcLabel, srcId)}
-          />
-        }
-      />
-    </div>
-  );
-}
-
-/**
- * A structured place picker (country → address) carrying its provenance mark —
- * the location-aware sibling of {@link ProvField}. The picked {@link LocationValue}
- * lives in local state for the geocoder UX, but the form still submits a plain
- * label string (`fieldKey`) via a hidden input, so the write path is unchanged.
- * Module-scoped so React keeps it mounted across the parent's re-renders.
- */
-function ProvLocationField({
-  label,
-  placeholder,
-  fieldKey,
-  value,
-  onChange,
-  status,
-  sources,
-  onProvChange,
-  onSearch,
-}: {
-  label: string;
-  placeholder: string;
-  /** The form field name the place label submits under, and the provenance key the
-   * mark reads/writes — both `birthPlace`/`deathPlace`, matching ProvField's key. */
-  fieldKey: string;
-  value: LocationValue | null;
-  onChange: (value: LocationValue | null) => void;
-  status: ProvenanceStatus;
-  sources: SourceOption[];
-  onProvChange: (k: string, status: ProvenanceStatus, sourceLabel?: string, sourceId?: string) => void;
-  onSearch: (query: string) => Promise<LocationSuggestion[]>;
-}) {
-  return (
-    <div style={{ flex: 1 }}>
-      <input type="hidden" name={fieldKey} value={locationLabel(value)} />
-      <LocationField
-        value={value}
-        onChange={onChange}
-        onSearch={onSearch}
-        hint={placeholder}
-        label={
-          <ProvLabel
-            label={label}
-            status={status}
-            sources={sources}
-            onChange={(s, srcLabel, srcId) => onProvChange(fieldKey, s, srcLabel, srcId)}
-          />
-        }
-      />
-    </div>
-  );
-}
+// ProvLabel, ProvField and ProvLocationField — the confidence-mark-bearing
+// field composites — now live in the design system (@family-archive/ui).
 
 export function AddPerson({
   editId,
@@ -1069,16 +950,16 @@ export function AddPerson({
 
           <div style={{ display: "grid", gap: "var(--space-lg)", position: "sticky", top: 0 }}>
             <Card title="Portrait">
-              <button className="app-dropzone" style={{ height: 150, borderRadius: "var(--radius-full)" }}>
+              <FileDropzone shape="round" style={{ height: 150 }} aria-label="Drop a portrait photo">
                 <Icon name="upload" />
                 <span style={{ fontSize: "var(--text-body-sm)" }}>Drop a photo</span>
-              </button>
+              </FileDropzone>
             </Card>
             <Card title="Documents">
-              <button className="app-dropzone" style={{ height: 96 }}>
+              <FileDropzone style={{ height: 96 }} aria-label="Drop documents">
                 <Icon name="upload" />
                 <span style={{ fontSize: "var(--text-body-sm)" }}>Certificates, articles, PDFs</span>
-              </button>
+              </FileDropzone>
             </Card>
             <Card title="Visibility">
               <RadioGroup
