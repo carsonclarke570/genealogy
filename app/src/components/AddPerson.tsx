@@ -73,6 +73,8 @@ interface RelRowState {
   /** Spouse rows only — when the couple married / divorced. */
   marriedDate?: PartialDate | null;
   divorcedDate?: PartialDate | null;
+  /** Spouse rows only — this person adopted the spouse's surname at marriage. */
+  tookSurname?: boolean;
 }
 
 let relKeySeq = 0;
@@ -147,6 +149,16 @@ function RelRow({
           <div style={{ flex: 1 }}>
             <DateField label="Divorced (if applicable)" value={row.divorcedDate ?? null} onChange={(d) => onUpdate({ divorcedDate: d })} />
           </div>
+        </div>
+      )}
+      {row.type === "spouse" && (
+        <div style={{ paddingLeft: 130 + 16 }}>
+          <Checkbox
+            label="Took spouse's surname"
+            description="Records a marriage name change adopting the spouse's surname"
+            checked={row.tookSurname ?? false}
+            onChange={(e) => onUpdate({ tookSurname: e.target.checked })}
+          />
         </div>
       )}
     </div>
@@ -457,6 +469,17 @@ export function AddPerson({
   // the Names section below manages every later name. Seed both from person.names.
   const sortedNames = useMemo(() => (person ? sortNames(person.names ?? []) : []), [person]);
   const birth = sortedNames[0] ?? null;
+  // Spouse-edge ids that already have a recorded marriage name change — drives the
+  // "Took spouse's surname" checkbox's pre-checked/locked state on existing edges.
+  const marriedNameRelIds = useMemo(
+    () =>
+      new Set(
+        sortedNames
+          .filter((n) => n.reason === "marriage" && n.relationshipId)
+          .map((n) => n.relationshipId as string),
+      ),
+    [sortedNames],
+  );
   const [names, setNames] = useState<NameRowState[]>(() =>
     sortedNames.slice(1).map((n) => ({
       key: `name-${nameKeySeq++}`,
@@ -524,12 +547,15 @@ export function AddPerson({
     divorced: PartialDate | null;
     marriedProv: ProvState;
     divorcedProv: ProvState;
+    /** Whether to record (on save) that the subject took this spouse's surname. */
+    tookSurname: boolean;
   };
   const emptySpouseDates: SpouseDateState = {
     married: null,
     divorced: null,
     marriedProv: { status: "unverified" },
     divorcedProv: { status: "unverified" },
+    tookSurname: false,
   };
   const [spouseDates, setSpouseDates] = useState<Record<string, SpouseDateState>>(() => {
     const out: Record<string, SpouseDateState> = {};
@@ -540,6 +566,7 @@ export function AddPerson({
           divorced: parsePartialDate(r.divorcedDate),
           marriedProv: { status: r.marriedProv ?? "unverified", mediaId: r.marriedMediaId ?? null },
           divorcedProv: { status: r.divorcedProv ?? "unverified", mediaId: r.divorcedMediaId ?? null },
+          tookSurname: marriedNameRelIds.has(r.id),
         };
       }
     }
@@ -577,6 +604,9 @@ export function AddPerson({
           marriedMediaId: s.marriedProv.mediaId ?? null,
           divorcedProv: s.divorcedProv.status,
           divorcedMediaId: s.divorcedProv.mediaId ?? null,
+          // Only ask the server to create one when it isn't already recorded —
+          // an existing marriage name change round-trips through the Names card.
+          tookSpouseSurname: !marriedNameRelIds.has(r.edgeId) && s.tookSurname,
         };
       }),
   ];
@@ -602,6 +632,7 @@ export function AddPerson({
               personId: r.personId,
               marriedDate: serializePartialDate(r.marriedDate ?? null),
               divorcedDate: serializePartialDate(r.divorcedDate ?? null),
+              tookSpouseSurname: r.tookSurname ?? false,
             }
           : { type: r.type, personId: r.personId },
       );
@@ -931,12 +962,14 @@ export function AddPerson({
                           </div>
                           {r.kind === "spouse" && !marked && (() => {
                             const sd = spouseDates[r.edgeId] ?? emptySpouseDates;
+                            const alreadyTook = marriedNameRelIds.has(r.edgeId);
                             const setMarriedProv = (status: ProvenanceStatus, _l?: string, id?: string) =>
                               setSpouseDate(r.edgeId, { marriedProv: { status, mediaId: id ?? null } });
                             const setDivorcedProv = (status: ProvenanceStatus, _l?: string, id?: string) =>
                               setSpouseDate(r.edgeId, { divorcedProv: { status, mediaId: id ?? null } });
                             return (
-                              <div className="app-field-row" style={{ paddingLeft: "var(--space-lg)" }}>
+                              <div style={{ display: "grid", gap: "var(--space-sm)", paddingLeft: "var(--space-lg)" }}>
+                              <div className="app-field-row">
                                 <div style={{ flex: 1 }}>
                                   <DateField
                                     label={
@@ -969,6 +1002,18 @@ export function AddPerson({
                                     onChange={(d) => setSpouseDate(r.edgeId, { divorced: d })}
                                   />
                                 </div>
+                              </div>
+                              <Checkbox
+                                label="Took spouse's surname"
+                                description={
+                                  alreadyTook
+                                    ? "Recorded — edit it in “Names & name changes” below"
+                                    : "Records a marriage name change adopting the spouse's surname"
+                                }
+                                checked={alreadyTook || sd.tookSurname}
+                                disabled={alreadyTook}
+                                onChange={(e) => setSpouseDate(r.edgeId, { tookSurname: e.target.checked })}
+                              />
                               </div>
                             );
                           })()}

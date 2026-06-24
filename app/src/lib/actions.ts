@@ -18,6 +18,7 @@ import { person, personName, relationship, event, eventPerson, media, residence 
 import { provStatuses, type ProvStatus } from "./prov";
 import { dateSortKey, type NameReason } from "./family-data";
 import { parsePartialDate, serializePartialDate, residenceDateKinds } from "./dates";
+import { composeMarriageNameDrafts, type FlaggedSpouse } from "./marriage-names";
 import { locationToColumns } from "./locations";
 import type { LocationValue } from "@family-archive/ui";
 import { indexPerson } from "./search/index-doc";
@@ -58,6 +59,8 @@ export type RelationDraft = {
   /** Spouse rows only: canonical partial-date strings for the timeline. */
   marriedDate?: string | null;
   divorcedDate?: string | null;
+  /** Spouse rows only: the person being added adopted this spouse's surname. */
+  tookSpouseSurname?: boolean;
 };
 
 const relationDraftSchema = z
@@ -67,6 +70,7 @@ const relationDraftSchema = z
       personId: z.string().min(1),
       marriedDate: z.string().nullish(),
       divorcedDate: z.string().nullish(),
+      tookSpouseSurname: z.boolean().optional().catch(false),
     }),
   )
   .catch([]);
@@ -92,6 +96,8 @@ export type RelationOp =
       marriedMediaId?: string | null;
       divorcedProv?: string;
       divorcedMediaId?: string | null;
+      /** The subject adopted this spouse's surname (only emitted when not already recorded). */
+      tookSpouseSurname?: boolean;
     };
 
 const optionalMediaId = z
@@ -112,6 +118,7 @@ const relationOpSchema = z
         marriedMediaId: optionalMediaId,
         divorcedProv: z.enum(provStatuses).catch("unverified"),
         divorcedMediaId: optionalMediaId,
+        tookSpouseSurname: z.boolean().optional().catch(false),
       }),
     ]),
   )
@@ -623,6 +630,70 @@ async function syncPersonNames(db: DB, personId: string, drafts: NameDraft[]): P
   ]);
 }
 
+/**
+ * Build the marriage name changes implied by "took spouse's surname" flags. For
+ * each flagged spouse we resolve the (now-persisted) spouse edge between the
+ * subject and that spouse — undirected, so the subject may sit on either end —
+ * take the spouse's current surname, and compose a `marriage` name change that
+ * keeps the subject's given names. Idempotent: an existing marriage name row for
+ * the same edge is reused (so re-saving updates rather than duplicates), and a
+ * flag is skipped entirely when a manual name draft already targets that edge
+ * (the manual row wins — guarding against a duplicate-key insert).
+ */
+async function buildSurnameNameDrafts(
+  db: DB,
+  subjectId: string,
+  given: string,
+  flagged: FlaggedSpouse[],
+  manualDrafts: NameDraft[],
+): Promise<NameDraft[]> {
+  if (flagged.length === 0) return [];
+  const spouseIds = [...new Set(flagged.map((f) => f.spousePersonId))];
+
+  // Resolve the spouse edge for each flagged partner, keyed by the partner's id.
+  const edges = await db
+    .select({ id: relationship.id, personId: relationship.personId, relatedId: relationship.relatedId })
+    .from(relationship)
+    .where(
+      and(
+        eq(relationship.kind, "spouse"),
+        or(
+          and(eq(relationship.personId, subjectId), inArray(relationship.relatedId, spouseIds)),
+          and(eq(relationship.relatedId, subjectId), inArray(relationship.personId, spouseIds)),
+        ),
+      ),
+    );
+  const relBySpouse = new Map<string, string>();
+  for (const e of edges) {
+    const other = e.personId === subjectId ? e.relatedId : e.personId;
+    if (!relBySpouse.has(other)) relBySpouse.set(other, e.id);
+  }
+
+  // The spouse's current surname (the name being adopted), plus any existing
+  // marriage name row to reuse — fetched concurrently.
+  const relIds = [...new Set(relBySpouse.values())];
+  const [partners, existingNames] = await Promise.all([
+    db.select({ id: person.id, surname: person.surname }).from(person).where(inArray(person.id, spouseIds)),
+    relIds.length
+      ? db
+          .select({ id: personName.id, relationshipId: personName.relationshipId })
+          .from(personName)
+          .where(and(eq(personName.personId, subjectId), eq(personName.reason, "marriage"), inArray(personName.relationshipId, relIds)))
+      : Promise.resolve([] as { id: string; relationshipId: string | null }[]),
+  ]);
+  const surnameByPerson = new Map(partners.map((p) => [p.id, p.surname]));
+  const existingByRel = new Map<string, string>();
+  for (const r of existingNames) if (r.relationshipId) existingByRel.set(r.relationshipId, r.id);
+
+  // A manual name row already covering an edge wins (so we never emit two drafts
+  // for one edge — the second would collide on insert). The composition itself
+  // (dedupe + id reuse) is pure, in ./marriage-names, so it's unit-tested.
+  const manualRelIds = new Set(
+    manualDrafts.map((d) => d.causeRelationshipId).filter((x): x is string => !!x),
+  );
+  return composeMarriageNameDrafts({ given, flagged, relBySpouse, surnameByPerson, existingByRel, manualRelIds });
+}
+
 /** Compose the full name history from the validated birth name + the form's later names. */
 function composeNameDrafts(
   data: z.infer<typeof createPersonSchema>,
@@ -661,9 +732,15 @@ export async function createPerson(formData: FormData): Promise<CreatePersonResu
   const { unlinkedSiblings } = await persistRelationships(db, id, relationships);
 
   // Record the name history (birth name + any later names), which also rewrites
-  // the current-name cache. Runs after relationships so a name change linked to an
-  // existing marriage resolves; links to brand-new edges drafted here are dropped.
-  await syncPersonNames(db, id, composeNameDrafts(parsed.data, parseNames(formData.get("names"))));
+  // the current-name cache. Runs after relationships so a name change linked to a
+  // marriage — including one auto-generated from a "took spouse's surname" flag on
+  // a brand-new spouse edge — resolves to a now-persisted relationship.
+  const manualNames = parseNames(formData.get("names"));
+  const flaggedSpouses = relationships
+    .filter((d) => d.type === "spouse" && d.tookSpouseSurname)
+    .map((d) => ({ spousePersonId: d.personId, marriedDate: d.marriedDate ?? null, prov: "unverified" }));
+  const autoNames = await buildSurnameNameDrafts(db, id, parsed.data.given, flaggedSpouses, manualNames);
+  await syncPersonNames(db, id, composeNameDrafts(parsed.data, [...manualNames, ...autoNames]));
 
   // Best-effort: index the new person for search. A failure here (embedding
   // server down, etc.) must never fail the create — the boot/`db:reindex`
@@ -968,17 +1045,48 @@ export async function updatePerson(
     return { ok: false, errors: { form: "That person no longer exists." } };
   }
 
-  // Remove any edges the user struck out, then add any newly drafted ones.
-  await applyRelationshipOps(db, id, parseRelationOps(formData.get("relationshipOps")));
-  const { unlinkedSiblings } = await persistRelationships(
-    db,
-    id,
-    parseRelationships(formData.get("relationships")),
+  // Remove any edges the user struck out, then add any newly drafted ones. Keep
+  // the parsed ops around so we can read "took spouse's surname" flags off them.
+  const relationshipOps = parseRelationOps(formData.get("relationshipOps"));
+  await applyRelationshipOps(db, id, relationshipOps);
+  const relationships = parseRelationships(formData.get("relationships"));
+  const { unlinkedSiblings } = await persistRelationships(db, id, relationships);
+
+  // Marriage name changes from "took spouse's surname": flags ride on both new
+  // spouse drafts (spouse id in hand) and existing-edge setDates ops (edge id in
+  // hand → resolve the partner). Resolve the ops' partners in one query.
+  const flaggedFromDrafts = relationships
+    .filter((d) => d.type === "spouse" && d.tookSpouseSurname)
+    .map((d) => ({ spousePersonId: d.personId, marriedDate: d.marriedDate ?? null, prov: "unverified" }));
+  const flaggedOps = relationshipOps.filter(
+    (o): o is Extract<RelationOp, { op: "setDates" }> => o.op === "setDates" && !!o.tookSpouseSurname,
   );
+  let flaggedFromOps: FlaggedSpouse[] = [];
+  if (flaggedOps.length) {
+    const rows = await db
+      .select({ id: relationship.id, personId: relationship.personId, relatedId: relationship.relatedId })
+      .from(relationship)
+      .where(inArray(relationship.id, flaggedOps.map((o) => o.id)));
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    flaggedFromOps = flaggedOps.flatMap((o) => {
+      const row = byId.get(o.id);
+      if (!row) return [];
+      const other = row.personId === id ? row.relatedId : row.personId;
+      return [{ spousePersonId: other, marriedDate: o.marriedDate, prov: o.marriedProv ?? "unverified" }];
+    });
+  }
 
   // Reconcile the name history (birth name from the Identity fields + later names),
   // which also rewrites the current-name cache the person UPDATE above seeded.
-  await syncPersonNames(db, id, composeNameDrafts(parsed.data, parseNames(formData.get("names"))));
+  const manualNames = parseNames(formData.get("names"));
+  const autoNames = await buildSurnameNameDrafts(
+    db,
+    id,
+    parsed.data.given,
+    [...flaggedFromDrafts, ...flaggedFromOps],
+    manualNames,
+  );
+  await syncPersonNames(db, id, composeNameDrafts(parsed.data, [...manualNames, ...autoNames]));
 
   // Best-effort re-index so edits to names/places/notes surface in search.
   try {
