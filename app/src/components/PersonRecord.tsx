@@ -61,6 +61,7 @@ export function PersonRecord({
   onNavigate,
   onToast,
   onUpload,
+  onEditMedia,
 }: {
   id: string;
   onOpen: (id: string, mode?: "edit") => void;
@@ -68,6 +69,8 @@ export function PersonRecord({
   onToast: (msg: string) => void;
   /** Open the full-screen upload screen with this person pre-attached. */
   onUpload: () => void;
+  /** Open the full-screen edit screen for a media item. */
+  onEditMedia: (mediaId: string) => void;
 }) {
   const { people, media: allMedia, graph, events: allEvents, residences: allResidences } = useDataset();
   const p = people[id];
@@ -592,7 +595,7 @@ export function PersonRecord({
         </div>
       </div>
 
-      <MediaDetail media={openMedia} onClose={() => setOpenMedia(null)} onOpen={onOpen} onToast={onToast} />
+      <MediaDetail media={openMedia} onClose={() => setOpenMedia(null)} onOpen={onOpen} onToast={onToast} onEdit={onEditMedia} />
       <AddResidenceDialog
         open={residenceEdit !== null}
         onClose={() => setResidenceEdit(null)}

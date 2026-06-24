@@ -13,9 +13,10 @@ import { Search } from "./Search";
 import { AddPerson } from "./AddPerson";
 import { Timeline } from "./Timeline";
 import { MediaUpload } from "./MediaUpload";
+import { MediaEdit } from "./MediaEdit";
 import type { TreeMode } from "@/lib/tree-layout";
 
-export type Screen = "explorer" | "person" | "gallery" | "search" | "add" | "timeline" | "upload";
+export type Screen = "explorer" | "person" | "gallery" | "search" | "add" | "timeline" | "upload" | "mediaEdit";
 
 interface Route {
   screen: Screen;
@@ -24,6 +25,8 @@ interface Route {
   editId: string | null;
   /** When on the "upload" screen, a person to pre-attach + lock — null means none. */
   uploadFor: string | null;
+  /** When on the "mediaEdit" screen, the media item being edited — null means none. */
+  editMediaId: string | null;
 }
 
 const NAV: [Screen, string, IconName][] = [
@@ -42,10 +45,11 @@ const TITLES: Record<Screen, string> = {
   add: "Add a person",
   timeline: "Family timeline",
   upload: "Upload media",
+  mediaEdit: "Edit media",
 };
 
 export function AppShell({ data }: { data: Dataset }) {
-  const [route, setRoute] = useState<Route>({ screen: "explorer", personId: "eleanor", editId: null, uploadFor: null });
+  const [route, setRoute] = useState<Route>({ screen: "explorer", personId: "eleanor", editId: null, uploadFor: null, editMediaId: null });
   // Explorer focus is a navigation stack so the fog-of-war view has a "back".
   const [focusStack, setFocusStack] = useState<string[]>([]);
   const focusId = focusStack.length ? focusStack[focusStack.length - 1] : null;
@@ -71,14 +75,17 @@ export function AppShell({ data }: { data: Dataset }) {
   // Any ordinary navigation clears edit + upload context; only the dedicated
   // openers (openPerson edit / openUpload) set them.
   const navigate = (screen: Screen, personId?: string) =>
-    setRoute((r) => ({ screen, personId: personId ?? r.personId, editId: null, uploadFor: null }));
+    setRoute((r) => ({ screen, personId: personId ?? r.personId, editId: null, uploadFor: null, editMediaId: null }));
   const openPerson = (personId: string, mode?: "edit") =>
     mode === "edit"
-      ? setRoute((r) => ({ screen: "add", personId: r.personId, editId: personId, uploadFor: null }))
+      ? setRoute((r) => ({ screen: "add", personId: r.personId, editId: personId, uploadFor: null, editMediaId: null }))
       : navigate("person", personId);
   // The full-screen upload screen; `personId` pre-attaches + locks that person.
   const openUpload = (personId?: string) =>
-    setRoute((r) => ({ screen: "upload", personId: r.personId, editId: null, uploadFor: personId ?? null }));
+    setRoute((r) => ({ screen: "upload", personId: r.personId, editId: null, uploadFor: personId ?? null, editMediaId: null }));
+  // The full-screen edit screen for an existing media item.
+  const openMediaEdit = (mediaId: string) =>
+    setRoute((r) => ({ screen: "mediaEdit", personId: r.personId, editId: null, uploadFor: null, editMediaId: mediaId }));
 
   return (
     <DatasetProvider value={data}>
@@ -176,12 +183,18 @@ export function AppShell({ data }: { data: Dataset }) {
               onNavigate={navigate}
               onToast={setToast}
               onUpload={() => openUpload(route.personId)}
+              onEditMedia={openMediaEdit}
             />
           )}
           {route.screen === "timeline" && <Timeline onOpen={openPerson} onNavigate={navigate} />}
-          {route.screen === "gallery" && <Gallery onOpen={openPerson} onToast={setToast} onUpload={() => openUpload()} />}
+          {route.screen === "gallery" && (
+            <Gallery onOpen={openPerson} onToast={setToast} onUpload={() => openUpload()} onEditMedia={openMediaEdit} />
+          )}
           {route.screen === "upload" && (
             <MediaUpload onNavigate={navigate} onToast={setToast} preselectPersonId={route.uploadFor ?? undefined} />
+          )}
+          {route.screen === "mediaEdit" && route.editMediaId && (
+            <MediaEdit mediaId={route.editMediaId} onNavigate={navigate} onToast={setToast} />
           )}
           {route.screen === "search" && <Search onOpen={openPerson} onNavigate={navigate} />}
           {route.screen === "add" && (

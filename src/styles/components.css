@@ -2172,22 +2172,32 @@ button.fa-avstack__item {
 }
 
 /* Popover — a floating overlay, so it earns the low overlay shadow. */
-.fa-cal {
-  position: absolute;
-  top: calc(100% + 6px);
-  inset-inline-start: 0;
+/* The AnchoredPopover portal container for the calendar. It carries the stacking
+   AND the visual chrome (mirroring .fa-combobox__pop) now that .fa-cal no longer
+   positions itself. The chrome must live here, not on .fa-cal: the popover panel
+   caps its own height with overflow:auto, which would clip a child's box-shadow —
+   so the shadow rides on the scrolling element itself, where it isn't clipped. */
+.fa-cal-pop {
   z-index: var(--z-dropdown);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  width: 19rem;
-  padding: var(--space-sm);
   background-color: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-overlay-low);
   animation: fa-cal-in var(--dur-fast) var(--ease-out-quart);
   transform-origin: top center;
+}
+
+.fa-cal {
+  /* Layout only — flows in normal order inside the .fa-cal-pop portal, which owns
+     the positioning, the gap below the trigger, the viewport-edge clamping, and
+     the chrome above. (It must NOT be position:absolute: the panel caps its own
+     height with overflow:auto, and an absolutely-positioned child would be pulled
+     out of flow — leaving the panel zero-sized and clipping the calendar.) */
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 19rem;
+  padding: var(--space-sm);
 }
 
 /* Month/year header: ‹ label › — the label drills up a level. */
@@ -2372,7 +2382,7 @@ button.fa-avstack__item {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .fa-cal,
+  .fa-cal-pop,
   .fa-cal__body {
     animation: none;
   }
