@@ -112,6 +112,18 @@ export type { FileDropzoneProps, FileDropzoneShape } from "./components/FileDrop
 export { SearchInput } from "./components/SearchInput";
 export type { SearchInputProps } from "./components/SearchInput";
 
+export { AvatarStack } from "./components/AvatarStack";
+export type { AvatarStackProps, AvatarStackItem } from "./components/AvatarStack";
+
+export { DetailRow } from "./components/DetailRow";
+export type { DetailRowProps } from "./components/DetailRow";
+
+export { MediaPreview } from "./components/MediaPreview";
+export type { MediaPreviewProps, MediaPreviewVariant } from "./components/MediaPreview";
+
+export { ClickableCard, CARD_RAISE_CLASS } from "./components/ClickableCard";
+export type { ClickableCardProps } from "./components/ClickableCard";
+
 export { ToastViewport } from "./components/ToastViewport";
 export type { ToastViewportProps, ToastViewportPosition } from "./components/ToastViewport";
 

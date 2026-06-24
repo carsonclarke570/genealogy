@@ -305,32 +305,8 @@ body {
   font-size: var(--text-body-sm);
   border-radius: var(--radius-sm);
 }
-/* Stretched-button overlay that makes a whole Card keyboard-operable without
-   nesting interactive elements. Secondary controls inside the card raise above
-   it with .app-above-overlay. */
-.app-card-open {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  border: 0;
-  background: transparent;
-  border-radius: inherit;
-  cursor: pointer;
-  transition: box-shadow 0.12s;
-}
-/* Subtle inner ring on hover signals the whole card is clickable — flat by
-   default (a border, not a lifting drop shadow). */
-.app-card-open:hover {
-  box-shadow: inset 0 0 0 1px var(--color-border-strong);
-}
-.app-card-open:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: -2px;
-}
-.app-above-overlay {
-  position: relative;
-  z-index: 2;
-}
+/* ClickableCard's stretched-button overlay (.fa-card-open) and the raise helper
+   (.fa-card-raise) now come from the design system. */
 
 /* Clickable "person in this record" row in the media-detail dialog. */
 .app-mediaperson {
@@ -836,15 +812,6 @@ body {
   align-items: center;
   gap: var(--space-sm);
   font-size: var(--text-body-sm);
-}
-.app-avstack {
-  display: inline-flex;
-}
-.app-avstack-item {
-  display: inline-flex;
-  border-radius: 50%;
-  outline: 2px solid var(--color-surface);
-  cursor: pointer;
 }
 .app-evsource {
   display: inline-flex;

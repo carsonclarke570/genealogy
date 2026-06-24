@@ -1470,6 +1470,123 @@ button.fa-chip:hover {
   outline-offset: var(--focus-ring-offset);
 }
 
+/* ── AvatarStack ─────────────────────────────────────────────────────────
+   Overlapping avatars reading as one cluster, each ringed in the surface
+   colour so the overlap stays legible. */
+.fa-avstack {
+  display: inline-flex;
+}
+.fa-avstack__item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-full);
+  outline: 2px solid var(--color-surface);
+}
+.fa-avstack__item + .fa-avstack__item {
+  margin-left: -7px;
+}
+button.fa-avstack__item {
+  cursor: pointer;
+}
+.fa-avstack__more {
+  min-width: 1.75rem;
+  height: 1.75rem;
+  padding: 0 0.375rem;
+  font-size: var(--text-label);
+  font-weight: var(--fw-medium);
+  color: var(--color-muted);
+  background: var(--color-surface-sunken);
+}
+
+/* ── DetailRow ───────────────────────────────────────────────────────────
+   A muted fixed-width label paired with an ink value, for metadata panels. */
+.fa-detailrow {
+  display: flex;
+  gap: var(--space-md);
+  align-items: baseline;
+  font-size: var(--text-body-sm);
+}
+.fa-detailrow__label {
+  flex: none;
+  color: var(--color-muted);
+}
+.fa-detailrow__value {
+  color: var(--color-ink);
+}
+
+/* ── MediaPreview ────────────────────────────────────────────────────────
+   Shared image / PDF / placeholder rendering for archived files. Callers
+   typically pass a height (and border) via style. */
+.fa-mediaprev {
+  display: block;
+  width: 100%;
+}
+.fa-mediaprev--thumb {
+  object-fit: cover;
+}
+.fa-mediaprev--detail {
+  aspect-ratio: 4 / 3;
+  max-height: 360px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+}
+.fa-mediaprev__pdf {
+  width: 100%;
+  height: 360px;
+  border-radius: var(--radius-sm);
+}
+.fa-mediaprev__ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  /* Informational label ("PDF document", "scanned certificate") — muted, not
+     faint: faint sits below the 4.5:1 contrast bar for small text. */
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+/* In a detail view the placeholder fills the same 4:3 box an image would, so
+   the dialog doesn't jump between a real preview and a fileless one. Thumbs
+   take their height from the caller's style instead. */
+.fa-mediaprev__ph--detail {
+  aspect-ratio: 4 / 3;
+  max-height: 360px;
+}
+
+/* ── ClickableCard ───────────────────────────────────────────────────────
+   A stretched transparent button makes the whole card keyboard-operable
+   without nesting interactive elements. Secondary controls raise above it. */
+.fa-card-open {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: 0;
+  background: transparent;
+  border-radius: inherit;
+  cursor: pointer;
+  transition: box-shadow var(--dur-fast) var(--ease-standard);
+}
+/* Flat at rest (a border, not a lift) — the inner ring just signals clickable. */
+.fa-card-open:hover {
+  box-shadow: inset 0 0 0 1px var(--color-border-strong);
+}
+.fa-card-open:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: calc(-1 * var(--focus-ring-width));
+}
+.fa-card-raise {
+  position: relative;
+  z-index: 2;
+}
+
 /* ── IconBadge ───────────────────────────────────────────────────────── */
 .fa-iconbadge {
   display: inline-flex;
