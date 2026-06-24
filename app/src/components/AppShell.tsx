@@ -12,15 +12,18 @@ import { Gallery } from "./Gallery";
 import { Search } from "./Search";
 import { AddPerson } from "./AddPerson";
 import { Timeline } from "./Timeline";
+import { MediaUpload } from "./MediaUpload";
 import type { TreeMode } from "@/lib/tree-layout";
 
-export type Screen = "explorer" | "person" | "gallery" | "search" | "add" | "timeline";
+export type Screen = "explorer" | "person" | "gallery" | "search" | "add" | "timeline" | "upload";
 
 interface Route {
   screen: Screen;
   personId: string;
   /** When on the "add" screen, the person being edited — null means a fresh add. */
   editId: string | null;
+  /** When on the "upload" screen, a person to pre-attach + lock — null means none. */
+  uploadFor: string | null;
 }
 
 const NAV: [Screen, string, IconName][] = [
@@ -38,10 +41,11 @@ const TITLES: Record<Screen, string> = {
   search: "Search the archive",
   add: "Add a person",
   timeline: "Family timeline",
+  upload: "Upload media",
 };
 
 export function AppShell({ data }: { data: Dataset }) {
-  const [route, setRoute] = useState<Route>({ screen: "explorer", personId: "eleanor", editId: null });
+  const [route, setRoute] = useState<Route>({ screen: "explorer", personId: "eleanor", editId: null, uploadFor: null });
   // Explorer focus is a navigation stack so the fog-of-war view has a "back".
   const [focusStack, setFocusStack] = useState<string[]>([]);
   const focusId = focusStack.length ? focusStack[focusStack.length - 1] : null;
@@ -64,13 +68,17 @@ export function AppShell({ data }: { data: Dataset }) {
     return () => clearTimeout(t);
   }, [toast]);
 
-  // Any ordinary navigation clears edit mode; only openPerson(id, "edit") sets it.
+  // Any ordinary navigation clears edit + upload context; only the dedicated
+  // openers (openPerson edit / openUpload) set them.
   const navigate = (screen: Screen, personId?: string) =>
-    setRoute((r) => ({ screen, personId: personId ?? r.personId, editId: null }));
+    setRoute((r) => ({ screen, personId: personId ?? r.personId, editId: null, uploadFor: null }));
   const openPerson = (personId: string, mode?: "edit") =>
     mode === "edit"
-      ? setRoute((r) => ({ screen: "add", personId: r.personId, editId: personId }))
+      ? setRoute((r) => ({ screen: "add", personId: r.personId, editId: personId, uploadFor: null }))
       : navigate("person", personId);
+  // The full-screen upload screen; `personId` pre-attaches + locks that person.
+  const openUpload = (personId?: string) =>
+    setRoute((r) => ({ screen: "upload", personId: r.personId, editId: null, uploadFor: personId ?? null }));
 
   return (
     <DatasetProvider value={data}>
@@ -162,10 +170,19 @@ export function AppShell({ data }: { data: Dataset }) {
             />
           )}
           {route.screen === "person" && (
-            <PersonRecord id={route.personId} onOpen={openPerson} onNavigate={navigate} onToast={setToast} />
+            <PersonRecord
+              id={route.personId}
+              onOpen={openPerson}
+              onNavigate={navigate}
+              onToast={setToast}
+              onUpload={() => openUpload(route.personId)}
+            />
           )}
           {route.screen === "timeline" && <Timeline onOpen={openPerson} onNavigate={navigate} />}
-          {route.screen === "gallery" && <Gallery onOpen={openPerson} onToast={setToast} />}
+          {route.screen === "gallery" && <Gallery onOpen={openPerson} onToast={setToast} onUpload={() => openUpload()} />}
+          {route.screen === "upload" && (
+            <MediaUpload onNavigate={navigate} onToast={setToast} preselectPersonId={route.uploadFor ?? undefined} />
+          )}
           {route.screen === "search" && <Search onOpen={openPerson} onNavigate={navigate} />}
           {route.screen === "add" && (
             <AddPerson

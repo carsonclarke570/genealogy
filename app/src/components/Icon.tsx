@@ -7,6 +7,8 @@ import { Icon as UIIcon, GLYPHS } from "@family-archive/ui";
 const APP_GLYPHS = {
   tree: "M12 3v4M12 17v4M5 7h14M5 7a2 2 0 100-1.9M19 7a2 2 0 100-1.9M12 11a2 2 0 100-1.9M6 21a2 2 0 100-1.9M18 21a2 2 0 100-1.9M6 19v-4h12v4M12 13v-2",
   gallery: "M3 5h18v14H3zM3 15l5-5 4 4 3-3 6 6M8 9a1.5 1.5 0 100-1.9",
+  // Clockwise rotate arrow — for the document viewer's "rotate 90°" control.
+  rotate: "M21 12a9 9 0 11-2.64-6.36M21 3v4h-4",
 } as const;
 
 const PATHS = { ...GLYPHS, ...APP_GLYPHS };
