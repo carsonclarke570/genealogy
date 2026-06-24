@@ -12,7 +12,7 @@ import {
   IconBadge,
   Input,
   LocationField,
-  MultiSelect,
+  MultiCombobox,
   Select,
   sourceMeta,
 } from "@family-archive/ui";
@@ -235,12 +235,10 @@ export function AddEventDialog({
           <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
             People involved
           </div>
-          <MultiSelect
-            label="People"
-            placeholder="Tag family members"
-            icon={<Icon name="tree" size={15} />}
-            summary={(n) => `${n} tagged`}
-            selected={persons}
+          <MultiCombobox
+            aria-label="People involved"
+            placeholder="Search family members…"
+            value={persons}
             onChange={setPersons}
             options={personOptions}
           />

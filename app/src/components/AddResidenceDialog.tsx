@@ -8,7 +8,7 @@ import {
   DateField,
   Dialog,
   LocationField,
-  MultiSelect,
+  MultiCombobox,
   ProvenanceMark,
   SegmentedControl,
   Textarea,
@@ -197,19 +197,14 @@ export function AddResidenceDialog({
 
         <div style={{ display: "grid", gap: "var(--space-sm)" }}>
           <span className="app-label">Who lived here</span>
-          <MultiSelect
-            label="Residents"
-            placeholder="Add the people who lived here…"
-            selected={residents}
+          <MultiCombobox
+            aria-label="Who lived here"
+            placeholder="Search the people who lived here…"
+            value={residents}
             onChange={setResidents}
             options={personOptions}
-            summary={(n) => `${n} ${n === 1 ? "resident" : "residents"}`}
+            error={errors.personIds}
           />
-          {errors.personIds && (
-            <div role="alert" style={{ color: "var(--color-danger)", fontSize: "var(--text-body-sm)" }}>
-              {errors.personIds}
-            </div>
-          )}
         </div>
 
         <div style={{ display: "grid", gap: "var(--space-sm)" }}>

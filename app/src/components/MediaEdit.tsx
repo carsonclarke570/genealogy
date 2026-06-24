@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Avatar, Button, Dialog, Input, LocationField, MultiSelect, Select, Textarea } from "@family-archive/ui";
+import { Avatar, Button, Dialog, Input, LocationField, MultiCombobox, Select, Textarea } from "@family-archive/ui";
 import type { LocationValue, ProvenanceStatus } from "@family-archive/ui";
 import { fullName, lifeDates, type MediaItem } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
@@ -192,13 +192,12 @@ export function MediaEdit({
           <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
             People in this record
           </div>
-          <MultiSelect
-            label="People"
-            placeholder="Link people…"
-            selected={selectedPeople}
+          <MultiCombobox
+            aria-label="People in this record"
+            placeholder="Search people…"
+            value={selectedPeople}
             onChange={setSelectedPeople}
             options={personOptions}
-            summary={(n) => `${n} linked`}
           />
         </div>
 

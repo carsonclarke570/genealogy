@@ -87,6 +87,9 @@ export type { MultiSelectProps, MultiSelectOption } from "./components/MultiSele
 export { Combobox } from "./components/Combobox";
 export type { ComboboxProps, ComboboxOption } from "./components/Combobox";
 
+export { MultiCombobox } from "./components/MultiCombobox";
+export type { MultiComboboxProps } from "./components/MultiCombobox";
+
 export { Timeline, TimelineItem } from "./components/Timeline";
 export type { TimelineProps, TimelineItemProps } from "./components/Timeline";
 
