@@ -81,6 +81,13 @@ export type {
 export { SegmentedControl } from "./components/SegmentedControl";
 export type { SegmentedControlProps, SegmentItem } from "./components/SegmentedControl";
 
+export { ProvLabel, ProvField, ProvLocationField } from "./components/ProvField";
+export type {
+  ProvLabelProps,
+  ProvFieldProps,
+  ProvLocationFieldProps,
+} from "./components/ProvField";
+
 export { MultiSelect } from "./components/MultiSelect";
 export type { MultiSelectProps, MultiSelectOption } from "./components/MultiSelect";
 
