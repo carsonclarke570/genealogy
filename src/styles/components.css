@@ -1681,6 +1681,63 @@ button.fa-chip:hover {
   color: var(--color-primary);
 }
 
+/* MultiCombobox — the chosen items, as removable chips beneath the control.
+   The control, popover, and list all reuse the .fa-combobox__* rules above. */
+.fa-multicombo__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin: var(--space-sm) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.fa-multicombo__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 0.125rem 0.25rem 0.125rem 0.4375rem;
+  font-size: var(--text-label);
+  color: var(--color-ink);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+}
+.fa-multicombo__chip-leading {
+  display: inline-flex;
+  flex: none;
+}
+.fa-multicombo__chip-label {
+  white-space: nowrap;
+}
+.fa-multicombo__chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  color: var(--color-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+.fa-multicombo__chip-remove:hover {
+  background-color: var(--color-surface-sunken);
+  color: var(--color-ink);
+}
+.fa-multicombo__chip-remove:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: 1px;
+}
+.fa-multicombo__chip-remove:disabled {
+  cursor: not-allowed;
+  color: var(--color-faint);
+}
+
 /* ── ToastViewport ───────────────────────────────────────────────────── */
 .fa-toast-viewport {
   position: fixed;

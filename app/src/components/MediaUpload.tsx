@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Avatar, Button, Dialog, Input, LocationField, MultiSelect, Select, Textarea } from "@family-archive/ui";
+import { Avatar, Button, Dialog, Input, LocationField, MultiCombobox, Select, Textarea } from "@family-archive/ui";
 import type { LocationValue } from "@family-archive/ui";
 import { fullName, lifeDates } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
@@ -249,13 +249,12 @@ export function MediaUpload({
               <Avatar name={lockedName} size="sm" /> {lockedName}
             </div>
           ) : (
-            <MultiSelect
-              label="People"
-              placeholder="Link people…"
-              selected={selectedPeople}
+            <MultiCombobox
+              aria-label="People in this record"
+              placeholder="Search people…"
+              value={selectedPeople}
               onChange={setSelectedPeople}
               options={personOptions}
-              summary={(n) => `${n} linked`}
             />
           )}
         </div>
