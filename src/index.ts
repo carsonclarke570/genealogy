@@ -109,6 +109,9 @@ export type { IconButtonProps, IconButtonSize } from "./components/IconButton";
 export { FileDropzone } from "./components/FileDropzone";
 export type { FileDropzoneProps, FileDropzoneShape } from "./components/FileDropzone";
 
+export { SearchInput } from "./components/SearchInput";
+export type { SearchInputProps } from "./components/SearchInput";
+
 export { ToastViewport } from "./components/ToastViewport";
 export type { ToastViewportProps, ToastViewportPosition } from "./components/ToastViewport";
 

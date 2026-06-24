@@ -8,7 +8,7 @@
  * Falls back to keyword-only ranking when the embedding server is offline.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Avatar, Badge, Button, Card, Chip, EmptyState, Spinner } from "@family-archive/ui";
+import { Avatar, Badge, Button, Card, Chip, EmptyState, SearchInput } from "@family-archive/ui";
 import { fullName, lifeDates, docCount, relationsOf } from "@/lib/family-data";
 import type { MediaItem } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
@@ -102,45 +102,12 @@ export function Search({
       style={{ height: "100%", overflow: "auto", padding: "var(--space-2xl) var(--space-2xl) var(--space-4xl)" }}
     >
       <div style={{ maxWidth: 760, margin: "0 auto" }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "var(--space-md)",
-            padding: "12px 16px",
-            background: "var(--color-surface-sunken)",
-            border: "1px solid var(--color-border)",
-            borderRadius: "var(--radius-md)",
-          }}
-        >
-          <span style={{ color: "var(--color-muted)", flex: "none", display: "inline-flex" }}>
-            <Icon name="search" size={20} />
-          </span>
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search people, documents, places…"
-            style={{
-              flex: 1,
-              border: "none",
-              background: "transparent",
-              outline: "none",
-              fontSize: "1.125rem",
-              fontFamily: "var(--font-sans)",
-              color: "var(--color-ink)",
-            }}
-          />
-          {status === "loading" && <Spinner size="sm" />}
-          {q && (
-            <button
-              onClick={() => setQ("")}
-              aria-label="Clear"
-              style={{ border: "none", background: "transparent", cursor: "pointer", color: "var(--color-muted)", display: "inline-flex" }}
-            >
-              <Icon name="close" size={18} />
-            </button>
-          )}
-        </div>
+        <SearchInput
+          value={q}
+          onChange={setQ}
+          loading={status === "loading"}
+          placeholder="Search people, documents, places…"
+        />
 
         <div style={{ display: "flex", gap: "var(--space-sm)", marginTop: "var(--space-md)", alignItems: "center" }}>
           {SCOPES.map(([k, label]) => (

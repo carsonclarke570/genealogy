@@ -1414,6 +1414,62 @@ button.fa-chip:hover {
   height: 22px;
 }
 
+/* ── SearchInput ─────────────────────────────────────────────────────────
+   A sunken query pill: leading magnifier, borderless input, trailing
+   spinner-or-clear. The border warms on focus-within. */
+.fa-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 12px 16px;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--dur-fast) var(--ease-standard);
+}
+.fa-search:focus-within {
+  border-color: var(--color-primary);
+}
+.fa-search__icon {
+  flex: none;
+  display: inline-flex;
+  color: var(--color-muted);
+}
+.fa-search__input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: var(--font-sans);
+  font-size: 1.125rem;
+  color: var(--color-ink);
+  appearance: none;
+}
+/* Suppress the browser's native search ✕ — we render our own clear button. */
+.fa-search__input::-webkit-search-cancel-button {
+  display: none;
+}
+.fa-search__clear {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-muted);
+  border-radius: var(--radius-sm);
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+.fa-search__clear:hover {
+  color: var(--color-ink);
+}
+.fa-search__clear:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
 /* ── IconBadge ───────────────────────────────────────────────────────── */
 .fa-iconbadge {
   display: inline-flex;
