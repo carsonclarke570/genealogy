@@ -64,7 +64,12 @@ export function AnchoredPopover({
   children,
 }: AnchoredPopoverProps) {
   const innerRef = useRef<HTMLDivElement | null>(null);
-  const [pos, setPos] = useState<{ top: number; left: number; width?: number } | null>(null);
+  const [pos, setPos] = useState<{
+    top: number;
+    left: number;
+    width?: number;
+    maxHeight: number;
+  } | null>(null);
   // Portals need the DOM; guard SSR / first render.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -80,18 +85,33 @@ export function AnchoredPopover({
     const vw = document.documentElement.clientWidth;
     const vh = window.innerHeight;
 
+    const margin = 8;
+
     let left = align === "end" ? r.right - popW : r.left;
-    left = Math.max(8, Math.min(left, vw - popW - 8));
+    left = Math.max(margin, Math.min(left, vw - popW - margin));
 
-    // Below the trigger by default; flip above when it would overflow the
-    // viewport and there is more room up top.
-    let top = r.bottom + gap;
-    if (top + popH > vh - 8 && r.top - gap - popH >= 8) {
-      top = r.top - gap - popH;
+    // Below the trigger by default; flip above only when the panel can't fit
+    // below *and* there's more room up top. Whichever side we land on, cap the
+    // panel's height to the room actually available there so a tall panel
+    // scrolls inside the viewport instead of spilling off-screen (the bug where
+    // a people picker near the bottom edge got clipped).
+    const spaceBelow = vh - margin - (r.bottom + gap);
+    const spaceAbove = r.top - gap - margin;
+    const placeBelow = popH <= spaceBelow || spaceBelow >= spaceAbove;
+
+    let top: number;
+    let maxHeight: number;
+    if (placeBelow) {
+      top = r.bottom + gap;
+      maxHeight = spaceBelow;
+    } else {
+      maxHeight = spaceAbove;
+      top = r.top - gap - Math.min(popH, maxHeight);
     }
-    top = Math.max(8, top);
+    top = Math.max(margin, top);
+    maxHeight = Math.max(maxHeight, 0);
 
-    setPos({ top, left, width: w });
+    setPos({ top, left, width: w, maxHeight });
   }, [anchorRef, align, gap, matchWidth, width]);
 
   useLayoutEffect(() => {
@@ -122,9 +142,21 @@ export function AnchoredPopover({
   };
 
   // Position before first paint via the layout effect; until measured, render
-  // off-screen and transparent so there's no flash at (0,0).
+  // off-screen and transparent so there's no flash at (0,0). Once measured, cap
+  // the height to the room available on the chosen side: the panel itself
+  // scrolls as a fallback, and `--fa-popover-max-h` lets an inner scroll region
+  // (e.g. a combobox list) shrink so it stays the single scrollbar.
   const placed: CSSProperties = pos
-    ? { top: pos.top, left: pos.left, width: pos.width, right: "auto", bottom: "auto" }
+    ? {
+        top: pos.top,
+        left: pos.left,
+        width: pos.width,
+        right: "auto",
+        bottom: "auto",
+        maxHeight: pos.maxHeight,
+        overflowY: "auto",
+        ["--fa-popover-max-h" as string]: `${pos.maxHeight}px`,
+      }
     : { top: 0, left: 0, opacity: 0, pointerEvents: "none" };
 
   return createPortal(
