@@ -1889,7 +1889,10 @@ button.fa-avstack__item {
 .fa-combobox__list {
   display: grid;
   gap: 2px;
-  max-height: 280px;
+  /* Cap at 280px, but shrink to whatever room the popover found on the chosen
+     side (set by AnchoredPopover) minus the panel's own padding — so a picker
+     near a viewport edge scrolls its list instead of being clipped. */
+  max-height: min(280px, calc(var(--fa-popover-max-h, 100vh) - 2 * var(--space-sm)));
   overflow: auto;
   margin: 0;
   padding: 0;
