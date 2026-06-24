@@ -23,6 +23,7 @@ import type { Person, MediaItem, EventType, TimelineEvent, Residence } from "./f
 import { sortNames, dateSortKey } from "./family-data";
 import type { RelationshipEdge } from "./family-graph";
 import { parsePartialDate } from "./dates";
+import { censusResidenceId, censusEventId } from "./census-ids";
 
 /** A stored `event` row plus its linked people — the builder's input shape. */
 export interface StoredEvent {
@@ -288,6 +289,18 @@ export function buildTimeline(input: {
     );
   }
 
+  // A census seeds *both* a census event and a (point) residence at the same
+  // place/people/year. On the timeline that's one fact shown twice, so we draw it
+  // once — as the census event (it carries the place + cites the record) — and skip
+  // the twin residence here. Keyed on the deterministic ids so only the auto-derived
+  // pair is deduped; the residence still appears on the person's Residences tab.
+  const censusEventMedia = new Set<string>();
+  for (const e of events) {
+    if (e.type === "census" && e.mediaId && e.id === censusEventId(e.mediaId)) {
+      censusEventMedia.add(e.mediaId);
+    }
+  }
+
   // ── 4b. Residencies — derived from the residence table ───────────────────
   // A "range" residence is a *span* (start → optional end): it carries an
   // `endDate` the views render as a bar. A "point" residence is a single known
@@ -295,6 +308,11 @@ export function buildTimeline(input: {
   // stretched to "present". Both are marked `auto` (edited via the residence
   // dialog, not the event dialog).
   for (const r of residences) {
+    // Skip a census-derived residence whose census event is on the timeline — the
+    // event already represents it (see note above).
+    if (r.source && censusEventMedia.has(r.source.id) && r.id === censusResidenceId(r.source.id)) {
+      continue;
+    }
     // A residence is shared by a household; keep only residents present in the
     // dataset (a deleted person drops out) and place the one span on each timeline.
     const residents = r.personIds.map((id) => people[id]).filter((p): p is Person => p != null);

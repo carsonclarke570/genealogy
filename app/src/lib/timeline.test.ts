@@ -384,6 +384,56 @@ describe("buildTimeline — residence spans", () => {
   });
 });
 
+describe("buildTimeline — census residence/event dedup", () => {
+  // A census seeds a census event AND a residence at the same place/year; the
+  // timeline shows the census event and drops the redundant residence span.
+  const censusEvent = (mediaId: string, over: Partial<StoredEvent> = {}): StoredEvent =>
+    stored({ id: `E-census-${mediaId}`, type: "census", title: "1940 Census", date: "1940", mediaId, ...over });
+  const censusResidence = (mediaId: string, personIds: string | string[], over: Partial<Residence> = {}): Residence =>
+    residence(`R-census-${mediaId}`, personIds, {
+      dateKind: "point",
+      start: { precision: "year", year: 1940, month: null, day: null },
+      startYear: 1940,
+      source: { id: mediaId, title: "1940 Census", type: "census" },
+      place: "Cambridge, MA",
+      ...over,
+    });
+
+  it("drops the census-derived residence when its census event is present", () => {
+    const p = person("ele", { born: 1915 });
+    const evs = buildTimeline({
+      ...empty,
+      people: peopleMap(p),
+      events: [censusEvent("M-7", { people: ["ele"] })],
+      residences: [censusResidence("M-7", "ele")],
+    });
+    expect(evs.some((e) => e.id === "res-R-census-M-7")).toBe(false);
+    // The census event stays — it carries the place + cites the record.
+    const ev = evs.find((e) => e.id === "ev-E-census-M-7")!;
+    expect(ev.type).toBe("census");
+    expect(eventsOf(evs, "ele").map((e) => e.id)).toContain("ev-E-census-M-7");
+  });
+
+  it("keeps a census residence when no census event exists (place-only census)", () => {
+    const p = person("ele", { born: 1915 });
+    const evs = buildTimeline({ ...empty, people: peopleMap(p), residences: [censusResidence("M-8", "ele")] });
+    expect(evs.some((e) => e.id === "res-R-census-M-8")).toBe(true);
+  });
+
+  it("does not drop an ordinary residence that merely cites a census as its source", () => {
+    const p = person("ele", { born: 1915 });
+    // Same source media, but a normal residence id (user-entered span) — not the twin.
+    const r = residence("r-own", "ele", { source: { id: "M-7", title: "1940 Census", type: "census" }, place: "Boston" });
+    const evs = buildTimeline({
+      ...empty,
+      people: peopleMap(p),
+      events: [censusEvent("M-7", { people: ["ele"] })],
+      residences: [r],
+    });
+    expect(evs.some((e) => e.id === "res-r-own")).toBe(true);
+  });
+});
+
 describe("buildTimeline — marriage provenance", () => {
   it("reads marriage prov + source from the spouse edge", () => {
     const a = person("bob", { born: 1900 });
