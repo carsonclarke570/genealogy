@@ -210,66 +210,8 @@ body {
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-overlay-low);
 }
-.app-seg {
-  display: flex;
-  padding: 4px;
-  gap: 3px;
-}
-.app-iconbtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 32px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-  color: var(--color-muted);
-  transition: background-color 0.12s, color 0.12s;
-}
-.app-iconbtn:hover {
-  background: var(--color-surface-sunken);
-  color: var(--color-ink);
-}
-.app-iconbtn svg {
-  width: 18px;
-  height: 18px;
-}
-.app-segbtn {
-  border: none;
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--text-label);
-  font-weight: 500;
-  padding: 6px 11px;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-muted);
-  transition: background-color 0.12s, color 0.12s;
-}
-.app-segbtn:hover:not(.on) {
-  background: var(--color-surface-sunken);
-  color: var(--color-ink);
-}
-.app-segbtn.on {
-  background: var(--color-primary);
-  color: #fff;
-}
-
-/* view toolbar: orientation + scope grouped in one bar, split by a hairline */
-.app-viewbar {
-  display: flex;
-  align-items: stretch;
-  flex-wrap: wrap;
-}
-.app-view-divider {
-  flex: none;
-  width: 1px;
-  align-self: stretch;
-  margin: 6px 0;
-  background: var(--color-border);
-}
+/* The on-canvas segmented toggles and icon buttons now come from the design
+   system (SegmentedControl + IconButton). */
 
 /* fog-of-war frontier markers — hidden kin in a given direction off a node */
 .app-fog-chip {
@@ -1217,13 +1159,6 @@ body {
    markers (lane dots, fog chips) grow an invisible tap zone via a pseudo so
    the visual timeline stays unchanged. */
 @media (pointer: coarse) {
-  .app-iconbtn {
-    width: 44px;
-    height: 44px;
-  }
-  .app-segbtn {
-    min-height: 40px;
-  }
   .app-typechip,
   .app-periodsel {
     min-height: 40px;

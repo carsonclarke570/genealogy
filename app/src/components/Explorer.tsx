@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 import type { CSSProperties } from "react";
-import { Avatar, Badge, Button, PersonNode } from "@family-archive/ui";
+import { Avatar, Badge, Button, IconButton, PersonNode, SegmentedControl } from "@family-archive/ui";
 import {
   shortName,
   fullName,
@@ -552,9 +552,9 @@ function Peek({
     <div className="app-peek app-scroll">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <span className="app-label">Focused person</span>
-        <button className="app-iconbtn" onClick={onClose} aria-label="Close">
+        <IconButton onClick={onClose} aria-label="Close">
           <Icon name="close" size={16} />
-        </button>
+        </IconButton>
       </div>
       <div style={{ display: "flex", gap: "var(--space-md)", alignItems: "center", marginTop: "var(--space-md)" }}>
         <Avatar name={fullName(p)} size="lg" />
@@ -742,42 +742,43 @@ export function Explorer({
       </div>
 
       <div
-        className="app-float app-switch-wrap app-viewbar"
-        style={{ position: "absolute", top: 16, right: focusId ? 392 : 16, zIndex: 4, transition: "right .2s ease" }}
+        className="app-switch-wrap"
+        style={{ position: "absolute", top: 16, right: focusId ? 392 : 16, zIndex: 4, display: "flex", gap: "var(--space-sm)", transition: "right .2s ease" }}
       >
-        <div className="app-seg" role="group" aria-label="Tree orientation">
-          {opts.map(([k, label]) => (
-            <button key={k} className={"app-segbtn" + (layout === k ? " on" : "")} onClick={() => setLayout(k)}>
-              {label}
-            </button>
-          ))}
-        </div>
-        <span className="app-view-divider" aria-hidden="true" />
-        <div className="app-seg" role="group" aria-label="What to show">
-          <button className={"app-segbtn" + (!overview ? " on" : "")} onClick={() => setOverview(false)}>
-            Focus
-          </button>
-          <button className={"app-segbtn" + (overview ? " on" : "")} onClick={() => setOverview(true)}>
-            Overview
-          </button>
-        </div>
+        <SegmentedControl
+          aria-label="Tree orientation"
+          value={layout}
+          onValueChange={(v) => setLayout(v as TreeMode)}
+          items={opts.map(([k, label]) => ({ value: k, label }))}
+          style={{ boxShadow: "var(--shadow-overlay-low)" }}
+        />
+        <SegmentedControl
+          aria-label="What to show"
+          value={overview ? "overview" : "focus"}
+          onValueChange={(v) => setOverview(v === "overview")}
+          items={[
+            { value: "focus", label: "Focus" },
+            { value: "overview", label: "Overview" },
+          ]}
+          style={{ boxShadow: "var(--shadow-overlay-low)" }}
+        />
       </div>
 
-      <div className="app-float app-seg app-zoomctl" style={{ ...segWrap, bottom: 16, left: 16 }}>
+      <div className="app-float app-zoomctl" style={{ ...segWrap, display: "flex", gap: 3, bottom: 16, left: 16 }}>
         {!overview && focusTrail.length > 0 && (
-          <button className="app-iconbtn" onClick={onBack} aria-label="Back" title="Back to previous person">
+          <IconButton onClick={onBack} aria-label="Back" title="Back to previous person">
             <Icon name="chevron" size={18} style={{ transform: "rotate(180deg)" }} />
-          </button>
+          </IconButton>
         )}
-        <button className="app-iconbtn" onClick={() => controls.current?.zoom(0.83)} aria-label="Zoom out">
+        <IconButton onClick={() => controls.current?.zoom(0.83)} aria-label="Zoom out">
           <Icon name="zoomOut" />
-        </button>
-        <button className="app-iconbtn" onClick={() => controls.current?.zoom(1.2)} aria-label="Zoom in">
+        </IconButton>
+        <IconButton onClick={() => controls.current?.zoom(1.2)} aria-label="Zoom in">
           <Icon name="zoomIn" />
-        </button>
-        <button className="app-iconbtn" onClick={() => controls.current?.reset()} aria-label="Recenter">
+        </IconButton>
+        <IconButton onClick={() => controls.current?.reset()} aria-label="Recenter">
           <Icon name="recenter" />
-        </button>
+        </IconButton>
       </div>
 
       {unplaced.length > 0 && (

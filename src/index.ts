@@ -96,6 +96,9 @@ export type { TimelineProps, TimelineItemProps } from "./components/Timeline";
 export { IconBadge } from "./components/IconBadge";
 export type { IconBadgeProps } from "./components/IconBadge";
 
+export { IconButton } from "./components/IconButton";
+export type { IconButtonProps, IconButtonSize } from "./components/IconButton";
+
 export { ToastViewport } from "./components/ToastViewport";
 export type { ToastViewportProps, ToastViewportPosition } from "./components/ToastViewport";
 

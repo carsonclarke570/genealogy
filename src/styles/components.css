@@ -1318,6 +1318,57 @@ button.fa-chip:hover {
   padding: 0.25rem 0.5rem;
 }
 
+/* ── IconButton ──────────────────────────────────────────────────────────
+   A quiet, label-less control for a lone glyph — the toolbar/chrome
+   workhorse. Transparent until hovered, then the sunken surface fills in and
+   the glyph warms from muted to ink. */
+.fa-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  transition: background-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+.fa-iconbtn:hover:not(:disabled) {
+  background: var(--color-surface-sunken);
+  color: var(--color-ink);
+}
+.fa-iconbtn:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+.fa-iconbtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.fa-iconbtn svg {
+  width: 18px;
+  height: 18px;
+}
+.fa-iconbtn--sm {
+  width: 28px;
+  height: 28px;
+}
+.fa-iconbtn--sm svg {
+  width: 16px;
+  height: 16px;
+}
+/* Touch pointers need a ≥44px hit area (WCAG 2.5.5) without changing the
+   desktop look. */
+@media (pointer: coarse) {
+  .fa-iconbtn {
+    width: 44px;
+    height: 44px;
+  }
+}
+
 /* ── IconBadge ───────────────────────────────────────────────────────── */
 .fa-iconbadge {
   display: inline-flex;
