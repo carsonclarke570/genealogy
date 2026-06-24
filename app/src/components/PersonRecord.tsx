@@ -35,7 +35,6 @@ import { eventsOf, fmtDate, meta } from "@/lib/timeline";
 import { Icon, type IconName } from "./Icon";
 import { PersonTimeline } from "./Timeline";
 import { MiniNode, DocDot, MediaThumb, ClickableCard } from "./shared";
-import { MediaUpload } from "./MediaUpload";
 import { MediaDetail } from "./MediaDetail";
 import { AddResidenceDialog } from "./AddResidenceDialog";
 import type { Screen } from "./AppShell";
@@ -61,17 +60,19 @@ export function PersonRecord({
   onOpen,
   onNavigate,
   onToast,
+  onUpload,
 }: {
   id: string;
   onOpen: (id: string, mode?: "edit") => void;
   onNavigate: (screen: Screen) => void;
   onToast: (msg: string) => void;
+  /** Open the full-screen upload screen with this person pre-attached. */
+  onUpload: () => void;
 }) {
   const { people, media: allMedia, graph, events: allEvents, residences: allResidences } = useDataset();
   const p = people[id];
   const [docFilter, setDocFilter] = useState<string>("all");
   const [tab, setTab] = useState<string>("overview");
-  const [uploadOpen, setUploadOpen] = useState(false);
   const [openMedia, setOpenMedia] = useState<MediaItem | null>(null);
   // null = closed; { residence } where residence is null for "add" or a row to edit.
   const [residenceEdit, setResidenceEdit] = useState<{ residence: Residence | null } | null>(null);
@@ -303,7 +304,7 @@ export function PersonRecord({
           </Chip>
         ))}
         <span style={{ marginLeft: "auto" }}>
-          <Button variant="secondary" size="sm" iconStart={<Icon name="upload" size={16} />} onClick={() => setUploadOpen(true)}>
+          <Button variant="secondary" size="sm" iconStart={<Icon name="upload" size={16} />} onClick={onUpload}>
             Add document
           </Button>
         </span>
@@ -315,7 +316,7 @@ export function PersonRecord({
             title="No documents yet"
             description={`Attach a photo, certificate, article or obituary to ${firstName}'s record.`}
             action={
-              <Button variant="secondary" iconStart={<Icon name="upload" size={16} />} onClick={() => setUploadOpen(true)}>
+              <Button variant="secondary" iconStart={<Icon name="upload" size={16} />} onClick={onUpload}>
                 Add document
               </Button>
             }
@@ -591,12 +592,6 @@ export function PersonRecord({
         </div>
       </div>
 
-      <MediaUpload
-        open={uploadOpen}
-        onClose={() => setUploadOpen(false)}
-        onToast={onToast}
-        preselectPersonId={id}
-      />
       <MediaDetail media={openMedia} onClose={() => setOpenMedia(null)} onOpen={onOpen} onToast={onToast} />
       <AddResidenceDialog
         open={residenceEdit !== null}

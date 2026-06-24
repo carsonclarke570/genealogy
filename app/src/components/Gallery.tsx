@@ -7,7 +7,6 @@ import { fullName, type MediaItem, type Person } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import { Icon } from "./Icon";
 import { DocDot, MediaThumb, ClickableCard } from "./shared";
-import { MediaUpload } from "./MediaUpload";
 import { MediaDetail } from "./MediaDetail";
 
 type SortKey = "newest" | "oldest" | "person";
@@ -39,14 +38,16 @@ const types: [string, string, ChipDot | undefined][] = [
 export function Gallery({
   onOpen,
   onToast,
+  onUpload,
 }: {
   onOpen: (id: string) => void;
   onToast: (msg: string) => void;
+  /** Open the full-screen upload screen. */
+  onUpload: () => void;
 }) {
   const { people, media } = useDataset();
   const [filter, setFilter] = useState<string>("all");
   const [sort, setSort] = useState<SortKey>("newest");
-  const [uploadOpen, setUploadOpen] = useState(false);
   const [openMedia, setOpenMedia] = useState<MediaItem | null>(null);
   const items = useMemo(
     () => sortMedia(media.filter((m) => filter === "all" || m.type === filter), sort, people),
@@ -78,7 +79,7 @@ export function Gallery({
           </div>
           {/* When empty, the empty-state below carries the single primary CTA (one-voice rule). */}
           {!isEmptyArchive && (
-            <Button variant="primary" iconStart={<Icon name="upload" size={16} />} onClick={() => setUploadOpen(true)}>
+            <Button variant="primary" iconStart={<Icon name="upload" size={16} />} onClick={onUpload}>
               Upload media
             </Button>
           )}
@@ -91,7 +92,7 @@ export function Gallery({
               title="No media in the archive yet"
               description="This is where the family's photos, certificates, articles and obituaries live. Upload the first one to begin."
               action={
-                <Button variant="primary" iconStart={<Icon name="upload" size={16} />} onClick={() => setUploadOpen(true)}>
+                <Button variant="primary" iconStart={<Icon name="upload" size={16} />} onClick={onUpload}>
                   Upload media
                 </Button>
               }
@@ -186,7 +187,6 @@ export function Gallery({
         )}
       </div>
 
-      <MediaUpload open={uploadOpen} onClose={() => setUploadOpen(false)} onToast={onToast} />
       <MediaDetail media={openMedia} onClose={() => setOpenMedia(null)} onOpen={onOpen} onToast={onToast} />
     </div>
   );
