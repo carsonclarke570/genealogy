@@ -31,6 +31,8 @@ export interface MediaEditInput {
   prov?: string;
   description: string;
   personIds: string[];
+  /** Where the household lived — only meaningful (and required) for a Census. */
+  location?: unknown;
 }
 
 export async function updateMedia(id: string, input: MediaEditInput): Promise<MediaMutationResult> {

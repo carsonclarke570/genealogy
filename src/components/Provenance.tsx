@@ -12,7 +12,7 @@ export type ProvenanceStatus =
   | "disputed";
 
 /** Document types, matching the --doc-* token family. */
-export type DocType = "photo" | "certificate" | "article" | "obituary" | "other";
+export type DocType = "photo" | "certificate" | "article" | "obituary" | "census" | "other";
 
 export interface SourceOption {
   id: string;
@@ -216,6 +216,7 @@ export const DOC_TYPE_LABEL: Record<DocType, string> = {
   certificate: "Certificate",
   article: "Article",
   obituary: "Obituary",
+  census: "Census",
   other: "Document",
 };
 

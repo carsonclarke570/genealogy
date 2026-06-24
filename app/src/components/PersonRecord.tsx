@@ -52,6 +52,10 @@ function notesParagraphs(notes: string | null | undefined): string[] {
     .filter(Boolean);
 }
 
+/** Join names into a natural English list: "A", "A and B", "A, B, and C". */
+const listForHumans = (items: string[]): string =>
+  new Intl.ListFormat("en", { style: "long", type: "conjunction" }).format(items);
+
 export function PersonRecord({
   id,
   onOpen,
@@ -393,6 +397,10 @@ export function PersonRecord({
           {residences.map((r) => {
             const detail = formatLocation(r.location);
             const secondary = detail && detail !== r.place.trim() ? detail : null;
+            // Everyone else who shared this home, by first name.
+            const coResidents = r.personIds
+              .filter((pid) => pid !== id && people[pid])
+              .map((pid) => people[pid].given.split(" ")[0]);
             return (
               <div
                 key={r.id}
@@ -422,6 +430,11 @@ export function PersonRecord({
                   {r.note && (
                     <div style={{ fontSize: "var(--text-body-sm)", color: "var(--color-ink)", marginTop: 4, lineHeight: 1.45 }}>
                       {r.note}
+                    </div>
+                  )}
+                  {coResidents.length > 0 && (
+                    <div className="app-muted" style={{ fontSize: "var(--text-body-sm)", marginTop: 4 }}>
+                      Shared with {listForHumans(coResidents)}
                     </div>
                   )}
                 </div>
@@ -588,7 +601,7 @@ export function PersonRecord({
       <AddResidenceDialog
         open={residenceEdit !== null}
         onClose={() => setResidenceEdit(null)}
-        personId={id}
+        lockedPersonId={id}
         editResidence={residenceEdit?.residence ?? null}
         onSaved={onToast}
       />

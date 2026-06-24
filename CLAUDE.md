@@ -78,33 +78,47 @@ Schema in `app/src/db/schema.ts`; refined from the initial sketch:
   edge is undirected, and a child carries one `parent` row per recorded parent —
   so the family graph below reconstructs deterministically regardless of how an
   edge was entered.
-- **media** — id, type (photo | certificate | article | obituary | other), title,
-  year, plus file fields (path, mime, original filename, description). Real upload
-  populates the file fields; legacy/seed rows leave them null (the read model
-  exposes `hasFile`/`mimeType` so the UI shows a real preview or a placeholder).
+- **media** — id, type (photo | certificate | article | obituary | **census** |
+  other), title, year, plus file fields (path, mime, original filename,
+  description). Real upload populates the file fields; legacy/seed rows leave them
+  null (the read model exposes `hasFile`/`mimeType` so the UI shows a real preview
+  or a placeholder). A **`census`** upload additionally captures a place and
+  auto-generates a residence + a census event for its household (see below).
 - **person_media** — links media to one or more people. The read model derives a
   real per-person `mediaCount` from these rows (which `docCount` now prefers over
   the legacy `docs` JSON tally).
 - **event** + **event_person** — stored *custom* life events (immigration,
-  military, education, career, religious, other), each linkable to one
+  military, education, career, religious, **census**, other), each linkable to one
   or more people and an optional source document. Births, deaths, marriages and
   divorces are **never stored** — they're derived on read (see below), so editing
   a date updates the timeline with no sync. (Residence is no longer an event type —
   it became the first-class span below.)
-- **residence** — a first-class location record: a structured location
-  (country → region → locality → address, plus `placeLabel` + optional lat/lng/
-  placeId from the geocoder), scoped to one person, with **unified provenance**
-  (status + optional linked source document + note). Its `dateKind` (`0006`
-  migration) picks how the dates read: a **range** (the default — `start` = moved
-  in, `end` = moved out, null end = lived there onward / "present") or a **point**
-  (a single *known* date in `start` — "we know they lived here around then but not
-  the span", rendered "c. YYYY", `end` unused). The distinction is stored
-  explicitly because "a start with no end" can't otherwise be told apart from
-  "still there". Residencies **derive into the timeline** on read — ranges as span
-  events, points as point events (so editing a residence updates the timeline with
-  no sync). The `0005` migration backfills old point-in-time `residence` *events*
-  into one residence span per linked person (keeping the event title as the
-  residence note) and removes those events; new installs seed residencies directly.
+- **residence** + **residence_person** — a first-class location record: a
+  structured location (country → region → locality → address, plus `placeLabel` +
+  optional lat/lng/placeId from the geocoder), with **unified provenance** (status +
+  optional linked source document + note). A home is shared by a household, so a
+  residence is **many-to-many with people** through the `residence_person` join
+  table (`0007` migration; the timeline derives one span per residence, linked to
+  every resident). Its `dateKind` (`0006` migration) picks how the dates read: a
+  **range** (the default — `start` = moved in, `end` = moved out, null end = lived
+  there onward / "present") or a **point** (a single *known* date in `start` — "we
+  know they lived here around then but not the span", rendered "c. YYYY", `end`
+  unused). The distinction is stored explicitly because "a start with no end" can't
+  otherwise be told apart from "still there". Residencies **derive into the
+  timeline** on read — ranges as span events, points as point events (so editing a
+  residence updates the timeline with no sync). The `0005` migration backfills old
+  point-in-time `residence` *events* into residence spans; new installs seed
+  residencies directly.
+- **Census auto-derivation** (`app/src/lib/census.ts`). Uploading a `census` media
+  item seeds two first-class records — a *point* **residence** and a **census
+  event** — linked to everyone on the media and citing it as their source. Both use
+  *deterministic* ids (`R-census-${mediaId}` / `E-census-${mediaId}`) so generation
+  is idempotent, and carry an **`autoManaged`** flag: while true the media route's
+  `syncCensusDerived` keeps them in step as the census is edited; the moment a user
+  edits one by hand (`updateResidence`/`updateEvent`) the flag flips to false and
+  the sync leaves it alone. Deleting the census (or changing its type away) removes
+  the rows it still owns. `buildCensusRows` (`app/src/lib/census-derive.ts`) is the
+  pure, unit-tested builder.
 
 **Unified provenance.** Every discrete fact — a person's birth/death dates and
 places, a marriage/divorce date, a media item, a residence, a stored event —

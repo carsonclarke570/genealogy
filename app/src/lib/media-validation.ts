@@ -16,7 +16,7 @@ import { provStatuses } from "./prov";
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024; // 25 MB
 
 /** The media `type` enum — must match the `media.type` column in db/schema.ts. */
-export const MEDIA_TYPES = ["photo", "certificate", "article", "obituary", "other"] as const;
+export const MEDIA_TYPES = ["photo", "certificate", "article", "obituary", "census", "other"] as const;
 export type MediaType = (typeof MEDIA_TYPES)[number];
 
 /** MIME types we accept (and will store + serve inline). */
@@ -38,30 +38,61 @@ const optionalText = z
 
 const CURRENT_YEAR = 2026;
 
+/**
+ * A structured location (the design-system `LocationValue` shape). Optional on a
+ * media item in general — required only for a Census, which seeds a residence from
+ * it (see the census refinement below). Sent as a JSON object in the request.
+ */
+const locationSchema = z
+  .object({
+    label: z.string(),
+    country: z.string().nullish(),
+    region: z.string().nullish(),
+    locality: z.string().nullish(),
+    address: z.string().nullish(),
+    lat: z.number().nullish(),
+    lng: z.number().nullish(),
+    placeId: z.string().nullish(),
+  })
+  .nullable()
+  .catch(null);
+
 /** Metadata that rides alongside the file in the multipart upload. */
-export const mediaMetaSchema = z.object({
-  title: z.string().trim().min(1, "A title is required").max(200),
-  type: z.enum(MEDIA_TYPES, { message: "Choose a document type" }),
-  year: z
-    .union([z.string(), z.number()])
-    .transform((v) => {
-      const n = typeof v === "number" ? v : parseInt(v, 10);
-      return Number.isFinite(n) ? n : null;
-    })
-    .nullable()
-    .refine((n) => n === null || (n >= 1500 && n <= CURRENT_YEAR + 1), {
-      message: "Enter a year between 1500 and today",
-    })
-    .catch(null),
-  description: optionalText,
-  // How confident we are this item is authentic (unified provenance). Optional on
-  // the wire so older upload callers (which omit it) still validate.
-  prov: z.enum(provStatuses).catch("unverified"),
-  personIds: z
-    .array(z.string().min(1))
-    .transform((ids) => [...new Set(ids)])
-    .catch([]),
-});
+export const mediaMetaSchema = z
+  .object({
+    title: z.string().trim().min(1, "A title is required").max(200),
+    type: z.enum(MEDIA_TYPES, { message: "Choose a document type" }),
+    year: z
+      .union([z.string(), z.number()])
+      .transform((v) => {
+        const n = typeof v === "number" ? v : parseInt(v, 10);
+        return Number.isFinite(n) ? n : null;
+      })
+      .nullable()
+      .refine((n) => n === null || (n >= 1500 && n <= CURRENT_YEAR + 1), {
+        message: "Enter a year between 1500 and today",
+      })
+      .catch(null),
+    description: optionalText,
+    // How confident we are this item is authentic (unified provenance). Optional on
+    // the wire so older upload callers (which omit it) still validate.
+    prov: z.enum(provStatuses).catch("unverified"),
+    personIds: z
+      .array(z.string().min(1))
+      .transform((ids) => [...new Set(ids)])
+      .catch([]),
+    // Where the household lived — only meaningful (and required) for a Census.
+    location: locationSchema,
+  })
+  .superRefine((data, ctx) => {
+    if (data.type === "census" && !data.location?.label.trim()) {
+      ctx.addIssue({
+        path: ["location"],
+        code: z.ZodIssueCode.custom,
+        message: "A census needs a place — where did the household live?",
+      });
+    }
+  });
 
 export type MediaMeta = z.infer<typeof mediaMetaSchema>;
 

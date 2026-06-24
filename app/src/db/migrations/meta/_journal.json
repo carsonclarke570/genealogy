@@ -50,6 +50,13 @@
       "when": 1782249811426,
       "tag": "0006_deep_dragon_lord",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1782310871432,
+      "tag": "0007_multi_person_residence_census",
+      "breakpoints": true
     }
   ]
 }

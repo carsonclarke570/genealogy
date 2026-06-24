@@ -51,6 +51,7 @@ export const EVENT_META: Record<EventType, { label: string; icon: string; color:
   career: { label: "Career", icon: "briefcase", color: "var(--doc-certificate)" },
   residence: { label: "Residence", icon: "home", color: "var(--doc-other)" },
   religious: { label: "Religious", icon: "church", color: "var(--doc-obituary)" },
+  census: { label: "Census", icon: "file", color: "var(--doc-census)" },
   other: { label: "Other", icon: "calendar", color: "var(--color-muted)" },
 };
 
@@ -67,6 +68,7 @@ export const TIMELINE_TYPE_ORDER: EventType[] = [
   "career",
   "residence",
   "religious",
+  "census",
   "document",
   "other",
 ];
@@ -83,6 +85,7 @@ export const STORED_EVENT_TYPES: EventType[] = [
   "education",
   "career",
   "religious",
+  "census",
   "other",
 ];
 
@@ -96,6 +99,21 @@ const typeRank = (t: EventType): number => {
 };
 
 const firstWord = (given: string): string => given.split(" ")[0];
+
+/**
+ * Title for a residence shared by a household: "Alice Smith lived in X" for one
+ * resident, "Alice & Bob lived in X" for two, "Alice Smith & N others lived in X"
+ * beyond. `residents` are the people present in the dataset, in link order.
+ */
+const residenceTitle = (residents: Person[], place: string): string => {
+  const [first, second, ...rest] = residents;
+  if (residents.length === 1) return `${firstWord(first.given)} ${first.surname} lived in ${place}`;
+  if (residents.length === 2) {
+    return `${firstWord(first.given)} & ${firstWord(second.given)} lived in ${place}`;
+  }
+  const others = rest.length + 1; // everyone after `first`
+  return `${firstWord(first.given)} ${first.surname} & ${others} others lived in ${place}`;
+};
 
 const yearDate = (year: number): PartialDate => ({ precision: "year", year, month: null, day: null });
 
@@ -277,15 +295,16 @@ export function buildTimeline(input: {
   // stretched to "present". Both are marked `auto` (edited via the residence
   // dialog, not the event dialog).
   for (const r of residences) {
-    const p = people[r.personId];
-    if (!p) continue;
-    const title = `${firstWord(p.given)} ${p.surname} lived in ${r.place}`;
+    // A residence is shared by a household; keep only residents present in the
+    // dataset (a deleted person drops out) and place the one span on each timeline.
+    const residents = r.personIds.map((id) => people[id]).filter((p): p is Person => p != null);
+    if (residents.length === 0) continue;
     const base = {
       id: `res-${r.id}`,
       type: "residence" as const,
-      title,
+      title: residenceTitle(residents, r.place),
       place: r.place,
-      people: [r.personId],
+      people: residents.map((p) => p.id),
       prov: r.prov,
       source: r.source,
       auto: true,
