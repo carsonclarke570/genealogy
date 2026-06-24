@@ -110,15 +110,20 @@ Schema in `app/src/db/schema.ts`; refined from the initial sketch:
   point-in-time `residence` *events* into residence spans; new installs seed
   residencies directly.
 - **Census auto-derivation** (`app/src/lib/census.ts`). Uploading a `census` media
-  item seeds two first-class records — a *point* **residence** and a **census
-  event** — linked to everyone on the media and citing it as their source. Both use
-  *deterministic* ids (`R-census-${mediaId}` / `E-census-${mediaId}`) so generation
-  is idempotent, and carry an **`autoManaged`** flag: while true the media route's
-  `syncCensusDerived` keeps them in step as the census is edited; the moment a user
-  edits one by hand (`updateResidence`/`updateEvent`) the flag flips to false and
-  the sync leaves it alone. Deleting the census (or changing its type away) removes
-  the rows it still owns. `buildCensusRows` (`app/src/lib/census-derive.ts`) is the
-  pure, unit-tested builder.
+  item seeds first-class records linked to everyone on the media and citing it as
+  their source: a **census event** is always generated, and a *point* **residence**
+  only when a place is given (the location is optional on the upload — clearing it
+  drops the residence and keeps the event). Both use *deterministic* ids
+  (`R-census-${mediaId}` / `E-census-${mediaId}`, in `app/src/lib/census-ids.ts`) so
+  generation is idempotent, and carry an **`autoManaged`** flag: while true the media
+  route's `syncCensusDerived` keeps them in step as the census is edited; the moment
+  a user edits one by hand (`updateResidence`/`updateEvent`) the flag flips to false
+  and the sync leaves it alone. Deleting the census (or changing its type away)
+  removes the rows it still owns. `buildCensusRows` (`app/src/lib/census-derive.ts`)
+  is the pure, unit-tested builder. **Timeline dedup:** the census event and its twin
+  residence are one fact, so `buildTimeline` draws it once — as the census event
+  (it carries the place + cites the record) — and skips the deterministic-id twin
+  residence (which still shows on the person's Residences tab).
 
 **Unified provenance.** Every discrete fact — a person's birth/death dates and
 places, a marriage/divorce date, a media item, a residence, a stored event —
