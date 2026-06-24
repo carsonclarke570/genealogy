@@ -14,7 +14,9 @@ export interface DetailRowProps {
  *
  * A muted, fixed-width label paired with an ink value, sized for a metadata
  * panel (a media detail, a record sidebar). Stack several and they align on the
- * label column. For form fields use `Input`; this is read-only presentation.
+ * label column. Rendered as a `dl`/`dt`/`dd` pair so assistive tech reads the
+ * term and its value as associated. For form fields use `Input`; this is
+ * read-only presentation.
  *
  * @example
  * <DetailRow label="Uploaded">12 May 2024</DetailRow>
@@ -22,9 +24,9 @@ export interface DetailRowProps {
  */
 export function DetailRow({ label, children, className, style }: DetailRowProps) {
   return (
-    <div className={["fa-detailrow", className].filter(Boolean).join(" ")} style={style}>
-      <span className="fa-detailrow__label">{label}</span>
-      <span className="fa-detailrow__value">{children}</span>
-    </div>
+    <dl className={["fa-detailrow", className].filter(Boolean).join(" ")} style={style}>
+      <dt className="fa-detailrow__label">{label}</dt>
+      <dd className="fa-detailrow__value">{children}</dd>
+    </dl>
   );
 }

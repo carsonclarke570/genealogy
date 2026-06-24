@@ -70,21 +70,30 @@ export function FileDropzone({
     emit(e.dataTransfer.files);
   };
 
+  // With no handler the dropzone is a static placeholder, not a control — render
+  // a plain div so keyboard/AT users don't tab to a button that does nothing.
+  // (A wired-but-disabled dropzone still renders a proper disabled button.)
+  if (!onFile) {
+    return (
+      <div className={classes} style={style}>
+        {children}
+      </div>
+    );
+  }
+
   return (
     <>
-      {interactive && (
-        <input
-          ref={inputRef}
-          type="file"
-          accept={accept}
-          hidden
-          onChange={(e) => {
-            emit(e.target.files);
-            // Reset so re-picking the same file still fires onChange.
-            e.target.value = "";
-          }}
-        />
-      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        hidden
+        onChange={(e) => {
+          emit(e.target.files);
+          // Reset so re-picking the same file still fires onChange.
+          e.target.value = "";
+        }}
+      />
       <button
         type="button"
         className={classes}

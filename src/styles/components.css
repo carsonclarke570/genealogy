@@ -1434,7 +1434,7 @@ button.fa-chip:hover {
   background: transparent;
   outline: none;
   font-family: var(--font-sans);
-  font-size: 1.125rem;
+  font-size: var(--text-title);
   color: var(--color-ink);
   appearance: none;
 }
@@ -2400,6 +2400,7 @@ button.fa-avstack__item {
   .fa-dialog__close,
   .fa-toast__dismiss,
   .fa-combobox__clear,
+  .fa-search__clear,
   .fa-datefield__clear {
     width: 44px;
     height: 44px;
