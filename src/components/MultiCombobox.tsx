@@ -184,7 +184,11 @@ export function MultiCombobox({
     }
   }
 
-  const classes = ["fa-combobox__control", invalid && "fa-combobox__control--invalid"]
+  const classes = [
+    "fa-combobox__control",
+    "fa-multicombo__control",
+    invalid && "fa-combobox__control--invalid",
+  ]
     .filter(Boolean)
     .join(" ");
 
@@ -203,11 +207,45 @@ export function MultiCombobox({
 
       <div className="fa-combobox" ref={rootRef}>
         {name && <input type="hidden" name={name} value={JSON.stringify(value)} />}
-        <div className={classes}>
+        <div
+          className={classes}
+          onMouseDown={(e) => {
+            // Click in the empty part of the control focuses the input, like a
+            // text field — but let chip remove buttons handle their own clicks.
+            if (e.target === e.currentTarget && !disabled) {
+              e.preventDefault();
+              inputRef.current?.focus();
+            }
+          }}
+        >
+          {chips.map((opt) => {
+            const chipName = textOf(opt.label);
+            return (
+              <span key={opt.value} className="fa-multicombo__chip">
+                {opt.leading && (
+                  <span className="fa-multicombo__chip-leading" aria-hidden="true">
+                    {opt.leading}
+                  </span>
+                )}
+                <span className="fa-multicombo__chip-label">{opt.label}</span>
+                <button
+                  type="button"
+                  className="fa-multicombo__chip-remove"
+                  aria-label={chipName ? `Remove ${chipName}` : "Remove"}
+                  disabled={disabled}
+                  onClick={() => remove(opt.value)}
+                >
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </span>
+            );
+          })}
           <input
             ref={inputRef}
             id={inputId}
-            className="fa-combobox__input"
+            className="fa-combobox__input fa-multicombo__input"
             role="combobox"
             type="text"
             autoComplete="off"
@@ -303,35 +341,6 @@ export function MultiCombobox({
             )}
           </ul>
         </AnchoredPopover>
-
-        {chips.length > 0 && (
-          <ul className="fa-multicombo__chips">
-            {chips.map((opt) => {
-              const chipName = textOf(opt.label);
-              return (
-                <li key={opt.value} className="fa-multicombo__chip">
-                  {opt.leading && (
-                    <span className="fa-multicombo__chip-leading" aria-hidden="true">
-                      {opt.leading}
-                    </span>
-                  )}
-                  <span className="fa-multicombo__chip-label">{opt.label}</span>
-                  <button
-                    type="button"
-                    className="fa-multicombo__chip-remove"
-                    aria-label={chipName ? `Remove ${chipName}` : "Remove"}
-                    disabled={disabled}
-                    onClick={() => remove(opt.value)}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                      <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                    </svg>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
       </div>
 
       {invalid ? (

@@ -1681,15 +1681,18 @@ button.fa-chip:hover {
   color: var(--color-primary);
 }
 
-/* MultiCombobox — the chosen items, as removable chips beneath the control.
-   The control, popover, and list all reuse the .fa-combobox__* rules above. */
-.fa-multicombo__chips {
-  display: flex;
+/* MultiCombobox — a token input: chosen items sit inside the control as
+   removable chips, inline with the search input. Popover + list reuse the
+   .fa-combobox__* rules above; the control adds wrapping for the chips. */
+.fa-multicombo__control {
   flex-wrap: wrap;
   gap: var(--space-xs);
-  margin: var(--space-sm) 0 0;
-  padding: 0;
-  list-style: none;
+  padding-block: 0.3125rem;
+}
+.fa-multicombo__input {
+  /* Keep a usable typing width; wraps to its own row once chips fill the line. */
+  flex: 1 1 6rem;
+  min-width: 6rem;
 }
 .fa-multicombo__chip {
   display: inline-flex;
