@@ -37,6 +37,7 @@ const DOC_LABEL: Record<DocType, string> = {
   certificate: "Certificate",
   article: "Article",
   obituary: "Obituary",
+  census: "Census",
   other: "Document",
 };
 

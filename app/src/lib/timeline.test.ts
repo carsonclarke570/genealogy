@@ -86,13 +86,13 @@ const pname = (id: string, surname: string, over: Partial<PersonName> = {}): Per
   ordinal: over.ordinal ?? 0,
 });
 
-const residence = (id: string, personId: string, over: Partial<Residence> = {}): Residence => {
+const residence = (id: string, personIds: string | string[], over: Partial<Residence> = {}): Residence => {
   // `in` (not `??`) so an explicit `null` start/end is respected, not defaulted.
   const start = "start" in over ? over.start ?? null : ({ precision: "year", year: 1950, month: null, day: null } as const);
   const end = "end" in over ? over.end ?? null : null;
   return {
     id,
-    personId,
+    personIds: Array.isArray(personIds) ? personIds : [personIds],
     location: over.location ?? { label: over.place ?? "Boston, MA" },
     place: over.place ?? "Boston, MA",
     dateKind: over.dateKind ?? "range",
@@ -343,6 +343,44 @@ describe("buildTimeline — residence spans", () => {
     const r = residence("r5", "ele", { dateKind: "point", start: null, startYear: null });
     const evs = buildTimeline({ ...empty, people: peopleMap(p), residences: [r] });
     expect(evs.some((e) => e.id === "res-r5")).toBe(false);
+  });
+
+  it("emits ONE span shared by a household, on each resident's timeline", () => {
+    const a = person("a", { given: "Alice", surname: "Rivers", born: 1970 });
+    const b = person("b", { given: "Bob", surname: "Rivers", born: 1968 });
+    const c = person("c", { given: "Cleo", surname: "Rivers", born: 1995 });
+    const r = residence("r6", ["a", "b", "c"], { place: "Cambridge, MA" });
+    const evs = buildTimeline({ ...empty, people: peopleMap(a, b, c), residences: [r] });
+    // Exactly one residence event, carrying all three residents.
+    const res = evs.filter((e) => e.id === "res-r6");
+    expect(res).toHaveLength(1);
+    expect(res[0].people).toEqual(["a", "b", "c"]);
+    // It surfaces on each resident's timeline.
+    for (const id of ["a", "b", "c"]) {
+      expect(eventsOf(evs, id).map((e) => e.id)).toContain("res-r6");
+    }
+  });
+
+  it("titles a residence by resident count (1 / 2 / many)", () => {
+    const a = person("a", { given: "Alice", surname: "Rivers" });
+    const b = person("b", { given: "Bob", surname: "Rivers" });
+    const c = person("c", { given: "Cleo", surname: "Rivers" });
+    const one = buildTimeline({ ...empty, people: peopleMap(a), residences: [residence("r-1", "a", { place: "Boston" })] });
+    expect(one.find((e) => e.id === "res-r-1")!.title).toBe("Alice Rivers lived in Boston");
+    const two = buildTimeline({ ...empty, people: peopleMap(a, b), residences: [residence("r-2", ["a", "b"], { place: "Boston" })] });
+    expect(two.find((e) => e.id === "res-r-2")!.title).toBe("Alice & Bob lived in Boston");
+    const many = buildTimeline({ ...empty, people: peopleMap(a, b, c), residences: [residence("r-3", ["a", "b", "c"], { place: "Boston" })] });
+    expect(many.find((e) => e.id === "res-r-3")!.title).toBe("Alice Rivers & 2 others lived in Boston");
+  });
+
+  it("drops residents not in the dataset, and skips a residence with none left", () => {
+    const a = person("a", { given: "Alice", surname: "Rivers" });
+    // Two ids, only one present → one resident on the event.
+    const kept = buildTimeline({ ...empty, people: peopleMap(a), residences: [residence("r-k", ["a", "ghost"], { place: "Boston" })] });
+    expect(kept.find((e) => e.id === "res-r-k")!.people).toEqual(["a"]);
+    // No present residents → no event at all.
+    const gone = buildTimeline({ ...empty, people: peopleMap(a), residences: [residence("r-g", ["ghost"], { place: "Boston" })] });
+    expect(gone.some((e) => e.id === "res-r-g")).toBe(false);
   });
 });
 

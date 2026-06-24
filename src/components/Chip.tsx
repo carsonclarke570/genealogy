@@ -6,6 +6,7 @@ export type ChipDot =
   | "certificate"
   | "article"
   | "obituary"
+  | "census"
   | "other"
   | "accent";
 
@@ -14,6 +15,7 @@ const DOT_COLOR: Record<ChipDot, string> = {
   certificate: "var(--doc-certificate)",
   article: "var(--doc-article)",
   obituary: "var(--doc-obituary)",
+  census: "var(--doc-census)",
   other: "var(--doc-other)",
   accent: "var(--color-primary)",
 };

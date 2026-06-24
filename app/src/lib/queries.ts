@@ -58,17 +58,27 @@ function parseJson<T>(raw: string, schema: z.ZodType<T>): T {
 export async function getDataset(): Promise<Dataset> {
   const db = await getDb();
   // Independent table reads — fetch concurrently rather than round-trip by round-trip.
-  const [personRows, relationshipRows, mediaRows, links, eventRows, eventLinks, nameRows, residenceRows] =
-    await Promise.all([
-      db.select().from(schema.person),
-      db.select().from(schema.relationship),
-      db.select().from(schema.media),
-      db.select().from(schema.personMedia),
-      db.select().from(schema.event),
-      db.select().from(schema.eventPerson),
-      db.select().from(schema.personName),
-      db.select().from(schema.residence),
-    ]);
+  const [
+    personRows,
+    relationshipRows,
+    mediaRows,
+    links,
+    eventRows,
+    eventLinks,
+    nameRows,
+    residenceRows,
+    residenceLinks,
+  ] = await Promise.all([
+    db.select().from(schema.person),
+    db.select().from(schema.relationship),
+    db.select().from(schema.media),
+    db.select().from(schema.personMedia),
+    db.select().from(schema.event),
+    db.select().from(schema.eventPerson),
+    db.select().from(schema.personName),
+    db.select().from(schema.residence),
+    db.select().from(schema.residencePerson),
+  ]);
 
   // Real attached-media count per person, derived from the link table.
   const mediaCountByPerson = new Map<string, number>();
@@ -177,12 +187,20 @@ export async function getDataset(): Promise<Dataset> {
     divorcedSource: r.divorcedMediaId ? mediaById.get(r.divorcedMediaId) ?? null : null,
   }));
 
+  // People who lived in each residence — a household is many-to-many with homes.
+  const peopleByResidence = new Map<string, string[]>();
+  for (const l of residenceLinks) {
+    (peopleByResidence.get(l.residenceId) ?? peopleByResidence.set(l.residenceId, []).get(l.residenceId)!).push(
+      l.personId,
+    );
+  }
+
   const residences: Residence[] = residenceRows.map((r) => {
     const start = parsePartialDate(r.startDate);
     const end = parsePartialDate(r.endDate);
     return {
       id: r.id,
-      personId: r.personId,
+      personIds: peopleByResidence.get(r.id) ?? [],
       location: locationFromColumns(r),
       place: r.placeLabel,
       dateKind: r.dateKind === "point" ? "point" : "range",

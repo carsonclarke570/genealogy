@@ -20,6 +20,7 @@ import { person, media as mediaTable, personMedia } from "@/db/schema";
 import { getStore, mediaKey } from "@/lib/storage";
 import { indexMedia } from "@/lib/search/index-doc";
 import { mediaMetaSchema, sniffMime, MAX_UPLOAD_BYTES } from "@/lib/media-validation";
+import { syncCensusDerived } from "@/lib/census";
 
 export const dynamic = "force-dynamic";
 
@@ -50,23 +51,29 @@ export async function POST(req: Request): Promise<Response> {
     return bad({ file: "Unsupported file type. Upload a JPEG, PNG, WebP, GIF, or PDF." });
   }
 
-  // personIds arrives as a JSON array string; tolerate absence/garbage.
-  let personIds: unknown = [];
-  const rawPeople = form.get("personIds");
-  if (typeof rawPeople === "string" && rawPeople.length) {
-    try {
-      personIds = JSON.parse(rawPeople);
-    } catch {
-      personIds = [];
+  // personIds + location arrive as JSON strings; tolerate absence/garbage.
+  const parseJsonField = (name: string): unknown => {
+    const raw = form.get(name);
+    if (typeof raw === "string" && raw.length) {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return undefined;
+      }
     }
-  }
+    return undefined;
+  };
+  const personIds = parseJsonField("personIds") ?? [];
+  const location = parseJsonField("location") ?? null;
 
   const parsed = mediaMetaSchema.safeParse({
     title: form.get("title") ?? "",
     type: form.get("type") ?? "",
     year: form.get("year") ?? "",
     description: form.get("description") ?? "",
+    prov: form.get("prov") ?? undefined,
     personIds,
+    location,
   });
   if (!parsed.success) {
     const errors: Record<string, string> = {};
@@ -98,20 +105,38 @@ export async function POST(req: Request): Promise<Response> {
 
     await getStore().put(key, buffer, { contentType: mimeType, size: buffer.length });
 
-    await db.insert(mediaTable).values({
-      id,
-      type: meta.type,
-      title: meta.title,
-      year: meta.year,
-      filePath: key,
-      mimeType,
-      originalFilename,
-      description: meta.description,
-    });
+    // Row + links + any census-derived records are one atomic unit: a Census that
+    // can't seed its residence/event must not leave a half-built archive.
+    await db.transaction(async (tx) => {
+      await tx.insert(mediaTable).values({
+        id,
+        type: meta.type,
+        title: meta.title,
+        year: meta.year,
+        filePath: key,
+        mimeType,
+        originalFilename,
+        description: meta.description,
+        prov: meta.prov,
+      });
 
-    if (validPeople.length > 0) {
-      await db.insert(personMedia).values(validPeople.map((personId) => ({ personId, mediaId: id })));
-    }
+      if (validPeople.length > 0) {
+        await tx.insert(personMedia).values(validPeople.map((personId) => ({ personId, mediaId: id })));
+      }
+
+      // A Census auto-generates a residence + event for the household it records.
+      // A fresh upload has no prior derived rows, so only the census path matters.
+      if (meta.type === "census") {
+        await syncCensusDerived(tx, {
+          mediaId: id,
+          type: meta.type,
+          year: meta.year,
+          personIds: validPeople,
+          location: meta.location,
+          prov: meta.prov,
+        });
+      }
+    });
 
     // Best-effort: index for search. A failure here must never fail the upload —
     // the boot/`db:reindex` backfill reconciles any missed rows.

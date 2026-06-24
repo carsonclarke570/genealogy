@@ -15,6 +15,7 @@ import { person, media as mediaTable, personMedia } from "@/db/schema";
 import { getStore } from "@/lib/storage";
 import { indexMedia, removeDoc } from "@/lib/search/index-doc";
 import { mediaMetaSchema } from "@/lib/media-validation";
+import { syncCensusDerived, removeCensusDerived } from "@/lib/census";
 
 export const dynamic = "force-dynamic";
 
@@ -43,21 +44,6 @@ export async function PUT(
   try {
     const db = await getDb();
 
-    const updated = await db
-      .update(mediaTable)
-      .set({
-        type: meta.type,
-        title: meta.title,
-        year: meta.year,
-        description: meta.description,
-        prov: meta.prov,
-      })
-      .where(eq(mediaTable.id, params.id))
-      .returning({ id: mediaTable.id });
-    if (updated.length === 0) {
-      return NextResponse.json({ ok: false, errors: { form: "That media no longer exists." } }, { status: 404 });
-    }
-
     // Re-sync the person links: keep only ids that exist, replace the set wholesale.
     let validPeople: string[] = [];
     if (meta.personIds.length > 0) {
@@ -67,9 +53,41 @@ export async function PUT(
         .where(inArray(person.id, meta.personIds));
       validPeople = rows.map((r) => r.id);
     }
-    await db.delete(personMedia).where(eq(personMedia.mediaId, params.id));
-    if (validPeople.length > 0) {
-      await db.insert(personMedia).values(validPeople.map((personId) => ({ personId, mediaId: params.id })));
+
+    const updated = await db.transaction(async (tx) => {
+      const u = await tx
+        .update(mediaTable)
+        .set({
+          type: meta.type,
+          title: meta.title,
+          year: meta.year,
+          description: meta.description,
+          prov: meta.prov,
+        })
+        .where(eq(mediaTable.id, params.id))
+        .returning({ id: mediaTable.id });
+      if (u.length === 0) return u;
+
+      await tx.delete(personMedia).where(eq(personMedia.mediaId, params.id));
+      if (validPeople.length > 0) {
+        await tx.insert(personMedia).values(validPeople.map((personId) => ({ personId, mediaId: params.id })));
+      }
+
+      // Keep the census-derived residence + event in step with the edited media
+      // (or remove them if the type changed away from census). Rows a user has
+      // edited by hand are left alone — see lib/census.ts.
+      await syncCensusDerived(tx, {
+        mediaId: params.id,
+        type: meta.type,
+        year: meta.year,
+        personIds: validPeople,
+        location: meta.location,
+        prov: meta.prov,
+      });
+      return u;
+    });
+    if (updated.length === 0) {
+      return NextResponse.json({ ok: false, errors: { form: "That media no longer exists." } }, { status: 404 });
     }
 
     // Best-effort: keep the search index in step with the new title/description.
@@ -99,7 +117,12 @@ export async function DELETE(
     if (row.filePath) {
       await getStore().delete(row.filePath);
     }
-    await db.delete(mediaTable).where(eq(mediaTable.id, params.id)); // cascades person_media
+    await db.transaction(async (tx) => {
+      // Drop any census-derived residence/event we still own (the media FK is
+      // set-null, so they'd otherwise linger as orphans). User-adopted rows stay.
+      await removeCensusDerived(tx, params.id);
+      await tx.delete(mediaTable).where(eq(mediaTable.id, params.id)); // cascades person_media
+    });
 
     try {
       await removeDoc(db, "media", params.id);

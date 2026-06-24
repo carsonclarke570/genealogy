@@ -90,7 +90,7 @@ export const relationship = pgTable("relationship", {
 export const media = pgTable("media", {
   id: text("id").primaryKey(),
   type: text("type", {
-    enum: ["photo", "certificate", "article", "obituary", "other"],
+    enum: ["photo", "certificate", "article", "obituary", "census", "other"],
   }).notNull(),
   title: text("title").notNull(),
   year: integer("year"),
@@ -131,7 +131,7 @@ export const personMedia = pgTable(
 export const event = pgTable("event", {
   id: text("id").primaryKey(),
   type: text("type", {
-    enum: ["immigration", "military", "education", "career", "residence", "religious", "other"],
+    enum: ["immigration", "military", "education", "career", "residence", "religious", "census", "other"],
   }).notNull(),
   title: text("title").notNull(),
   // Canonical partial-date string (precision implied), plus the derived 4-digit
@@ -142,6 +142,10 @@ export const event = pgTable("event", {
   prov: text("prov", { enum: [...provStatuses] }).notNull().default("unverified"),
   // Optional cited source document; cleared (not deleted) if the media is removed.
   mediaId: text("media_id").references(() => media.id, { onDelete: "set null" }),
+  // True for rows auto-generated from a source document (a Census upload seeds an
+  // event + residence). Flips to false the moment a user edits the row by hand, so
+  // the document sync stops overwriting their changes. See lib/census.ts.
+  autoManaged: boolean("auto_managed").notNull().default(false),
   ...timestamps,
 });
 
@@ -203,44 +207,59 @@ export const personName = pgTable(
 );
 
 /**
- * Where a person lived, and for what span — a first-class record (not an `event`,
+ * Where people lived, and for what span — a first-class record (not an `event`,
  * which is point-in-time). A residence has a start and an optional end date
  * (precision-aware partial-date strings, like births), a structured location
  * (country → address, with optional coordinates) plus a display label, and the
  * unified provenance (status + optional linked source document + note). The
- * timeline derives a span event from each row (see lib/timeline.ts).
+ * residence is many-to-many with people (a home is shared by a household) via
+ * `residence_person`. The timeline derives a span event from each row, linked to
+ * every resident (see lib/timeline.ts).
  */
-export const residence = pgTable(
-  "residence",
+export const residence = pgTable("residence", {
+  id: text("id").primaryKey(),
+  // Structured location parts (any may be null) + the human display string.
+  country: text("country"),
+  region: text("region"),
+  locality: text("locality"),
+  address: text("address"),
+  placeLabel: text("place_label").notNull(),
+  lat: doublePrecision("lat"),
+  lng: doublePrecision("lng"),
+  placeId: text("place_id"),
+  // How the dates are meant: a "range" (move-in → move-out) or a "point" (a
+  // single known date we only know they lived here around — no span).
+  dateKind: text("date_kind", { enum: [...residenceDateKinds] }).notNull().default("range"),
+  // Canonical partial-date strings + derived 4-digit years (mirrors person dates).
+  // For a "point" residence only the start fields are used (the known date).
+  startDate: text("start_date"),
+  startYear: integer("start_year"),
+  endDate: text("end_date"),
+  endYear: integer("end_year"),
+  prov: text("prov", { enum: [...provStatuses] }).notNull().default("unverified"),
+  mediaId: text("media_id").references(() => media.id, { onDelete: "set null" }),
+  note: text("note"),
+  // True for rows auto-generated from a source document (a Census upload). Flips to
+  // false the moment a user edits the residence by hand. See lib/census.ts.
+  autoManaged: boolean("auto_managed").notNull().default(false),
+  ...timestamps,
+});
+
+/** Which people lived in a residence — a household is many-to-many with homes. */
+export const residencePerson = pgTable(
+  "residence_person",
   {
-    id: text("id").primaryKey(),
+    residenceId: text("residence_id")
+      .notNull()
+      .references(() => residence.id, { onDelete: "cascade" }),
     personId: text("person_id")
       .notNull()
       .references(() => person.id, { onDelete: "cascade" }),
-    // Structured location parts (any may be null) + the human display string.
-    country: text("country"),
-    region: text("region"),
-    locality: text("locality"),
-    address: text("address"),
-    placeLabel: text("place_label").notNull(),
-    lat: doublePrecision("lat"),
-    lng: doublePrecision("lng"),
-    placeId: text("place_id"),
-    // How the dates are meant: a "range" (move-in → move-out) or a "point" (a
-    // single known date we only know they lived here around — no span).
-    dateKind: text("date_kind", { enum: [...residenceDateKinds] }).notNull().default("range"),
-    // Canonical partial-date strings + derived 4-digit years (mirrors person dates).
-    // For a "point" residence only the start fields are used (the known date).
-    startDate: text("start_date"),
-    startYear: integer("start_year"),
-    endDate: text("end_date"),
-    endYear: integer("end_year"),
-    prov: text("prov", { enum: [...provStatuses] }).notNull().default("unverified"),
-    mediaId: text("media_id").references(() => media.id, { onDelete: "set null" }),
-    note: text("note"),
-    ...timestamps,
   },
-  (t) => ({ personIdx: index("residence_person_idx").on(t.personId) }),
+  (t) => ({
+    pk: primaryKey({ columns: [t.residenceId, t.personId] }),
+    personIdx: index("residence_person_person_idx").on(t.personId),
+  }),
 );
 
 /**
@@ -279,4 +298,5 @@ export type PersonMediaRow = typeof personMedia.$inferSelect;
 export type EventRow = typeof event.$inferSelect;
 export type EventPersonRow = typeof eventPerson.$inferSelect;
 export type ResidenceRow = typeof residence.$inferSelect;
+export type ResidencePersonRow = typeof residencePerson.$inferSelect;
 export type SearchDocRow = typeof searchDoc.$inferSelect;

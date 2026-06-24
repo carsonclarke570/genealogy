@@ -149,11 +149,11 @@ export async function seed(db: DB): Promise<{ seeded: boolean }> {
     }
 
     // Residencies (where people lived). Inserted after media so a cited source FK
-    // resolves. The display label doubles as the structured `placeLabel`.
+    // resolves. The display label doubles as the structured `placeLabel`. A home is
+    // shared by a household, so residents are linked through `residence_person`.
     for (const r of residences) {
       await tx.insert(schema.residence).values({
         id: r.id,
-        personId: r.personId,
         country: r.country ?? null,
         region: r.region ?? null,
         locality: r.locality ?? null,
@@ -168,6 +168,9 @@ export async function seed(db: DB): Promise<{ seeded: boolean }> {
         mediaId: r.mediaId ?? null,
         note: r.note ?? null,
       });
+      for (const personId of r.personIds) {
+        await tx.insert(schema.residencePerson).values({ residenceId: r.id, personId });
+      }
     }
   });
 

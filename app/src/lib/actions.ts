@@ -14,7 +14,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/db/client";
-import { person, personName, relationship, event, eventPerson, media, residence } from "@/db/schema";
+import { person, personName, relationship, event, eventPerson, media, residence, residencePerson } from "@/db/schema";
 import { provStatuses, type ProvStatus } from "./prov";
 import { dateSortKey, type NameReason } from "./family-data";
 import { parsePartialDate, serializePartialDate, residenceDateKinds } from "./dates";
@@ -25,6 +25,8 @@ import { indexPerson } from "./search/index-doc";
 /**
  * The event types a user can add by hand (births/deaths/etc. are derived;
  * residence is a first-class span persisted via createResidence, not here).
+ * `census` is normally auto-generated from a Census upload (see lib/census.ts),
+ * but lives here too so an auto-generated census event can be hand-edited.
  */
 const STORED_EVENT_TYPE_VALUES = [
   "immigration",
@@ -32,6 +34,7 @@ const STORED_EVENT_TYPE_VALUES = [
   "education",
   "career",
   "religious",
+  "census",
   "other",
 ] as const;
 
@@ -779,6 +782,8 @@ export async function updateEvent(id: string, input: EventInput): Promise<EventR
       place: data.place,
       prov: data.prov,
       mediaId: data.mediaId,
+      // A hand edit takes ownership: stop the census sync overwriting this row.
+      autoManaged: false,
       updatedAt: new Date(),
     })
     .where(eq(event.id, id))
@@ -808,7 +813,8 @@ export type ResidenceResult =
 
 /** The shape the Add/Edit-residence dialog submits (controlled client state). */
 export interface ResidenceInput {
-  personId: string;
+  /** Everyone known to have lived here (a home is shared by a household). */
+  personIds: string[];
   /** The chosen place (label + structured parts + optional coordinates). */
   location: LocationValue | null;
   /** "range" (move-in → move-out) or "point" (a single known date). @default "range" */
@@ -836,7 +842,7 @@ const locationInputSchema = z
   .nullable();
 
 const residenceInputSchema = z.object({
-  personId: z.string().min(1, "Pick whose residence this is"),
+  personIds: z.array(z.string().min(1)).min(1, "Pick at least one person who lived here"),
   location: locationInputSchema,
   dateKind: z.enum(residenceDateKinds).catch("range"),
   start: z
@@ -855,11 +861,24 @@ const residenceInputSchema = z.object({
   note: optionalText,
 });
 
+/** Replace a residence's resident set with the validated, existing people given. */
+async function syncResidencePeople(db: DB, residenceId: string, peopleIds: string[]): Promise<void> {
+  await db.delete(residencePerson).where(eq(residencePerson.residenceId, residenceId));
+  const ids = [...new Set(peopleIds)];
+  if (ids.length === 0) return;
+  const existing = await db.select({ id: person.id }).from(person).where(inArray(person.id, ids));
+  const rows = existing.map((p) => ({ residenceId, personId: p.id }));
+  if (rows.length > 0) await db.insert(residencePerson).values(rows);
+}
+
 /** Validate a residence draft into the column values to write, or field errors. */
 async function residenceColumns(
   db: DB,
   input: ResidenceInput,
-): Promise<{ ok: true; cols: Record<string, unknown> } | { ok: false; errors: Record<string, string> }> {
+): Promise<
+  | { ok: true; cols: Record<string, unknown>; personIds: string[] }
+  | { ok: false; errors: Record<string, string> }
+> {
   const parsed = residenceInputSchema.safeParse(input);
   if (!parsed.success) {
     const errors: Record<string, string> = {};
@@ -874,12 +893,14 @@ async function residenceColumns(
   const loc = locationToColumns(data.location as LocationValue | null);
   if (!loc) return { ok: false, errors: { location: "Choose where they lived" } };
 
-  // The person and any cited document must exist (FKs would reject otherwise).
+  // At least one resident, and any cited document, must exist (FKs reject otherwise).
+  const ids = [...new Set(data.personIds)];
   const [people, docs] = await Promise.all([
-    db.select({ id: person.id }).from(person).where(eq(person.id, data.personId)),
+    db.select({ id: person.id }).from(person).where(inArray(person.id, ids)),
     data.mediaId ? db.select({ id: media.id }).from(media).where(eq(media.id, data.mediaId)) : Promise.resolve([] as { id: string }[]),
   ]);
-  if (people.length === 0) return { ok: false, errors: { personId: "That person no longer exists." } };
+  const validPeople = people.map((p) => p.id);
+  if (validPeople.length === 0) return { ok: false, errors: { personIds: "None of those people exist anymore." } };
   const mediaId = data.mediaId && docs.length ? data.mediaId : null;
 
   // A "point" residence has no span — only the single known date in `start`;
@@ -889,8 +910,8 @@ async function residenceColumns(
 
   return {
     ok: true,
+    personIds: validPeople,
     cols: {
-      personId: data.personId,
       ...loc,
       dateKind: data.dateKind,
       startDate: data.start,
@@ -910,6 +931,7 @@ export async function createResidence(input: ResidenceInput): Promise<ResidenceR
   if (!built.ok) return built;
   const id = randomUUID();
   await db.insert(residence).values({ id, ...built.cols } as typeof residence.$inferInsert);
+  await syncResidencePeople(db, id, built.personIds);
   revalidatePath("/");
   return { ok: true, id };
 }
@@ -921,10 +943,12 @@ export async function updateResidence(id: string, input: ResidenceInput): Promis
   if (!built.ok) return built;
   const updated = await db
     .update(residence)
-    .set({ ...built.cols, updatedAt: new Date() } as Partial<typeof residence.$inferInsert>)
+    // A hand edit takes ownership: stop the census sync overwriting this row.
+    .set({ ...built.cols, autoManaged: false, updatedAt: new Date() } as Partial<typeof residence.$inferInsert>)
     .where(eq(residence.id, id))
     .returning({ id: residence.id });
   if (updated.length === 0) return { ok: false, errors: { form: "That residence no longer exists." } };
+  await syncResidencePeople(db, id, built.personIds);
   revalidatePath("/");
   return { ok: true, id };
 }

@@ -58,6 +58,7 @@
     --doc-certificate: var(--color-success);
     --doc-article: var(--color-warning);
     --doc-obituary: var(--color-muted);
+    --doc-census: var(--color-primary);
     --doc-other: var(--color-faint);
 
     /* Family-tree graph (React Flow + relatives-tree). The layout scales off the

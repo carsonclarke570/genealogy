@@ -48,10 +48,11 @@ export interface SeedEvent {
   prov: "verified" | "unverified" | "estimated" | "disputed";
 }
 
-/** A residence span (where someone lived, and for what period). */
+/** A residence span (where one or more people lived, and for what period). */
 export interface SeedResidence {
   id: string;
-  personId: string;
+  /** Everyone known to have lived here (a home is shared by a household). */
+  personIds: string[];
   /** Display label + optional structured parts. */
   place: string;
   locality?: string | null;
@@ -139,18 +140,15 @@ export const events: SeedEvent[] = [
  * to exercise the timeline's residence bars.)
  */
 export const residences: SeedResidence[] = [
-  { id: "R-thomas-boston", personId: "thomas", place: "Boston, MA", locality: "Boston", region: "Massachusetts", country: "United States", start: "1911", end: "1971", prov: "estimated" },
-  { id: "R-alice-boston", personId: "alice", place: "Boston, MA", locality: "Boston", region: "Massachusetts", country: "United States", start: "1911", end: "1975", prov: "estimated" },
-  { id: "R-eleanor-concord", personId: "eleanor", place: "Concord, MA", locality: "Concord", region: "Massachusetts", country: "United States", start: "1950", end: "2001", prov: "unverified" },
-  { id: "R-frederick-concord", personId: "frederick", place: "Concord, MA", locality: "Concord", region: "Massachusetts", country: "United States", start: "1950", end: "1989", prov: "unverified" },
-  { id: "R-rose-portland", personId: "rose", place: "Portland, ME", locality: "Portland", region: "Maine", country: "United States", start: "1947", end: "2010", prov: "unverified" },
-  { id: "R-james-concord", personId: "james", place: "Concord, MA", locality: "Concord", region: "Massachusetts", country: "United States", start: "1943", end: "2018", prov: "verified", mediaId: "M-110" },
-  { id: "R-sarah-cambridge", personId: "sarah", place: "Cambridge, MA", locality: "Cambridge", region: "Massachusetts", country: "United States", start: "2003", prov: "unverified" },
-  { id: "R-michael-cambridge", personId: "michael", place: "Cambridge, MA", locality: "Cambridge", region: "Massachusetts", country: "United States", start: "2003", prov: "unverified" },
-  { id: "R-olivia-cambridge", personId: "olivia", place: "Cambridge, MA", locality: "Cambridge", region: "Massachusetts", country: "United States", start: "2003", end: "2020", prov: "unverified", note: "Family home through high school" },
+  // Shared homes: a couple / a household live in one residence, not a row each.
+  { id: "R-thomas-alice-boston", personIds: ["thomas", "alice"], place: "Boston, MA", locality: "Boston", region: "Massachusetts", country: "United States", start: "1911", end: "1975", prov: "estimated" },
+  { id: "R-eleanor-frederick-concord", personIds: ["eleanor", "frederick"], place: "Concord, MA", locality: "Concord", region: "Massachusetts", country: "United States", start: "1950", end: "2001", prov: "unverified" },
+  { id: "R-rose-portland", personIds: ["rose"], place: "Portland, ME", locality: "Portland", region: "Maine", country: "United States", start: "1947", end: "2010", prov: "unverified" },
+  { id: "R-james-concord", personIds: ["james"], place: "Concord, MA", locality: "Concord", region: "Massachusetts", country: "United States", start: "1943", end: "2018", prov: "verified", mediaId: "M-110" },
+  { id: "R-cambridge-home", personIds: ["sarah", "michael", "olivia"], place: "Cambridge, MA", locality: "Cambridge", region: "Massachusetts", country: "United States", start: "2003", prov: "unverified", note: "Family home through high school" },
   // A "known date" residence — the SS Carmania manifest places Thomas & Alice in
   // Liverpool in 1911, but we don't know when they arrived or left.
-  { id: "R-thomas-liverpool", personId: "thomas", place: "Liverpool, England", locality: "Liverpool", country: "England", dateKind: "point", start: "1911", prov: "verified", mediaId: "M-112", note: "Departure port on the passage manifest" },
+  { id: "R-thomas-alice-liverpool", personIds: ["thomas", "alice"], place: "Liverpool, England", locality: "Liverpool", country: "England", dateKind: "point", start: "1911", prov: "verified", mediaId: "M-112", note: "Departure port on the passage manifest" },
 ];
 
 export const media: SeedMedia[] = [

@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Avatar, Button, Dialog, Input, MultiSelect, Select, Textarea } from "@family-archive/ui";
-import type { ProvenanceStatus } from "@family-archive/ui";
+import { Avatar, Button, Dialog, Input, LocationField, MultiSelect, Select, Textarea } from "@family-archive/ui";
+import type { LocationValue, ProvenanceStatus } from "@family-archive/ui";
 import { fullName, lifeDates, type MediaItem } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import { updateMedia } from "@/lib/media-client";
 import { MEDIA_TYPES } from "@/lib/media-validation";
+import { censusResidenceId } from "@/lib/census-ids";
 import { PROV_LABEL, provStatuses } from "@/lib/prov";
 import { Icon } from "./Icon";
 
@@ -16,8 +17,15 @@ const TYPE_LABELS: [(typeof MEDIA_TYPES)[number], string][] = [
   ["certificate", "Certificate"],
   ["article", "Article"],
   ["obituary", "Obituary"],
+  ["census", "Census"],
   ["other", "Other"],
 ];
+
+/** Fetch place suggestions from the auth-gated geocoder feeding `LocationField`. */
+const searchPlaces = (q: string) =>
+  fetch(`/api/geocode?q=${encodeURIComponent(q)}`)
+    .then((r) => r.json())
+    .then((d) => d.suggestions);
 
 /**
  * Edit an existing archive item's metadata (title/type/year/description) and the
@@ -36,13 +44,14 @@ export function MediaEdit({
   onToast: (msg: string) => void;
 }) {
   const router = useRouter();
-  const { people } = useDataset();
+  const { people, residences } = useDataset();
 
   const [title, setTitle] = useState("");
   const [type, setType] = useState<(typeof MEDIA_TYPES)[number]>("photo");
   const [year, setYear] = useState("");
   const [prov, setProv] = useState<ProvenanceStatus>("unverified");
   const [description, setDescription] = useState("");
+  const [location, setLocation] = useState<LocationValue | null>(null);
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -57,7 +66,10 @@ export function MediaEdit({
     setProv(media.prov);
     setDescription(media.description ?? "");
     setSelectedPeople(media.people);
-  }, [open, media]);
+    // Pre-fill the census place from the residence it generated (if any).
+    const censusRes = residences.find((r) => r.id === censusResidenceId(media.id));
+    setLocation(censusRes?.location ?? null);
+  }, [open, media, residences]);
 
   const close = () => {
     if (busy) return;
@@ -74,6 +86,7 @@ export function MediaEdit({
       prov,
       description,
       personIds: selectedPeople,
+      location,
     });
     setBusy(false);
     if (result.ok) {
@@ -163,6 +176,17 @@ export function MediaEdit({
             </Select>
           </div>
         </div>
+
+        {type === "census" && (
+          <LocationField
+            label="Where they lived (optional)"
+            hint="The census place. Its event (and the residence, if a place is set) for everyone below stay in step with this — unless you’ve edited them by hand. Clear the place to drop the residence."
+            value={location}
+            onChange={setLocation}
+            onSearch={searchPlaces}
+            error={errors.location}
+          />
+        )}
 
         <div>
           <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>

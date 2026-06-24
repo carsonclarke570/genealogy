@@ -168,17 +168,21 @@ export type EventType =
   | "career"
   | "residence"
   | "religious"
+  | "census"
   | "other";
 
 /**
- * A place someone lived for a span of time. The structured `location` carries
- * country → address granularity (+ optional coordinates); `place` is its display
- * label. `start`/`end` are precision-aware partial dates (end null = ongoing).
- * Provenance follows the unified model (status + linked source document + note).
+ * A place one or more people lived for a span of time. The structured `location`
+ * carries country → address granularity (+ optional coordinates); `place` is its
+ * display label. `start`/`end` are precision-aware partial dates (end null =
+ * ongoing). A home is shared by a household, so a residence links to every
+ * resident (`personIds`). Provenance follows the unified model (status + linked
+ * source document + note).
  */
 export interface Residence {
   id: string;
-  personId: string;
+  /** Everyone known to have lived here (one row, shared by the household). */
+  personIds: string[];
   location: LocationValue;
   /** Display label for the location (mirrors `location.label`). */
   place: string;
@@ -381,7 +385,7 @@ export function provMediaIdOf(p: Person, field: string): string | null {
 /** A person's residencies, earliest span first (undated spans sort last). */
 export function residencesOf(residences: Residence[], personId: string): Residence[] {
   return residences
-    .filter((r) => r.personId === personId)
+    .filter((r) => r.personIds.includes(personId))
     .sort((a, b) => dateSortKey(a.start) - dateSortKey(b.start));
 }
 

@@ -31,6 +31,7 @@ const types: [string, string, ChipDot | undefined][] = [
   ["certificate", "Certificates", "certificate"],
   ["article", "Articles", "article"],
   ["obituary", "Obituaries", "obituary"],
+  ["census", "Census", "census"],
   ["other", "Other", "other"],
 ];
 

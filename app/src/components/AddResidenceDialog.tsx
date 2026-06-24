@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Avatar,
   Button,
   DateField,
   Dialog,
   LocationField,
+  MultiSelect,
   ProvenanceMark,
   SegmentedControl,
   Textarea,
@@ -16,7 +18,7 @@ import type {
   PartialDate,
   ProvenanceStatus,
 } from "@family-archive/ui";
-import { sourceOptions, type Residence } from "@/lib/family-data";
+import { fullName, lifeDates, sourceOptions, type Residence } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import { serializePartialDate, type ResidenceDateKind } from "@/lib/dates";
 import { PROV_LABEL } from "@/lib/prov";
@@ -44,26 +46,27 @@ const searchPlaces = (q: string) =>
 export function AddResidenceDialog({
   open,
   onClose,
-  personId,
+  lockedPersonId,
   editResidence,
   onSaved,
 }: {
   open: boolean;
   onClose: () => void;
-  /** Whose residence this is. */
-  personId: string;
+  /** When opened from a person record, that person is pre-selected and always kept. */
+  lockedPersonId?: string;
   /** When set, edit this residence instead of adding a new one. */
   editResidence?: Residence | null;
   /** Called after a successful create/update/delete (e.g. to toast). */
   onSaved?: (message: string) => void;
 }) {
-  const { media } = useDataset();
+  const { media, people } = useDataset();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   const editingId = editResidence?.id ?? null;
 
   const [location, setLocation] = useState<LocationValue | null>(null);
+  const [residents, setResidents] = useState<string[]>([]);
   const [dateKind, setDateKind] = useState<ResidenceDateKind>("range");
   const [start, setStart] = useState<PartialDate | null>(null);
   const [end, setEnd] = useState<PartialDate | null>(null);
@@ -78,6 +81,7 @@ export function AddResidenceDialog({
     setErrors({});
     if (editResidence) {
       setLocation(editResidence.location);
+      setResidents(editResidence.personIds);
       setDateKind(editResidence.dateKind);
       setStart(editResidence.start);
       setEnd(editResidence.end);
@@ -86,6 +90,7 @@ export function AddResidenceDialog({
       setNote(editResidence.note ?? "");
     } else {
       setLocation(null);
+      setResidents(lockedPersonId ? [lockedPersonId] : []);
       setDateKind("range");
       setStart(null);
       setEnd(null);
@@ -93,7 +98,18 @@ export function AddResidenceDialog({
       setMediaId("");
       setNote("");
     }
-  }, [open, editResidence]);
+  }, [open, editResidence, lockedPersonId]);
+
+  const personOptions = useMemo(
+    () =>
+      Object.values(people).map((p) => ({
+        value: p.id,
+        label: fullName(p),
+        description: lifeDates(p),
+        leading: <Avatar name={fullName(p)} size="sm" />,
+      })),
+    [people],
+  );
 
   const sources = sourceOptions(media);
   // The citation label shown beside the editable provenance mark.
@@ -103,8 +119,10 @@ export function AddResidenceDialog({
 
   const submit = () =>
     startTransition(async () => {
+      // The person whose record opened the dialog is always one of the residents.
+      const personIds = [...new Set(lockedPersonId ? [lockedPersonId, ...residents] : residents)];
       const input: ResidenceInput = {
-        personId,
+        personIds,
         location,
         dateKind,
         start: serializePartialDate(start),
@@ -176,6 +194,23 @@ export function AddResidenceDialog({
           onSearch={searchPlaces}
           error={errors.location}
         />
+
+        <div style={{ display: "grid", gap: "var(--space-sm)" }}>
+          <span className="app-label">Who lived here</span>
+          <MultiSelect
+            label="Residents"
+            placeholder="Add the people who lived here…"
+            selected={residents}
+            onChange={setResidents}
+            options={personOptions}
+            summary={(n) => `${n} ${n === 1 ? "resident" : "residents"}`}
+          />
+          {errors.personIds && (
+            <div role="alert" style={{ color: "var(--color-danger)", fontSize: "var(--text-body-sm)" }}>
+              {errors.personIds}
+            </div>
+          )}
+        </div>
 
         <div style={{ display: "grid", gap: "var(--space-sm)" }}>
           <span className="app-label">Dates</span>

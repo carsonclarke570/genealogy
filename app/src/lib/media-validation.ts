@@ -16,7 +16,7 @@ import { provStatuses } from "./prov";
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024; // 25 MB
 
 /** The media `type` enum — must match the `media.type` column in db/schema.ts. */
-export const MEDIA_TYPES = ["photo", "certificate", "article", "obituary", "other"] as const;
+export const MEDIA_TYPES = ["photo", "certificate", "article", "obituary", "census", "other"] as const;
 export type MediaType = (typeof MEDIA_TYPES)[number];
 
 /** MIME types we accept (and will store + serve inline). */
@@ -37,6 +37,25 @@ const optionalText = z
   .catch(null);
 
 const CURRENT_YEAR = 2026;
+
+/**
+ * A structured location (the design-system `LocationValue` shape). Optional on a
+ * media item in general — required only for a Census, which seeds a residence from
+ * it (see the census refinement below). Sent as a JSON object in the request.
+ */
+const locationSchema = z
+  .object({
+    label: z.string(),
+    country: z.string().nullish(),
+    region: z.string().nullish(),
+    locality: z.string().nullish(),
+    address: z.string().nullish(),
+    lat: z.number().nullish(),
+    lng: z.number().nullish(),
+    placeId: z.string().nullish(),
+  })
+  .nullable()
+  .catch(null);
 
 /** Metadata that rides alongside the file in the multipart upload. */
 export const mediaMetaSchema = z.object({
@@ -61,6 +80,9 @@ export const mediaMetaSchema = z.object({
     .array(z.string().min(1))
     .transform((ids) => [...new Set(ids)])
     .catch([]),
+  // Where the household lived — only meaningful for a Census, and optional even
+  // then: with a place we also seed a residence, without one only the census event.
+  location: locationSchema,
 });
 
 export type MediaMeta = z.infer<typeof mediaMetaSchema>;

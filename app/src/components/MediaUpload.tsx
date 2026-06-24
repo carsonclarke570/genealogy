@@ -2,7 +2,8 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Avatar, Button, Dialog, Input, MultiSelect, Select, Textarea } from "@family-archive/ui";
+import { Avatar, Button, Dialog, Input, LocationField, MultiSelect, Select, Textarea } from "@family-archive/ui";
+import type { LocationValue } from "@family-archive/ui";
 import { fullName, lifeDates } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import { uploadMedia } from "@/lib/media-client";
@@ -17,8 +18,15 @@ const TYPE_LABELS: [(typeof MEDIA_TYPES)[number], string][] = [
   ["certificate", "Certificate"],
   ["article", "Article"],
   ["obituary", "Obituary"],
+  ["census", "Census"],
   ["other", "Other"],
 ];
+
+/** Fetch place suggestions from the auth-gated geocoder feeding `LocationField`. */
+const searchPlaces = (q: string) =>
+  fetch(`/api/geocode?q=${encodeURIComponent(q)}`)
+    .then((r) => r.json())
+    .then((d) => d.suggestions);
 
 function prettySize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -52,6 +60,7 @@ export function MediaUpload({
   const [type, setType] = useState<(typeof MEDIA_TYPES)[number]>("photo");
   const [year, setYear] = useState("");
   const [description, setDescription] = useState("");
+  const [location, setLocation] = useState<LocationValue | null>(null);
   const [selectedPeople, setSelectedPeople] = useState<string[]>(
     preselectPersonId ? [preselectPersonId] : [],
   );
@@ -64,6 +73,7 @@ export function MediaUpload({
     setType("photo");
     setYear("");
     setDescription("");
+    setLocation(null);
     setSelectedPeople(preselectPersonId ? [preselectPersonId] : []);
     setErrors({});
   };
@@ -102,6 +112,7 @@ export function MediaUpload({
     form.set("year", year);
     form.set("description", description);
     form.set("personIds", JSON.stringify(selectedPeople));
+    if (location) form.set("location", JSON.stringify(location));
 
     const result = await uploadMedia(form);
     setBusy(false);
@@ -217,6 +228,17 @@ export function MediaUpload({
             />
           </div>
         </div>
+
+        {type === "census" && (
+          <LocationField
+            label="Where they lived (optional)"
+            hint="We’ll add a census event for everyone below. Add a place and we’ll also record a residence there."
+            value={location}
+            onChange={setLocation}
+            onSearch={searchPlaces}
+            error={errors.location}
+          />
+        )}
 
         <div>
           <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
