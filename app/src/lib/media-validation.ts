@@ -58,41 +58,32 @@ const locationSchema = z
   .catch(null);
 
 /** Metadata that rides alongside the file in the multipart upload. */
-export const mediaMetaSchema = z
-  .object({
-    title: z.string().trim().min(1, "A title is required").max(200),
-    type: z.enum(MEDIA_TYPES, { message: "Choose a document type" }),
-    year: z
-      .union([z.string(), z.number()])
-      .transform((v) => {
-        const n = typeof v === "number" ? v : parseInt(v, 10);
-        return Number.isFinite(n) ? n : null;
-      })
-      .nullable()
-      .refine((n) => n === null || (n >= 1500 && n <= CURRENT_YEAR + 1), {
-        message: "Enter a year between 1500 and today",
-      })
-      .catch(null),
-    description: optionalText,
-    // How confident we are this item is authentic (unified provenance). Optional on
-    // the wire so older upload callers (which omit it) still validate.
-    prov: z.enum(provStatuses).catch("unverified"),
-    personIds: z
-      .array(z.string().min(1))
-      .transform((ids) => [...new Set(ids)])
-      .catch([]),
-    // Where the household lived — only meaningful (and required) for a Census.
-    location: locationSchema,
-  })
-  .superRefine((data, ctx) => {
-    if (data.type === "census" && !data.location?.label.trim()) {
-      ctx.addIssue({
-        path: ["location"],
-        code: z.ZodIssueCode.custom,
-        message: "A census needs a place — where did the household live?",
-      });
-    }
-  });
+export const mediaMetaSchema = z.object({
+  title: z.string().trim().min(1, "A title is required").max(200),
+  type: z.enum(MEDIA_TYPES, { message: "Choose a document type" }),
+  year: z
+    .union([z.string(), z.number()])
+    .transform((v) => {
+      const n = typeof v === "number" ? v : parseInt(v, 10);
+      return Number.isFinite(n) ? n : null;
+    })
+    .nullable()
+    .refine((n) => n === null || (n >= 1500 && n <= CURRENT_YEAR + 1), {
+      message: "Enter a year between 1500 and today",
+    })
+    .catch(null),
+  description: optionalText,
+  // How confident we are this item is authentic (unified provenance). Optional on
+  // the wire so older upload callers (which omit it) still validate.
+  prov: z.enum(provStatuses).catch("unverified"),
+  personIds: z
+    .array(z.string().min(1))
+    .transform((ids) => [...new Set(ids)])
+    .catch([]),
+  // Where the household lived — only meaningful for a Census, and optional even
+  // then: with a place we also seed a residence, without one only the census event.
+  location: locationSchema,
+});
 
 export type MediaMeta = z.infer<typeof mediaMetaSchema>;
 

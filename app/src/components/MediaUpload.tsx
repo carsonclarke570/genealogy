@@ -231,8 +231,8 @@ export function MediaUpload({
 
         {type === "census" && (
           <LocationField
-            label="Where they lived"
-            hint="A census records a household at a place — we’ll add a residence and a census event for everyone below."
+            label="Where they lived (optional)"
+            hint="We’ll add a census event for everyone below. Add a place and we’ll also record a residence there."
             value={location}
             onChange={setLocation}
             onSearch={searchPlaces}

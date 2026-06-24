@@ -60,7 +60,7 @@ export interface CensusSyncInput {
   year: number | null;
   /** Everyone on the media (the household). */
   personIds: string[];
-  /** The census place. Required when type is "census" (validated at the boundary). */
+  /** The census place (optional). With one we also seed a residence; without, only the event. */
   location: LocationValue | null;
   prov: ProvStatus;
 }
@@ -70,8 +70,10 @@ export interface CensusSyncInput {
  *
  * - type !== "census": remove the derived rows we still own (autoManaged), leaving
  *   any a user has adopted by hand. Join rows cascade.
- * - type === "census": upsert both rows. A row that doesn't exist is created; one we
- *   still own is updated; one a user has adopted (autoManaged=false) is left alone.
+ * - type === "census": always upsert the census **event**; upsert the **residence**
+ *   only when a place is given, and remove the residence we own when the place is
+ *   cleared. A row that doesn't exist is created; one we still own is updated; one a
+ *   user has adopted (autoManaged=false) is left alone.
  */
 export async function syncCensusDerived(db: DbOrTx, input: CensusSyncInput): Promise<void> {
   const resId = censusResidenceId(input.mediaId);
@@ -83,10 +85,6 @@ export async function syncCensusDerived(db: DbOrTx, input: CensusSyncInput): Pro
     return;
   }
 
-  // A census must have a place to seed a residence (the route enforces this; guard
-  // anyway so a malformed call is a no-op rather than a half-built record).
-  if (!input.location) return;
-
   const { residence: resRow, event: evRow } = buildCensusRows({
     mediaId: input.mediaId,
     year: input.year,
@@ -94,22 +92,28 @@ export async function syncCensusDerived(db: DbOrTx, input: CensusSyncInput): Pro
     prov: input.prov,
   });
 
-  // Residence: insert when absent, update while we own it, skip once user-adopted.
-  const [existingRes] = await db
-    .select({ autoManaged: residence.autoManaged })
-    .from(residence)
-    .where(eq(residence.id, resId));
-  if (!existingRes) {
-    await db.insert(residence).values(resRow);
-    await syncResidenceResidents(db, resId, input.personIds);
-  } else if (existingRes.autoManaged) {
-    const { id: _id, ...rest } = resRow;
-    void _id;
-    await db.update(residence).set({ ...rest, updatedAt: new Date() }).where(eq(residence.id, resId));
-    await syncResidenceResidents(db, resId, input.personIds);
+  // Residence: only when a place is known. Insert when absent, update while we own
+  // it, skip once user-adopted. With no place, drop the residence we still own (the
+  // census kept its event but its place was cleared).
+  if (resRow) {
+    const [existingRes] = await db
+      .select({ autoManaged: residence.autoManaged })
+      .from(residence)
+      .where(eq(residence.id, resId));
+    if (!existingRes) {
+      await db.insert(residence).values(resRow);
+      await syncResidenceResidents(db, resId, input.personIds);
+    } else if (existingRes.autoManaged) {
+      const { id: _id, ...rest } = resRow;
+      void _id;
+      await db.update(residence).set({ ...rest, updatedAt: new Date() }).where(eq(residence.id, resId));
+      await syncResidenceResidents(db, resId, input.personIds);
+    }
+  } else {
+    await db.delete(residence).where(and(eq(residence.id, resId), eq(residence.autoManaged, true)));
   }
 
-  // Event: same upsert-while-owned rule.
+  // Event: always generated. Same upsert-while-owned rule.
   const [existingEv] = await db
     .select({ autoManaged: event.autoManaged })
     .from(event)

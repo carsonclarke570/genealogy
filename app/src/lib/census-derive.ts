@@ -14,46 +14,53 @@ export interface CensusSource {
   mediaId: string;
   /** The census year (the media item's `year`), or null when undated. */
   year: number | null;
-  /** Where the household lived, per the census. */
-  location: LocationValue;
+  /**
+   * Where the household lived, per the census. Optional: with a place we also
+   * generate a residence; without one only the census event is generated.
+   */
+  location: LocationValue | null;
   /** Confidence carried over from the media item. */
   prov: ProvStatus;
 }
 
 /**
- * The residence + event rows a census media item generates. Pure — given the same
- * source it always returns the same rows (same ids, same values). The residence is
- * a "point" (a census places a household at a year, not across a move-in/out span).
+ * The records a census media item generates. Pure — given the same source it
+ * always returns the same rows (same ids, same values). The **event** is always
+ * generated; the **residence** only when a place is known (else `null`) — a census
+ * with no recorded place still marks that the household appeared in it. The
+ * residence is a "point" (a census places a household at a year, not a span).
  */
 export function buildCensusRows(src: CensusSource): {
-  residence: typeof residence.$inferInsert;
+  residence: typeof residence.$inferInsert | null;
   event: typeof event.$inferInsert;
 } {
   const dateStr = src.year != null ? String(src.year) : null;
-  const loc = locationToColumns(src.location);
-  const placeLabel = loc?.placeLabel ?? src.location.label;
+  const loc = src.location ? locationToColumns(src.location) : null;
+  const placeLabel = loc?.placeLabel ?? null;
 
   return {
-    residence: {
-      id: censusResidenceId(src.mediaId),
-      country: loc?.country ?? null,
-      region: loc?.region ?? null,
-      locality: loc?.locality ?? null,
-      address: loc?.address ?? null,
-      placeLabel,
-      lat: loc?.lat ?? null,
-      lng: loc?.lng ?? null,
-      placeId: loc?.placeId ?? null,
-      dateKind: "point",
-      startDate: dateStr,
-      startYear: src.year,
-      endDate: null,
-      endYear: null,
-      prov: src.prov,
-      mediaId: src.mediaId,
-      note: null,
-      autoManaged: true,
-    },
+    residence: loc
+      ? {
+          id: censusResidenceId(src.mediaId),
+          country: loc.country,
+          region: loc.region,
+          locality: loc.locality,
+          address: loc.address,
+          placeLabel: loc.placeLabel,
+          lat: loc.lat,
+          lng: loc.lng,
+          placeId: loc.placeId,
+          dateKind: "point",
+          startDate: dateStr,
+          startYear: src.year,
+          endDate: null,
+          endYear: null,
+          prov: src.prov,
+          mediaId: src.mediaId,
+          note: null,
+          autoManaged: true,
+        }
+      : null,
     event: {
       id: censusEventId(src.mediaId),
       type: "census",

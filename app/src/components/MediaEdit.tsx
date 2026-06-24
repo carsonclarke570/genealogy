@@ -179,8 +179,8 @@ export function MediaEdit({
 
         {type === "census" && (
           <LocationField
-            label="Where they lived"
-            hint="The census place — its residence and event for everyone below stay in step with this, unless you’ve edited them by hand."
+            label="Where they lived (optional)"
+            hint="The census place. Its event (and the residence, if a place is set) for everyone below stay in step with this — unless you’ve edited them by hand. Clear the place to drop the residence."
             value={location}
             onChange={setLocation}
             onSearch={searchPlaces}
