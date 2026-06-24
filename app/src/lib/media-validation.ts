@@ -11,12 +11,13 @@
  */
 import { z } from "zod";
 import { provStatuses } from "./prov";
+import { parsePartialDate, serializePartialDate } from "./dates";
 
 /** Hard ceiling on an uploaded file. */
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024; // 25 MB
 
 /** The media `type` enum — must match the `media.type` column in db/schema.ts. */
-export const MEDIA_TYPES = ["photo", "certificate", "article", "obituary", "census", "other"] as const;
+export const MEDIA_TYPES = ["photo", "certificate", "article", "obituary", "census", "grave", "other"] as const;
 export type MediaType = (typeof MEDIA_TYPES)[number];
 
 /** MIME types we accept (and will store + serve inline). */
@@ -40,10 +41,11 @@ const CURRENT_YEAR = 2026;
 
 /**
  * A structured location (the design-system `LocationValue` shape). Optional on a
- * media item in general — required only for a Census, which seeds a residence from
- * it (see the census refinement below). Sent as a JSON object in the request.
+ * media item in general — used by a Census (the household's place, which seeds a
+ * residence) and a Grave (the burial place, surfaced on the death event). Sent as
+ * a JSON object in the request.
  */
-const locationSchema = z
+export const locationSchema = z
   .object({
     label: z.string(),
     country: z.string().nullish(),
@@ -82,7 +84,22 @@ export const mediaMetaSchema = z.object({
     .catch([]),
   // Where the household lived — only meaningful for a Census, and optional even
   // then: with a place we also seed a residence, without one only the census event.
+  // For a Grave this carries the burial place instead.
   location: locationSchema,
+  // Per-person dates keyed by person id — only meaningful for a Grave (the
+  // death/burial date the headstone records for each person). Each value is
+  // re-canonicalised to a partial-date string; unparseable entries are dropped.
+  personDates: z
+    .record(z.string().min(1), z.union([z.string(), z.null()]))
+    .transform((map) => {
+      const out: Record<string, string> = {};
+      for (const [id, raw] of Object.entries(map)) {
+        const canon = serializePartialDate(parsePartialDate(raw));
+        if (canon) out[id] = canon;
+      }
+      return out;
+    })
+    .catch({}),
 });
 
 export type MediaMeta = z.infer<typeof mediaMetaSchema>;

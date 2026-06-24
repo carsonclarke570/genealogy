@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Avatar, Button, Dialog, Input, LocationField, MultiCombobox, Select, Textarea } from "@family-archive/ui";
-import type { LocationValue, ProvenanceStatus } from "@family-archive/ui";
+import { Avatar, Button, DateField, Dialog, Input, LocationField, MultiCombobox, Select, Textarea } from "@family-archive/ui";
+import type { LocationValue, PartialDate, ProvenanceStatus } from "@family-archive/ui";
 import { fullName, lifeDates, type MediaItem } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import { updateMedia } from "@/lib/media-client";
 import { MEDIA_TYPES } from "@/lib/media-validation";
 import { censusResidenceId } from "@/lib/census-ids";
+import { parsePartialDate, serializePartialDate } from "@/lib/dates";
 import { PROV_LABEL, provStatuses } from "@/lib/prov";
 import { Icon } from "./Icon";
 
@@ -18,6 +19,7 @@ const TYPE_LABELS: [(typeof MEDIA_TYPES)[number], string][] = [
   ["article", "Article"],
   ["obituary", "Obituary"],
   ["census", "Census"],
+  ["grave", "Grave"],
   ["other", "Other"],
 ];
 
@@ -52,6 +54,7 @@ export function MediaEdit({
   const [prov, setProv] = useState<ProvenanceStatus>("unverified");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState<LocationValue | null>(null);
+  const [graveDates, setGraveDates] = useState<Record<string, PartialDate | null>>({});
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -66,9 +69,20 @@ export function MediaEdit({
     setProv(media.prov);
     setDescription(media.description ?? "");
     setSelectedPeople(media.people);
-    // Pre-fill the census place from the residence it generated (if any).
-    const censusRes = residences.find((r) => r.id === censusResidenceId(media.id));
-    setLocation(censusRes?.location ?? null);
+    // Pre-fill the place: a Census from the residence it generated, a Grave from
+    // the burial place stored on the media row; and a Grave's per-person dates.
+    if (media.type === "grave") {
+      setLocation(media.location ?? null);
+      const dates: Record<string, PartialDate | null> = {};
+      for (const [pid, raw] of Object.entries(media.personDates ?? {})) {
+        dates[pid] = parsePartialDate(raw);
+      }
+      setGraveDates(dates);
+    } else {
+      const censusRes = residences.find((r) => r.id === censusResidenceId(media.id));
+      setLocation(censusRes?.location ?? null);
+      setGraveDates({});
+    }
   }, [open, media, residences]);
 
   const close = () => {
@@ -87,6 +101,14 @@ export function MediaEdit({
       description,
       personIds: selectedPeople,
       location,
+      personDates:
+        type === "grave"
+          ? Object.fromEntries(
+              selectedPeople
+                .map((pid) => [pid, serializePartialDate(graveDates[pid])] as const)
+                .filter((entry): entry is [string, string] => entry[1] != null),
+            )
+          : undefined,
     });
     setBusy(false);
     if (result.ok) {
@@ -188,6 +210,17 @@ export function MediaEdit({
           />
         )}
 
+        {type === "grave" && (
+          <LocationField
+            label="Burial location (optional)"
+            hint="Where they’re buried — shown on their death event."
+            value={location}
+            onChange={setLocation}
+            onSearch={searchPlaces}
+            error={errors.location}
+          />
+        )}
+
         <div>
           <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
             People in this record
@@ -200,6 +233,22 @@ export function MediaEdit({
             options={personOptions}
           />
         </div>
+
+        {type === "grave" && selectedPeople.length > 0 && (
+          <div style={{ display: "grid", gap: "var(--space-md)" }}>
+            <div className="app-label">Date on the headstone (optional, per person)</div>
+            {selectedPeople.map((pid) =>
+              people[pid] ? (
+                <DateField
+                  key={pid}
+                  label={fullName(people[pid])}
+                  value={graveDates[pid] ?? null}
+                  onChange={(d) => setGraveDates((prev) => ({ ...prev, [pid]: d }))}
+                />
+              ) : null,
+            )}
+          </div>
+        )}
 
         <Textarea
           label="Description (optional)"

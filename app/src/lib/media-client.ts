@@ -31,8 +31,10 @@ export interface MediaEditInput {
   prov?: string;
   description: string;
   personIds: string[];
-  /** Where the household lived — only meaningful (and required) for a Census. */
+  /** A place — the household's (Census) or the burial place (Grave). */
   location?: unknown;
+  /** Per-person dates keyed by person id — only meaningful for a Grave. */
+  personDates?: Record<string, string | null>;
 }
 
 export async function updateMedia(id: string, input: MediaEditInput): Promise<MediaMutationResult> {

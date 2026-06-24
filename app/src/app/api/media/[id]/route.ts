@@ -62,6 +62,8 @@ export async function PUT(
           title: meta.title,
           year: meta.year,
           description: meta.description,
+          // A Grave stores its burial place on the row; clear it for other types.
+          location: meta.type === "grave" && meta.location ? JSON.stringify(meta.location) : null,
           prov: meta.prov,
         })
         .where(eq(mediaTable.id, params.id))
@@ -70,7 +72,14 @@ export async function PUT(
 
       await tx.delete(personMedia).where(eq(personMedia.mediaId, params.id));
       if (validPeople.length > 0) {
-        await tx.insert(personMedia).values(validPeople.map((personId) => ({ personId, mediaId: params.id })));
+        await tx.insert(personMedia).values(
+          validPeople.map((personId) => ({
+            personId,
+            mediaId: params.id,
+            // Per-person grave date (the headstone's date for this person); null otherwise.
+            date: meta.type === "grave" ? meta.personDates?.[personId] ?? null : null,
+          })),
+        );
       }
 
       // Keep the census-derived residence + event in step with the edited media

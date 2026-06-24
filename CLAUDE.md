@@ -79,14 +79,19 @@ Schema in `app/src/db/schema.ts`; refined from the initial sketch:
   so the family graph below reconstructs deterministically regardless of how an
   edge was entered.
 - **media** — id, type (photo | certificate | article | obituary | **census** |
-  other), title, year, plus file fields (path, mime, original filename,
+  **grave** | other), title, year, plus file fields (path, mime, original filename,
   description). Real upload populates the file fields; legacy/seed rows leave them
   null (the read model exposes `hasFile`/`mimeType` so the UI shows a real preview
   or a placeholder). A **`census`** upload additionally captures a place and
-  auto-generates a residence + a census event for its household (see below).
-- **person_media** — links media to one or more people. The read model derives a
-  real per-person `mediaCount` from these rows (which `docCount` now prefers over
-  the legacy `docs` JSON tally).
+  auto-generates a residence + a census event for its household (see below). A
+  **`grave`** (headstone) upload captures a **burial location** (stored as JSON in
+  `media.location`) and a **per-person date** (on `person_media.date`); unlike
+  census it derives **no** stored rows — it merges into each person's *derived*
+  death event on read (see Grave merge below).
+- **person_media** — links media to one or more people (plus an optional per-link
+  `date`, used by a grave for the death/burial date the stone records per person).
+  The read model derives a real per-person `mediaCount` from these rows (which
+  `docCount` now prefers over the legacy `docs` JSON tally).
 - **event** + **event_person** — stored *custom* life events (immigration,
   military, education, career, religious, **census**, other), each linkable to one
   or more people and an optional source document. Births, deaths, marriages and
@@ -124,6 +129,17 @@ Schema in `app/src/db/schema.ts`; refined from the initial sketch:
   residence are one fact, so `buildTimeline` draws it once — as the census event
   (it carries the place + cites the record) — and skips the deterministic-id twin
   residence (which still shows on the person's Residences tab).
+- **Grave merge** (`app/src/lib/timeline.ts`). A `grave` (headstone) media carries
+  a burial location (`media.location`) and a death/burial date *per person*
+  (`person_media.date`). It seeds **no** stored rows — instead `buildTimeline`'s
+  death derivation merges it into each person's derived death event: the person's
+  recorded death date stays **primary** (it may cite a death certificate that
+  disagrees with the stone), the headstone rides along as a `burial` source + place,
+  and a differing date is **flagged** (`burial.conflictsWithRecorded`). A grave with
+  a date also **manufactures** a death event for someone with none recorded (a
+  headstone implies death), and the grave media is consumed so it never doubles as a
+  standalone document event. This is the deliberate, lighter counterpart to census —
+  the target (the died event) is itself derived, so there is nothing to sync.
 
 **Unified provenance.** Every discrete fact — a person's birth/death dates and
 places, a marriage/divorce date, a media item, a residence, a stored event —

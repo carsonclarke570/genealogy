@@ -7,6 +7,7 @@ const DOC_LABEL: Record<DocType, string> = {
   article: "Article",
   obituary: "Obituary",
   census: "Census",
+  grave: "Grave",
   other: "Document",
 };
 

@@ -131,6 +131,14 @@ export interface MediaItem {
   mimeType: string | null;
   /** Whether an actual file is stored for this item (filePath is set). */
   hasFile: boolean;
+  /** Structured location (a Grave's burial place); null for items without one. */
+  location?: LocationValue | null;
+  /**
+   * Per-person dates this item records, keyed by person id — a Grave's
+   * death/burial date per person, as a canonical partial-date string. Absent keys
+   * mean no date was recorded for that person.
+   */
+  personDates?: Record<string, string | null>;
 }
 
 /** The authenticated route that streams a media item's bytes. */
@@ -224,6 +232,18 @@ export interface TimelineEvent {
   source: { id: string; title: string; type: DocType } | null;
   /** True for derived events (birth/death/marriage/divorce/document); false for stored ones. */
   auto: boolean;
+  /**
+   * Burial details merged into a death event from a Grave (headstone) media item:
+   * the burial place, the date the stone records (which may differ from the
+   * person's recorded death date), the headstone as a cited source, and whether
+   * those two dates conflict. Undefined on every event but a death with a grave.
+   */
+  burial?: {
+    place: string | null;
+    date: PartialDate | null;
+    source: { id: string; title: string; type: DocType } | null;
+    conflictsWithRecorded: boolean;
+  } | null;
   /**
    * Name changes attached to this event (a marriage/immigration that caused one),
    * rendered nested inside it instead of as standalone timeline events.

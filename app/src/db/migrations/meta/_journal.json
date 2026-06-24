@@ -57,6 +57,13 @@
       "when": 1782310871432,
       "tag": "0007_multi_person_residence_census",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1782322105302,
+      "tag": "0008_lame_deathbird",
+      "breakpoints": true
     }
   ]
 }
