@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
 
 export interface SegmentItem {
@@ -22,9 +22,23 @@ export interface SegmentedControlProps {
   onValueChange?: (value: string) => void;
   /** Compact height for dense toolbars. @default "md" */
   size?: "sm" | "md";
-  /** Accessible name for the group (e.g. "Tree layout"). */
+  /**
+   * Visible field label rendered above the control. When set, the group is
+   * associated to it via `aria-labelledby` and the bare `aria-label` is dropped —
+   * matching the Input/Combobox label/hint/error contract for use inside forms.
+   */
+  label?: ReactNode;
+  /** Helper text shown beneath the control when there is no error. */
+  hint?: ReactNode;
+  /** Error message. Sets `aria-invalid` and replaces the hint. */
+  error?: ReactNode;
+  /** Marks the field required and shows a danger asterisk on the label. */
+  required?: boolean;
+  /** Root id; the label/hint/error ids derive from it. */
+  id?: string;
+  /** Accessible name for the group when there is no visible `label` (e.g. "Tree layout"). */
   "aria-label"?: string;
-  /** Extra class names merged onto the root, for positioning/floating chrome. */
+  /** Extra class names merged onto the control, for positioning/floating chrome. */
   className?: string;
   /** Inline style on the root (e.g. a shadow when floating over a canvas). */
   style?: CSSProperties;
@@ -56,6 +70,11 @@ export function SegmentedControl({
   defaultValue,
   onValueChange,
   size = "md",
+  label,
+  hint,
+  error,
+  required,
+  id,
   "aria-label": ariaLabel,
   className,
   style,
@@ -63,6 +82,14 @@ export function SegmentedControl({
   const [internal, setInternal] = useState(defaultValue ?? items[0]?.value);
   const active = value ?? internal;
   const btnRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  const autoId = useId();
+  const fieldId = id ?? autoId;
+  const labelId = `${fieldId}-label`;
+  const hintId = `${fieldId}-hint`;
+  const errorId = `${fieldId}-error`;
+  const invalid = Boolean(error);
+  const hasField = Boolean(label || hint || error);
 
   const select = (v: string) => {
     if (value === undefined) setInternal(v);
@@ -94,8 +121,16 @@ export function SegmentedControl({
     .filter(Boolean)
     .join(" ");
 
-  return (
-    <div className={classes} style={style} role="radiogroup" aria-label={ariaLabel} onKeyDown={onKeyDown}>
+  const group = (
+    <div
+      className={classes}
+      style={hasField ? undefined : style}
+      role="radiogroup"
+      aria-label={label ? undefined : ariaLabel}
+      aria-labelledby={label ? labelId : undefined}
+      aria-describedby={invalid ? errorId : hint ? hintId : undefined}
+      onKeyDown={onKeyDown}
+    >
       {items.map((it) => {
         const on = it.value === active;
         return (
@@ -117,6 +152,42 @@ export function SegmentedControl({
           </button>
         );
       })}
+    </div>
+  );
+
+  // Bare control (floating toolbars): unchanged. Otherwise wrap it in the shared
+  // field scaffold so a labelled segmented control reads exactly like an Input.
+  if (!hasField) return group;
+
+  return (
+    <div className="fa-field" style={style}>
+      {label && (
+        <span className="fa-field__label" id={labelId}>
+          {label}
+          {required && (
+            <span className="fa-field__required" aria-hidden="true">
+              *
+            </span>
+          )}
+        </span>
+      )}
+      {group}
+      {invalid ? (
+        <span id={errorId} className="fa-field__error" role="alert">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M8 4.5v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <circle cx="8" cy="11" r="0.9" fill="currentColor" />
+          </svg>
+          {error}
+        </span>
+      ) : (
+        hint && (
+          <span id={hintId} className="fa-field__hint">
+            {hint}
+          </span>
+        )
+      )}
     </div>
   );
 }

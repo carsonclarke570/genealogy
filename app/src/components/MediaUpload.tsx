@@ -21,7 +21,6 @@ import { fullName, lifeDates } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import { uploadMedia } from "@/lib/media-client";
 import { MAX_UPLOAD_BYTES, MEDIA_TYPES } from "@/lib/media-validation";
-import { PROV_LABEL, provStatuses } from "@/lib/prov";
 import { serializePartialDate } from "@/lib/dates";
 import { DocViewer } from "./DocViewer";
 import { Icon } from "./Icon";
@@ -84,7 +83,6 @@ export function MediaUpload({
   const [title, setTitle] = useState("");
   const [type, setType] = useState<(typeof MEDIA_TYPES)[number]>("photo");
   const [year, setYear] = useState("");
-  const [prov, setProv] = useState<(typeof provStatuses)[number]>("unverified");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState<LocationValue | null>(null);
   const [graveDates, setGraveDates] = useState<Record<string, PartialDate | null>>({});
@@ -131,7 +129,7 @@ export function MediaUpload({
     form.set("title", title);
     form.set("type", type);
     form.set("year", year);
-    form.set("prov", prov);
+    form.set("prov", "unverified");
     form.set("description", description);
     form.set("personIds", JSON.stringify(selectedPeople));
     if (location) form.set("location", JSON.stringify(location));
@@ -298,28 +296,9 @@ export function MediaUpload({
               </div>
             </div>
 
-            <div>
-              <Select label="Confidence" value={prov} onChange={(e) => setProv(e.target.value as (typeof provStatuses)[number])}>
-                {provStatuses.map((s) => (
-                  <option key={s} value={s}>
-                    {PROV_LABEL[s]}
-                  </option>
-                ))}
-              </Select>
-              <div
-                className="app-muted"
-                style={{ fontSize: "var(--text-label)", marginTop: 6, display: "flex", alignItems: "center", gap: 6 }}
-              >
-                <span style={{ color: "var(--color-success)", display: "inline-flex" }}>
-                  <Icon name="check" size={13} />
-                </span>
-                Marking a record verified cites it as a source for the facts it proves.
-              </div>
-            </div>
-
             {type === "census" && (
               <LocationField
-                label="Where they lived (optional)"
+                label="Where they lived"
                 hint="We’ll add a census event for everyone below. Add a place and we’ll also record a residence there."
                 value={location}
                 onChange={setLocation}
@@ -330,7 +309,7 @@ export function MediaUpload({
 
             {type === "grave" && (
               <LocationField
-                label="Burial location (optional)"
+                label="Burial location"
                 hint="Where they’re buried — shown on their death event."
                 value={location}
                 onChange={setLocation}
@@ -339,11 +318,9 @@ export function MediaUpload({
               />
             )}
 
-            <div>
-              <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
-                People in this record
-              </div>
-              {lockedName ? (
+            {lockedName ? (
+              <div className="fa-field">
+                <span className="fa-field__label">People in this record</span>
                 <div
                   style={{
                     display: "flex",
@@ -355,20 +332,20 @@ export function MediaUpload({
                 >
                   <Avatar name={lockedName} size="sm" /> {lockedName}
                 </div>
-              ) : (
-                <MultiCombobox
-                  aria-label="People in this record"
-                  placeholder="Search people…"
-                  value={selectedPeople}
-                  onChange={setSelectedPeople}
-                  options={personOptions}
-                />
-              )}
-            </div>
+              </div>
+            ) : (
+              <MultiCombobox
+                label="People in this record"
+                placeholder="Search people…"
+                value={selectedPeople}
+                onChange={setSelectedPeople}
+                options={personOptions}
+              />
+            )}
 
             {type === "grave" && selectedPeople.length > 0 && (
               <div style={{ display: "grid", gap: "var(--space-md)" }}>
-                <div className="app-label">Date on the headstone (optional, per person)</div>
+                <span className="fa-field__label">Headstone dates</span>
                 {selectedPeople.map((pid) =>
                   people[pid] ? (
                     <DateField
@@ -383,7 +360,7 @@ export function MediaUpload({
             )}
 
             <Textarea
-              label="Description (optional)"
+              label="Description"
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}

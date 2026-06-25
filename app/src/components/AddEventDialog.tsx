@@ -5,23 +5,20 @@ import { useRouter } from "next/navigation";
 import {
   Avatar,
   Button,
-  Combobox,
   DateField,
   Dialog,
-  DOC_TYPE_LABEL,
   IconBadge,
   Input,
   LocationField,
   MultiCombobox,
+  ProvenanceMark,
   Select,
-  sourceMeta,
 } from "@family-archive/ui";
 import type { LocationValue, PartialDate, ProvenanceStatus } from "@family-archive/ui";
 import { fullName, lifeDates, sourceOptions, type TimelineEvent } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import { serializePartialDate } from "@/lib/dates";
 import { locationFromLabel, locationLabel } from "@/lib/locations";
-import { provStatuses } from "@/lib/prov";
 import { EVENT_META, STORED_EVENT_TYPES, meta } from "@/lib/timeline";
 import { createEvent, updateEvent, deleteEvent, type EventInput } from "@/lib/actions";
 import { Icon, type IconName } from "./Icon";
@@ -105,25 +102,11 @@ export function AddEventDialog({
       leading: <Avatar name={fullName(p)} size="sm" />,
     }));
 
-  // The full archive, as searchable source options (title + type · year).
-  const sourceDocOptions = sourceOptions(media).map((s) => ({
-    value: s.id,
-    label: s.label,
-    description: sourceMeta(s),
-    leading: (
-      <span
-        aria-hidden="true"
-        style={{
-          display: "block",
-          width: 8,
-          height: 8,
-          borderRadius: "50%",
-          background: `var(--doc-${s.type ?? "other"})`,
-        }}
-      />
-    ),
-    keywords: `${s.type ? DOC_TYPE_LABEL[s.type] : ""} ${s.year ?? ""}`,
-  }));
+  const sources = sourceOptions(media);
+  // The citation label shown beside the editable provenance mark.
+  const sourceLabel = mediaId
+    ? sources.find((s) => s.id === mediaId)?.label ?? media.find((m) => m.id === mediaId)?.title
+    : undefined;
 
   const submit = () =>
     startTransition(async () => {
@@ -173,7 +156,12 @@ export function AddEventDialog({
           <Button variant="ghost" onClick={onClose} disabled={pending}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={submit} loading={pending} iconStart={<Icon name="plus" size={16} />}>
+          <Button
+            variant="primary"
+            onClick={submit}
+            loading={pending}
+            iconStart={<Icon name={editingId ? "check" : "plus"} size={16} />}
+          >
             {editingId ? "Save changes" : "Add event"}
           </Button>
         </>
@@ -202,6 +190,7 @@ export function AddEventDialog({
 
         <Input
           label="What happened"
+          required
           placeholder="e.g. Sailed for America aboard the SS Carmania"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -232,39 +221,30 @@ export function AddEventDialog({
           </div>
         </div>
 
-        <div>
-          <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
-            People involved
-          </div>
-          <MultiCombobox
-            aria-label="People involved"
-            placeholder="Search family members…"
-            value={persons}
-            onChange={setPersons}
-            options={personOptions}
-          />
-        </div>
+        <MultiCombobox
+          label="People involved"
+          placeholder="Search family members…"
+          value={persons}
+          onChange={setPersons}
+          options={personOptions}
+        />
 
-        <div className="app-field-row">
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <Combobox
-              label="Source document (optional)"
-              placeholder="Search documents…"
-              emptyMessage="No documents match"
-              value={mediaId || null}
-              onChange={(v) => setMediaId(v ?? "")}
-              options={sourceDocOptions}
-            />
-          </div>
-          <div style={{ width: 170, flex: "none" }}>
-            <Select label="Confidence" value={prov} onChange={(e) => setProv(e.target.value as ProvenanceStatus)}>
-              {provStatuses.map((s) => (
-                <option key={s} value={s}>
-                  {PROV_LABEL[s]}
-                </option>
-              ))}
-            </Select>
-          </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
+          <span className="app-label">Confidence</span>
+          <ProvenanceMark
+            status={prov}
+            source={prov === "verified" ? sourceLabel : undefined}
+            sources={sources}
+            onChange={(status, _src, sourceId) => {
+              setProv(status);
+              // "Verified" cites a document; any other status clears the source.
+              setMediaId(status === "verified" && sourceId && sourceId !== "__new" ? sourceId : "");
+            }}
+          />
+          <span className="app-muted" style={{ fontSize: "var(--text-body-sm)" }}>
+            {PROV_LABEL[prov]}
+            {prov === "verified" && sourceLabel ? ` · ${sourceLabel}` : ""}
+          </span>
         </div>
       </div>
     </Dialog>

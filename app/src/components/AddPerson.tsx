@@ -268,7 +268,7 @@ function NameRow({
       </div>
       <div className="app-field-row" style={{ alignItems: "flex-end" }}>
         <div style={{ flex: 1 }}>
-          <Select label="Linked to (optional)" value={row.cause} onChange={(e) => onUpdate({ cause: e.target.value })}>
+          <Select label="Linked to" value={row.cause} onChange={(e) => onUpdate({ cause: e.target.value })}>
             {causeOptions.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
@@ -277,7 +277,7 @@ function NameRow({
           </Select>
         </div>
         <div style={{ flex: 1 }}>
-          <Select label="Source document (optional)" value={row.source} onChange={(e) => onUpdate({ source: e.target.value })}>
+          <Select label="Source document" value={row.source} onChange={(e) => onUpdate({ source: e.target.value })}>
             <option value="">No source on file</option>
             {mediaOptions.map((m) => (
               <option key={m.id} value={m.id}>
@@ -981,10 +981,16 @@ export function AddPerson({
             </Card>
             <Card>
               <div style={{ display: "grid", gap: "var(--space-sm)" }}>
-                <Button type="submit" variant="primary" fullWidth loading={pending}>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  fullWidth
+                  loading={pending}
+                  iconStart={<Icon name="check" size={16} />}
+                >
                   {isEdit ? "Save changes" : "Save person"}
                 </Button>
-                <Button type="button" variant="secondary" fullWidth disabled={pending} onClick={() => onNavigate("explorer")}>
+                <Button type="button" variant="ghost" fullWidth disabled={pending} onClick={() => onNavigate("explorer")}>
                   Cancel
                 </Button>
                 <div className="app-muted" style={{ fontSize: "var(--text-label)", textAlign: "center" }}>

@@ -173,7 +173,12 @@ export function AddResidenceDialog({
           <Button variant="ghost" onClick={onClose} disabled={pending}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={submit} loading={pending} iconStart={<Icon name="plus" size={16} />}>
+          <Button
+            variant="primary"
+            onClick={submit}
+            loading={pending}
+            iconStart={<Icon name={editingId ? "check" : "plus"} size={16} />}
+          >
             {editingId ? "Save changes" : "Add residence"}
           </Button>
         </>
@@ -188,6 +193,7 @@ export function AddResidenceDialog({
 
         <LocationField
           label="Place"
+          required
           hint="From a country down to a street address — as much as you know."
           value={location}
           onChange={setLocation}
@@ -195,22 +201,19 @@ export function AddResidenceDialog({
           error={errors.location}
         />
 
-        <div style={{ display: "grid", gap: "var(--space-sm)" }}>
-          <span className="app-label">Who lived here</span>
-          <MultiCombobox
-            aria-label="Who lived here"
-            placeholder="Search the people who lived here…"
-            value={residents}
-            onChange={setResidents}
-            options={personOptions}
-            error={errors.personIds}
-          />
-        </div>
+        <MultiCombobox
+          label="Who lived here"
+          required
+          placeholder="Search the people who lived here…"
+          value={residents}
+          onChange={setResidents}
+          options={personOptions}
+          error={errors.personIds}
+        />
 
         <div style={{ display: "grid", gap: "var(--space-sm)" }}>
-          <span className="app-label">Dates</span>
           <SegmentedControl
-            aria-label="What the dates mean"
+            label="Dates"
             size="sm"
             value={dateKind}
             onValueChange={(v) => setDateKind(v as ResidenceDateKind)}
@@ -249,7 +252,7 @@ export function AddResidenceDialog({
         </div>
 
         <Textarea
-          label="Note (optional)"
+          label="Note"
           placeholder="e.g. The family home on Maple Street, kept until the war."
           rows={3}
           value={note}
