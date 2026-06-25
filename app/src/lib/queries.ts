@@ -11,7 +11,7 @@ import "server-only";
 import { z } from "zod";
 import { getDb } from "@/db/client";
 import * as schema from "@/db/schema";
-import type { Person, MediaItem, Dataset, EventType, NameReason, Residence, ProvFact } from "./family-data";
+import type { Person, MediaItem, Dataset, EventType, NameReason, Residence, ProvFact, PlaceCoord } from "./family-data";
 import { assemblePersonNames } from "./family-data";
 import { buildFamilyGraph, type RelationshipEdge } from "./family-graph";
 import { buildTimeline, type StoredEvent } from "./timeline";
@@ -69,6 +69,7 @@ export async function getDataset(): Promise<Dataset> {
     nameRows,
     residenceRows,
     residenceLinks,
+    placeRows,
   ] = await Promise.all([
     db.select().from(schema.person),
     db.select().from(schema.relationship),
@@ -79,6 +80,7 @@ export async function getDataset(): Promise<Dataset> {
     db.select().from(schema.personName),
     db.select().from(schema.residence),
     db.select().from(schema.residencePerson),
+    db.select().from(schema.place),
   ]);
 
   // Real attached-media count per person, derived from the link table.
@@ -250,6 +252,21 @@ export async function getDataset(): Promise<Dataset> {
     people: peopleByEvent.get(e.id) ?? [],
   }));
 
+  // Coordinate gazetteer (normalised label → coordinate) — one map, no N+1.
+  const places: Record<string, PlaceCoord> = {};
+  for (const r of placeRows) {
+    places[r.normalized] = {
+      normalized: r.normalized,
+      label: r.label,
+      lat: r.lat,
+      lng: r.lng,
+      country: r.country,
+      region: r.region,
+      locality: r.locality,
+      status: r.status === "resolved" ? "resolved" : "unresolved",
+    };
+  }
+
   return {
     people,
     graph: buildFamilyGraph(relationships),
@@ -257,5 +274,6 @@ export async function getDataset(): Promise<Dataset> {
     media,
     residences,
     events: buildTimeline({ people, relationships, media, residences, events }),
+    places,
   };
 }

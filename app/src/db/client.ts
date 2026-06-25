@@ -23,6 +23,7 @@ import { count } from "drizzle-orm";
 import * as schema from "./schema";
 import { seed } from "./seed";
 import { reindex } from "./reindex";
+import { geocodeArchive } from "./geocode";
 
 export type DB = NodePgDatabase<typeof schema>;
 
@@ -44,7 +45,24 @@ async function init(): Promise<DB> {
   // Still idempotent — no-ops once the family table is populated.
   if (process.env.NODE_ENV !== "production") await seed(db);
   await reindexIfStale(db);
+  await geocodeIfConfigured(db);
   return db;
+}
+
+/**
+ * Backfill the coordinate gazetteer for any archive place still unresolved.
+ * Best-effort: a geocoder error must never block boot (the map degrades to
+ * whatever coordinates exist — the seed's starter set still covers the demo).
+ * Skipped entirely when no geocoder is configured, so a keyless install pays
+ * nothing here.
+ */
+async function geocodeIfConfigured(db: DB): Promise<void> {
+  if (!process.env.GEOCODER_URL) return;
+  try {
+    await geocodeArchive(db);
+  } catch (err) {
+    console.error("Gazetteer backfill on boot failed (continuing):", err);
+  }
 }
 
 /**

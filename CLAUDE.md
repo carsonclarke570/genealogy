@@ -28,6 +28,7 @@ never be served without an authenticated session.
 | File storage   | Object storage (Railway bucket / S3), served via protected routes |
 | Auth           | Auth.js (NextAuth) — session required for all app routes      |
 | Graph viz      | React Flow (`@xyflow/react`) for the explorable tree          |
+| Map viz        | Leaflet + **public CARTO basemap tiles** (the one 3rd-party dep) |
 | Search         | Hybrid: pgvector (dense) + Postgres full-text, fused by RRF    |
 | Embeddings     | Self-hosted Hugging Face TEI (open-source model) — no 3rd party |
 | Geocoding      | Self-hosted Photon (Apache-2.0), env-gated — no 3rd party       |
@@ -36,6 +37,12 @@ never be served without an authenticated session.
 
 > Decisions were made deliberately for a private, low-maintenance, self-contained
 > family archive. Prefer simple, boring, well-supported tools over novelty.
+>
+> **Privacy exception — basemap tiles.** Unlike embeddings (TEI) and geocoding
+> (Photon), which are self-hosted so no family data leaves the project, the Family
+> Map's basemap raster tiles are fetched from the public CARTO CDN. Only the map
+> viewport (z/x/y tile coordinates) leaks — never names, places, or records — but
+> it is the one accepted third-party request in the app.
 
 ## Architecture & conventions
 
@@ -114,6 +121,21 @@ Schema in `app/src/db/schema.ts`; refined from the initial sketch:
   residence updates the timeline with no sync). The `0005` migration backfills old
   point-in-time `residence` *events* into residence spans; new installs seed
   residencies directly.
+- **place** — a coordinate **gazetteer** (`0009` migration): one cached coordinate
+  per unique place, keyed by a `normalized` label (lib/place-key.ts), so the bare
+  text places that recur across the archive (birth/death/event places) dedupe to
+  one geocode each and the **Family Map** can plot them. `status` is
+  `resolved`/`unresolved` (an unresolved row is a place looked up but not located —
+  it surfaces in the map's "Places to locate"); `source` records who supplied the
+  coordinate (`geocoder` | `user` pin-drop | `archive` capture-at-entry). Populated
+  three ways through `app/src/lib/places.ts`: **capture-at-entry** (the picker's
+  coordinate is upserted on person/event/residence save — see `capturePlace`),
+  the **`db:geocode` batch backfill** (`ensurePlaces`, Photon, env-gated; wired
+  into boot after migrate→seed→reindex, a no-op when `GEOCODER_URL` is unset), and
+  a manual **pin-drop** (`setPlaceCoords` server action). The seed ships **starter
+  coordinates** for the demo family (`app/src/db/seed-data.ts` `places`) so the map
+  works with no geocoder running. Reads never block on population — the read model
+  just loads `place` into `Dataset.places`.
 - **Census auto-derivation** (`app/src/lib/census.ts`). Uploading a `census` media
   item seeds first-class records linked to everyone on the media and citing it as
   their source: a **census event** is always generated, and a *point* **residence**
@@ -211,11 +233,31 @@ with type/person/period filters; the person record gets a Timeline tab + event
 strip, and `AddEventDialog` persists new events via the `createEvent` /
 `updateEvent` / `deleteEvent` server actions.
 
+The **Family Map** is a third pure derivation off the same `Dataset`:
+`app/src/lib/map-journey.ts` (`journeyOf`, unit-tested in `map-journey.test.ts`)
+turns each person's timeline `events` + the `places` gazetteer into a geographic
+**journey** — birth → located life-events / residences (oldest → newest) → death.
+A move is a `move` edge; an ocean crossing (endpoints on opposite Atlantic sides,
+judged from longitude — no region table) is a `voyage`; an immigration `"A → B"`
+place splits into two stops; a concurrently-held home (overlapping residence
+spans) forks the path as a `branch`. Coordinates resolve through the gazetteer by
+label, with progressive locality-dropping + sub-city jitter, so finer addresses
+separate on zoom. `corridors` aggregate shared moves at scale, `lineages` /
+`lineColorFor` colour by surname (seeded tokens `--fa-line-*`, else a hashed hue),
+and `unmappedPlaces` lists places with no coordinate. The Map screen
+(`app/src/components/FamilyMap.tsx`, Leaflet loaded client-side) draws arcs,
+arrows, lineage-segmented clusters and marching-chevron corridors over a CARTO
+basemap, with a lineage/person filter, a time scrubber + Play, and a **pin-drop**
+(persisted via the `setPlaceCoords` server action) for unlocated places. The
+time-scrubber control is the design system's new `Slider` primitive.
+
 DB access goes through `getDb()` (`app/src/db/client.ts`) — a memoized
 `Promise<DB>` over a `pg` pool (Postgres queries are async). On first use it
 applies pending migrations; **outside production** it then seeds an empty
-database with the demo family (both idempotent). Production boots empty so the
-real family is entered by hand.
+database with the demo family; it then backfills the search index and (when
+`GEOCODER_URL` is set) the place gazetteer — so the boot order is
+migrate → seed → reindex → geocode (all idempotent / best-effort). Production
+boots empty so the real family is entered by hand.
 
 ## Commands
 
@@ -243,6 +285,7 @@ npm run db:generate  # generate a Drizzle migration after editing schema.ts
 npm run db:migrate   # apply migrations to the DB (uses DATABASE_URL)
 npm run db:seed      # seed an empty DB with the demo family (idempotent)
 npm run db:reindex   # rebuild the search index from the tables (idempotent)
+npm run db:geocode   # backfill the place gazetteer from the archive (needs GEOCODER_URL)
 npm test             # vitest — unit tests for the pure family-graph + layout code
 ```
 
@@ -299,6 +342,12 @@ keyless/serviceless by default, exactly like lexical-only search.
   docker-compose `geocoder` service (Photon, `:2322`) is **optional and heavy** —
   its search index is a multi-GB download, so the first boot is slow; omit the
   service to run without it.
+- The same Photon instance also backfills the **place gazetteer** for the Family
+  Map: `npm run db:geocode` (and boot) geocode every archive place once and cache
+  the coordinate (`app/src/lib/places.ts`). With no `GEOCODER_URL` the map still
+  works off the seed's **starter coordinates** for the demo family and any
+  capture-at-entry / pin-drop coordinates; unlocated places surface in "Places to
+  locate".
 
 ## Deployment (Railway)
 
@@ -372,9 +421,13 @@ country → address spans with start/end partial dates, they derive into the
 timeline as span events, and the `0005` migration backfills old point-in-time
 residence events. Places are entered through a **location picker** (`LocationField`
 + `/api/geocode`) backed by an optional **self-hosted Photon geocoder**
-(`GEOCODER_URL`), degrading to archive-place autocomplete when unset. Every
-discrete fact carries a **unified `ProvenanceMark`** (status + linked source
-document + note).
+(`GEOCODER_URL`), degrading to archive-place autocomplete when unset. A
+**first-class Family Map** is live: a `place` coordinate gazetteer (seeded with
+starter coordinates, filled by capture-at-entry + the `db:geocode` Photon
+backfill + manual pin-drops) feeds a pure journey/corridor derivation
+(`lib/map-journey.ts`) drawn on a Leaflet + CARTO map with lineage colours, a
+time scrubber, clustering and corridor aggregation. Every discrete fact carries a
+**unified `ProvenanceMark`** (status + linked source document + note).
 Still stubbed: Auth.js (a shared password gate stands in) and image thumbnails
 (originals are served, lazy-loaded). Not yet wired: indexing events into hybrid
 search. Next up: thumbnail generation + Auth.js.

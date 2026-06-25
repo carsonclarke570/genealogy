@@ -11,8 +11,9 @@
 import { count } from "drizzle-orm";
 import { type NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "./schema";
-import { people, units, media, events, residences } from "./seed-data";
+import { people, units, media, events, residences, places } from "./seed-data";
 import { parsePartialDate } from "../lib/dates";
+import { normalizePlace, placeKeyId } from "../lib/place-key";
 
 type DB = NodePgDatabase<typeof schema>;
 
@@ -171,6 +172,22 @@ export async function seed(db: DB): Promise<{ seeded: boolean }> {
       for (const personId of r.personIds) {
         await tx.insert(schema.residencePerson).values({ residenceId: r.id, personId });
       }
+    }
+
+    // Starter gazetteer — pre-resolved coordinates so the Family Map works with
+    // no geocoder. Keyed on the normalised label, so it dedupes with anything the
+    // batch geocoder / capture-at-entry later adds.
+    for (const pl of places) {
+      const normalized = normalizePlace(pl.label);
+      await tx.insert(schema.place).values({
+        id: placeKeyId(normalized),
+        normalized,
+        label: pl.label,
+        lat: pl.lat,
+        lng: pl.lng,
+        source: "geocoder",
+        status: "resolved",
+      });
     }
   });
 

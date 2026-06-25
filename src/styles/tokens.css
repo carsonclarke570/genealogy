@@ -62,6 +62,16 @@
     --doc-grave: var(--color-ink);
     --doc-other: var(--color-faint);
 
+    /* Lineage palette — Family Map line colours, one per seeded surname. Distinct
+       hues tuned to read over the CARTO light basemap; any unseeded surname falls
+       back to a hashed hue in lib/map-journey.ts. */
+    --fa-line-rivers: oklch(0.55 0.13 250);
+    --fa-line-bain: oklch(0.56 0.13 150);
+    --fa-line-tran: oklch(0.58 0.14 65);
+    --fa-line-reed: oklch(0.55 0.16 350);
+    --fa-line-cole: oklch(0.55 0.15 30);
+    --fa-line-other: oklch(0.6 0.02 250);
+
     /* Family-tree graph (React Flow + relatives-tree). The layout scales off the
        node cell size. Edges default to a visible hairline, the active lineage
        warms to the sienna voice, and divorced/step/adoptive links go dashed. */
@@ -179,6 +189,14 @@
     --color-danger-tint: oklch(0.3 0.07 26);
     --color-backdrop: oklch(0 0 0 / 0.6);
     --edge: oklch(0.42 0.012 55);
+
+    /* Lineage palette — brightened to read over the CARTO dark basemap. */
+    --fa-line-rivers: oklch(0.74 0.12 250);
+    --fa-line-bain: oklch(0.77 0.13 150);
+    --fa-line-tran: oklch(0.8 0.13 65);
+    --fa-line-reed: oklch(0.74 0.15 350);
+    --fa-line-cole: oklch(0.72 0.14 30);
+    --fa-line-other: oklch(0.7 0.02 250);
 
     --shadow-overlay-low: 0 1px 2px oklch(0 0 0 / 0.4),
       0 6px 16px oklch(0 0 0 / 0.45);

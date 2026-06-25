@@ -272,6 +272,49 @@ export const residencePerson = pgTable(
 );
 
 /**
+ * Place gazetteer — a coordinate cache keyed by a normalised place label.
+ *
+ * Births, deaths and event places are bare text strings (no coordinates of their
+ * own), and identical strings recur across the archive. This table resolves each
+ * unique place *once* to a coordinate and reuses it everywhere, so the Family Map
+ * can plot every place a person touched without a geocode per row. The join key
+ * is `normalized` (lowercased / whitespace-collapsed label), so "Boston, MA" maps
+ * to one row no matter how it was typed.
+ *
+ * Population is decoupled from reads: the dataset read just *reads* this cache.
+ * Rows are filled by (a) the seed's starter coordinates, (b) capture-at-entry —
+ * the picker's coordinates are upserted here on person/event/residence save, (c)
+ * the `db:geocode` batch backfill (Photon, env-gated), and (d) manual pin-drops
+ * (`setPlaceCoords`). `status` distinguishes a resolved coordinate from a place
+ * that was looked up but couldn't be located (so it surfaces in "Places to
+ * locate"); `source` records who supplied the coordinate.
+ */
+export const place = pgTable(
+  "place",
+  {
+    id: text("id").primaryKey(), // `P-<hash of normalized>`
+    normalized: text("normalized").notNull().unique(),
+    label: text("label").notNull(),
+    country: text("country"),
+    region: text("region"),
+    locality: text("locality"),
+    address: text("address"),
+    lat: doublePrecision("lat"),
+    lng: doublePrecision("lng"),
+    placeId: text("place_id"),
+    // Who supplied the coordinate: the geocoder, a manual pin-drop ("user"), or
+    // the captured picker value on an archive save ("archive").
+    source: text("source", { enum: ["geocoder", "user", "archive"] }),
+    // "resolved" once a coordinate is known; "unresolved" after a lookup that
+    // found nothing (drives the "Places to locate" panel + a re-try later).
+    status: text("status", { enum: ["resolved", "unresolved"] }).notNull().default("unresolved"),
+    // Last geocode attempt — for re-tries / staleness.
+    geocodedAt: timestamp("geocoded_at"),
+    ...timestamps,
+  },
+);
+
+/**
  * Search index — a decoupled, denormalised view of the searchable corpus
  * (people + media), one row per indexed entity, kept in sync by the indexing
  * pipeline (lib/search/index-doc.ts). Hybrid search (lib/search/query.ts) ranks
@@ -308,4 +351,5 @@ export type EventRow = typeof event.$inferSelect;
 export type EventPersonRow = typeof eventPerson.$inferSelect;
 export type ResidenceRow = typeof residence.$inferSelect;
 export type ResidencePersonRow = typeof residencePerson.$inferSelect;
+export type PlaceRow = typeof place.$inferSelect;
 export type SearchDocRow = typeof searchDoc.$inferSelect;

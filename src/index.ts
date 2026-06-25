@@ -49,6 +49,9 @@ export type { RadioGroupProps, RadioOption } from "./components/RadioGroup";
 export { Switch } from "./components/Switch";
 export type { SwitchProps } from "./components/Switch";
 
+export { Slider } from "./components/Slider";
+export type { SliderProps } from "./components/Slider";
+
 export { Toast } from "./components/Toast";
 export type { ToastProps, ToastTone } from "./components/Toast";
 

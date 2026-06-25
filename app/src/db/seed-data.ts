@@ -151,6 +151,40 @@ export const residences: SeedResidence[] = [
   { id: "R-thomas-alice-liverpool", personIds: ["thomas", "alice"], place: "Liverpool, England", locality: "Liverpool", country: "England", dateKind: "point", start: "1911", prov: "verified", mediaId: "M-112", note: "Departure port on the passage manifest" },
 ];
 
+/**
+ * Starter gazetteer — approximate coordinates for every place the demo family
+ * touches, so the **Family Map works out of the box with no geocoder running**
+ * (production / new installs geocode real places via Photon — see lib/places.ts).
+ * Ported from the design prototype (hf/geo.js `PLACES`). The label must match the
+ * place strings above exactly (it's normalised to the gazetteer join key). A few
+ * extra cities are included so map demos beyond the seeded facts still resolve.
+ */
+export interface SeedPlace {
+  label: string;
+  lat: number;
+  lng: number;
+}
+
+export const places: SeedPlace[] = [
+  { label: "Sheffield, England", lat: 53.3811, lng: -1.4701 },
+  { label: "Leeds, England", lat: 53.8008, lng: -1.5491 },
+  { label: "Glasgow, Scotland", lat: 55.8642, lng: -4.2518 },
+  { label: "Liverpool, England", lat: 53.4084, lng: -2.9916 },
+  { label: "Edinburgh, Scotland", lat: 55.9533, lng: -3.1883 },
+  { label: "Normandy, France", lat: 49.1829, lng: -0.3707 },
+  { label: "Boston, MA", lat: 42.3601, lng: -71.0589 },
+  { label: "Concord, MA", lat: 42.4604, lng: -71.3489 },
+  { label: "Cambridge, MA", lat: 42.3736, lng: -71.1097 },
+  { label: "Amherst, MA", lat: 42.3732, lng: -72.5199 },
+  { label: "Portland, ME", lat: 43.6591, lng: -70.2568 },
+  { label: "Hartford, CT", lat: 41.7658, lng: -72.6734 },
+  { label: "Albany, NY", lat: 42.6526, lng: -73.7562 },
+  { label: "Providence, RI", lat: 41.824, lng: -71.4128 },
+  { label: "New York, NY", lat: 40.7128, lng: -74.006 },
+  { label: "San Jose, CA", lat: 37.3382, lng: -121.8863 },
+  { label: "Seattle, WA", lat: 47.6062, lng: -122.3321 },
+];
+
 export const media: SeedMedia[] = [
   { id: "M-101", type: "photo", title: "Rivers family at the lake house", year: 1962, people: ["thomas", "alice", "rose"] },
   { id: "M-102", type: "certificate", title: "Eleanor Rivers — birth certificate", year: 1915, people: ["eleanor"] },

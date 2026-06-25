@@ -64,6 +64,13 @@
       "when": 1782322105302,
       "tag": "0008_lame_deathbird",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1782348807197,
+      "tag": "0009_perpetual_abomination",
+      "breakpoints": true
     }
   ]
 }

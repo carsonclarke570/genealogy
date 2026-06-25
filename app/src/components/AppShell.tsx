@@ -14,9 +14,10 @@ import { AddPerson } from "./AddPerson";
 import { Timeline } from "./Timeline";
 import { MediaUpload } from "./MediaUpload";
 import { MediaEdit } from "./MediaEdit";
+import { FamilyMap } from "./FamilyMap";
 import type { TreeMode } from "@/lib/tree-layout";
 
-export type Screen = "explorer" | "person" | "gallery" | "search" | "add" | "timeline" | "upload" | "mediaEdit";
+export type Screen = "explorer" | "person" | "gallery" | "search" | "add" | "timeline" | "map" | "upload" | "mediaEdit";
 
 interface Route {
   screen: Screen;
@@ -32,6 +33,7 @@ interface Route {
 const NAV: [Screen, string, IconName][] = [
   ["explorer", "Explorer", "tree"],
   ["timeline", "Timeline", "clock"],
+  ["map", "Family map", "map"],
   ["search", "Search", "search"],
   ["gallery", "Media archive", "gallery"],
   ["add", "Add person", "plus"],
@@ -44,6 +46,7 @@ const TITLES: Record<Screen, string> = {
   search: "Search the archive",
   add: "Add a person",
   timeline: "Family timeline",
+  map: "Family map",
   upload: "Upload media",
   mediaEdit: "Edit media",
 };
@@ -187,6 +190,7 @@ export function AppShell({ data }: { data: Dataset }) {
             />
           )}
           {route.screen === "timeline" && <Timeline onOpen={openPerson} onNavigate={navigate} />}
+          {route.screen === "map" && <FamilyMap theme={theme} onOpen={openPerson} />}
           {route.screen === "gallery" && (
             <Gallery onOpen={openPerson} onToast={setToast} onUpload={() => openUpload()} onEditMedia={openMediaEdit} />
           )}
@@ -217,7 +221,7 @@ export function AppShell({ data }: { data: Dataset }) {
             onClick={() => navigate(k)}
           >
             <Icon name={icon} />
-            <span>{label === "Media archive" ? "Media" : label === "Add person" ? "Add" : label}</span>
+            <span>{label === "Media archive" ? "Media" : label === "Add person" ? "Add" : label === "Family map" ? "Map" : label}</span>
           </button>
         ))}
       </nav>
