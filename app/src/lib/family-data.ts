@@ -251,6 +251,23 @@ export interface TimelineEvent {
   nested?: TimelineEvent[];
 }
 
+/**
+ * One resolved (or attempted) place in the coordinate gazetteer (the `place`
+ * table). Keyed on the normalised label; `lat`/`lng` are null until a coordinate
+ * is known (`status: "unresolved"` means it was looked up but couldn't be
+ * located, so it surfaces in the map's "Places to locate"). Drives the Family Map.
+ */
+export interface PlaceCoord {
+  normalized: string;
+  label: string;
+  lat: number | null;
+  lng: number | null;
+  country: string | null;
+  region: string | null;
+  locality: string | null;
+  status: "resolved" | "unresolved";
+}
+
 /** The full in-memory snapshot the UI renders from (assembled in lib/queries.ts). */
 export interface Dataset {
   people: Record<string, Person>;
@@ -263,6 +280,8 @@ export interface Dataset {
   residences: Residence[];
   /** The merged, chronologically-sorted life-event timeline (derived + stored). */
   events: TimelineEvent[];
+  /** Coordinate gazetteer (normalised label → coordinate), powering the Family Map. */
+  places: Record<string, PlaceCoord>;
 }
 
 export function fullName(p: Person): string {

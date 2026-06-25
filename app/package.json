@@ -10,11 +10,13 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx src/db/seed.ts",
     "db:reindex": "tsx src/db/reindex.ts",
+    "db:geocode": "tsx src/db/geocode.ts",
     "test": "vitest run"
   },
   "dependencies": {
     "@family-archive/ui": "file:..",
     "drizzle-orm": "^0.45.2",
+    "leaflet": "^1.9.4",
     "minio": "^8.0.7",
     "next": "^14.2.15",
     "pg": "^8.13.1",
@@ -24,6 +26,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/leaflet": "^1.9.21",
     "@types/node": "^20.14.0",
     "@types/pg": "^8.11.10",
     "@types/react": "^18.3.12",

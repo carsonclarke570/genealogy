@@ -22,6 +22,7 @@ import { composeMarriageNameDrafts, type FlaggedSpouse } from "./marriage-names"
 import { locationToColumns } from "./locations";
 import type { LocationValue } from "@family-archive/ui";
 import { indexPerson } from "./search/index-doc";
+import { capturePlace, capturePlaces, setPlaceCoords as setPlaceCoordsRow } from "./places";
 
 /**
  * The event types a user can add by hand (births/deaths/etc. are derived;
@@ -149,6 +150,35 @@ const partialDateFromString = z
   .string()
   .transform((v) => parsePartialDate(v))
   .catch(null);
+
+/**
+ * A {@link LocationValue} as the pickers submit it — label + structured parts +
+ * optional coordinates. Shared by events, residencies and the person form's
+ * place fields, so capture-at-entry can store the coordinate the picker collected.
+ */
+const locationInputSchema = z
+  .object({
+    label: z.string(),
+    country: z.string().nullish(),
+    region: z.string().nullish(),
+    locality: z.string().nullish(),
+    address: z.string().nullish(),
+    lat: z.number().nullish(),
+    lng: z.number().nullish(),
+    placeId: z.string().nullish(),
+  })
+  .nullable();
+
+/** Parse a hidden JSON location field (the person form's birth/death place) → value or null. */
+function parseLocationField(raw: FormDataEntryValue | null): LocationValue | null {
+  if (typeof raw !== "string" || !raw.length) return null;
+  try {
+    const parsed = locationInputSchema.parse(JSON.parse(raw));
+    return parsed as LocationValue | null;
+  } catch {
+    return null;
+  }
+}
 
 const createPersonSchema = z.object({
   // given/surname are the *birth* name (the first name in the person's history);
@@ -745,6 +775,13 @@ export async function createPerson(formData: FormData): Promise<CreatePersonResu
   const autoNames = await buildSurnameNameDrafts(db, id, parsed.data.given, flaggedSpouses, manualNames);
   await syncPersonNames(db, id, composeNameDrafts(parsed.data, [...manualNames, ...autoNames]));
 
+  // Capture-at-entry: keep the coordinate the picker collected for birth/death
+  // place so the Family Map can plot it without a geocode round-trip.
+  await capturePlaces(db, [
+    parseLocationField(formData.get("birthPlaceLoc")),
+    parseLocationField(formData.get("deathPlaceLoc")),
+  ]);
+
   // Best-effort: index the new person for search. A failure here (embedding
   // server down, etc.) must never fail the create — the boot/`db:reindex`
   // backfill will reconcile any missed rows.
@@ -775,6 +812,8 @@ export interface EventInput {
   /** Canonical partial-date string ("YYYY" / "YYYY-MM" / "YYYY-MM-DD"), or null. */
   date: string | null;
   place?: string | null;
+  /** The picked place with coordinates (captured into the gazetteer for the map). */
+  location?: LocationValue | null;
   prov?: string;
   /** A cited source document id, or null. */
   mediaId?: string | null;
@@ -790,6 +829,7 @@ const eventInputSchema = z.object({
     .nullish()
     .transform((v) => serializePartialDate(parsePartialDate(v ?? null))),
   place: optionalText,
+  location: locationInputSchema.optional(),
   prov: z.enum(provStatuses).catch("unverified"),
   mediaId: z
     .string()
@@ -832,6 +872,7 @@ export async function createEvent(input: EventInput): Promise<EventResult> {
     mediaId: data.mediaId,
   });
   await syncEventPeople(db, id, data.people);
+  await capturePlace(db, data.location as LocationValue | null);
   revalidatePath("/");
   return { ok: true, id };
 }
@@ -867,6 +908,7 @@ export async function updateEvent(id: string, input: EventInput): Promise<EventR
     .returning({ id: event.id });
   if (updated.length === 0) return { ok: false, errors: { form: "That event no longer exists." } };
   await syncEventPeople(db, id, data.people);
+  await capturePlace(db, data.location as LocationValue | null);
   revalidatePath("/");
   return { ok: true, id };
 }
@@ -904,19 +946,6 @@ export interface ResidenceInput {
   mediaId?: string | null;
   note?: string | null;
 }
-
-const locationInputSchema = z
-  .object({
-    label: z.string(),
-    country: z.string().nullish(),
-    region: z.string().nullish(),
-    locality: z.string().nullish(),
-    address: z.string().nullish(),
-    lat: z.number().nullish(),
-    lng: z.number().nullish(),
-    placeId: z.string().nullish(),
-  })
-  .nullable();
 
 const residenceInputSchema = z.object({
   personIds: z.array(z.string().min(1)).min(1, "Pick at least one person who lived here"),
@@ -1009,6 +1038,7 @@ export async function createResidence(input: ResidenceInput): Promise<ResidenceR
   const id = randomUUID();
   await db.insert(residence).values({ id, ...built.cols } as typeof residence.$inferInsert);
   await syncResidencePeople(db, id, built.personIds);
+  await capturePlace(db, input.location);
   revalidatePath("/");
   return { ok: true, id };
 }
@@ -1026,6 +1056,7 @@ export async function updateResidence(id: string, input: ResidenceInput): Promis
     .returning({ id: residence.id });
   if (updated.length === 0) return { ok: false, errors: { form: "That residence no longer exists." } };
   await syncResidencePeople(db, id, built.personIds);
+  await capturePlace(db, input.location);
   revalidatePath("/");
   return { ok: true, id };
 }
@@ -1034,6 +1065,31 @@ export async function deleteResidence(id: string): Promise<{ ok: boolean }> {
   if (!id) return { ok: false };
   const db = await getDb();
   await db.delete(residence).where(eq(residence.id, id));
+  revalidatePath("/");
+  return { ok: true };
+}
+
+// ── Place gazetteer (Family Map) ───────────────────────────────────────────────
+// Manual pin-drop: when the geocoder can't find a place a record references, the
+// map lets a curator drop a pin. This persists that coordinate to the shared
+// gazetteer (replacing the prototype's per-browser localStorage), so the stop
+// appears for everyone and survives reloads.
+
+const pinDropSchema = z.object({
+  label: z.string().trim().min(1),
+  lat: z.number().gte(-90).lte(90),
+  lng: z.number().gte(-180).lte(180),
+});
+
+export async function setPlaceCoords(
+  label: string,
+  lat: number,
+  lng: number,
+): Promise<{ ok: boolean }> {
+  const parsed = pinDropSchema.safeParse({ label, lat, lng });
+  if (!parsed.success) return { ok: false };
+  const db = await getDb();
+  await setPlaceCoordsRow(db, parsed.data.label, parsed.data.lat, parsed.data.lng);
   revalidatePath("/");
   return { ok: true };
 }
@@ -1111,6 +1167,12 @@ export async function updatePerson(
     manualNames,
   );
   await syncPersonNames(db, id, composeNameDrafts(parsed.data, [...manualNames, ...autoNames]));
+
+  // Capture-at-entry: store the picker's coordinate for birth/death place.
+  await capturePlaces(db, [
+    parseLocationField(formData.get("birthPlaceLoc")),
+    parseLocationField(formData.get("deathPlaceLoc")),
+  ]);
 
   // Best-effort re-index so edits to names/places/notes surface in search.
   try {

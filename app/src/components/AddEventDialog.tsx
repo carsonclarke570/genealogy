@@ -132,6 +132,7 @@ export function AddEventDialog({
         title,
         date: serializePartialDate(date),
         place: locationLabel(place) || null,
+        location: place,
         prov,
         mediaId: mediaId || null,
         people: persons,

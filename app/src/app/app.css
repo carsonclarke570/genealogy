@@ -1317,3 +1317,362 @@ body {
     overflow: visible;
   }
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   Family Map — geographic migration overlay (component: components/FamilyMap)
+
+   Leaflet draws the basemap; the migration layer (arcs, arrows, pins, clusters,
+   corridors) is hand-drawn as divIcons + SVG paths so it stays on the archive
+   palette and flips with the theme. A lineage colour rides in via the `--ln`
+   custom property set per element. Floating panels reuse `.fa-float`; the side
+   peek reuses `.app-peek`/`.app-scroll`.
+   ════════════════════════════════════════════════════════════════════════ */
+.mig-root {
+  position: absolute;
+  inset: 0;
+}
+.mig-map {
+  position: absolute;
+  inset: 0;
+  background: var(--color-surface-sunken);
+}
+.mig-root.mig-placing .mig-map {
+  cursor: crosshair;
+}
+
+/* Top-left title stack */
+.mig-tl {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  align-items: flex-start;
+  max-width: min(48vw, 420px);
+}
+.mig-unmapped-btn,
+.mig-corridorhint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 8px 12px;
+  font-size: var(--text-body-sm);
+  color: var(--color-ink);
+  cursor: pointer;
+  border: none;
+  background: var(--color-bg);
+}
+.mig-corridorhint {
+  cursor: default;
+}
+.mig-leg-arrows {
+  color: var(--color-primary);
+  letter-spacing: -1px;
+  font-size: 13px;
+}
+
+/* Top-right filter bar */
+.mig-filters {
+  position: absolute;
+  top: 16px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  transition: right 0.2s ease;
+}
+.mig-filterstoggle,
+.mig-filterspop {
+  font: inherit;
+}
+.mig-filterstoggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-ink);
+  font-size: var(--text-body-sm);
+}
+.mig-filterspop {
+  position: absolute;
+  top: calc(100% + var(--space-sm));
+  right: 0;
+  width: 280px;
+  padding: var(--space-lg);
+  background: var(--color-bg);
+}
+
+/* Bottom-left legend */
+.mig-legend {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 10px var(--space-md);
+  font-size: var(--text-body-sm);
+  color: var(--color-muted);
+  max-width: min(70vw, 560px);
+}
+.mig-leg {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.mig-leg-m {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-bg);
+  box-shadow: 0 0 0 1px var(--color-border-strong);
+}
+.mig-leg-born {
+  background: var(--color-success);
+}
+.mig-leg-lived {
+  background: var(--color-primary);
+}
+.mig-leg-died {
+  background: var(--color-muted);
+}
+.mig-leg-pathsym {
+  width: 18px;
+  height: 0;
+  border-top: 2px solid var(--color-primary);
+}
+.mig-undated {
+  gap: var(--space-sm);
+}
+
+/* Bottom-centre time scrubber */
+.mig-time {
+  position: absolute;
+  bottom: 16px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  width: min(440px, 86vw);
+}
+.mig-time-yr {
+  flex: none;
+  min-width: 72px;
+  font-size: var(--text-body-sm);
+  color: var(--color-ink);
+  font-feature-settings: "tnum" 1;
+}
+.mig-time .fa-slider {
+  flex: 1;
+}
+.mig-time-ends {
+  flex: none;
+  display: none;
+}
+
+/* Pin-drop banner (top-centre) */
+.mig-placebar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 10px var(--space-md);
+  font-size: var(--text-body-sm);
+}
+
+/* ── person pins ─────────────────────────────────────────────────────── */
+.mig-pt-wrap {
+  background: none !important;
+  border: none !important;
+}
+.mig-pt {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+  background: var(--ln, var(--color-primary));
+  border: 2px solid var(--color-bg);
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--ln, var(--color-primary)) 55%, transparent);
+  transform-origin: center;
+}
+.mig-pt--birth {
+  box-shadow: 0 0 0 2px var(--color-success);
+}
+.mig-pt--death {
+  background: var(--color-bg);
+  border-color: var(--ln, var(--color-muted));
+}
+.mig-pt.mig-active {
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ln, var(--color-primary)) 45%, transparent);
+}
+.mig-pt.mig-dim {
+  opacity: 0.32;
+}
+
+/* ── arcs + arrows (SVG paths drawn by Leaflet) ──────────────────────── */
+.mig-edge {
+  stroke: var(--ln, var(--color-primary));
+  fill: none;
+}
+.mig-edge--voyage {
+  stroke-dasharray: 2 5;
+  stroke-linecap: round;
+}
+.mig-edge--branch {
+  stroke-dasharray: 5 4;
+  opacity: 0.7;
+}
+.mig-edge.mig-dim {
+  opacity: 0.25;
+}
+.mig-arrow-wrap {
+  background: none !important;
+  border: none !important;
+}
+.mig-arrow {
+  display: inline-block;
+  color: var(--ln, var(--color-primary));
+  font-size: 13px;
+  line-height: 1;
+  transform-origin: center;
+}
+.mig-arrow.mig-dim {
+  opacity: 0.25;
+}
+
+/* ── corridors (aggregated flows) ────────────────────────────────────── */
+.mig-corridor {
+  stroke: var(--color-primary);
+  fill: none;
+}
+.mig-corr-chev {
+  fill: var(--color-primary);
+  opacity: 0.85;
+  pointer-events: none;
+  font-family: var(--font-sans);
+}
+
+/* ── clusters ────────────────────────────────────────────────────────── */
+.mig-cluster-wrap {
+  background: none !important;
+  border: none !important;
+}
+.mig-cluster {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mig-cluster-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-full);
+}
+.mig-cluster-core {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-weight: 600;
+  font-feature-settings: "tnum" 1;
+  box-shadow: var(--shadow-overlay-low);
+}
+.mig-cluster.mig-active .mig-cluster-core {
+  outline: 2px solid var(--color-primary);
+}
+.mig-cluster.mig-dim {
+  opacity: 0.4;
+}
+
+/* small lineage dots reused in peeks + combobox options */
+.mig-linedot,
+.mig-rowdot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--ln, var(--color-primary));
+}
+.mig-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Leaflet tooltip ─────────────────────────────────────────────────── */
+.leaflet-tooltip.mig-tip {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-overlay-low);
+  font-family: var(--font-sans);
+  font-size: var(--text-body-sm);
+  padding: 6px 8px;
+}
+.leaflet-tooltip.mig-tip::before {
+  display: none;
+}
+.mig-tip-hint {
+  color: var(--color-muted);
+  font-size: var(--text-label);
+}
+
+/* ── peek panels (reuse .app-peek; left-anchored variant + event rows) ─ */
+.app-peek--left {
+  left: var(--space-md);
+  right: auto;
+}
+.app-peekev {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+}
+.app-peekev-t {
+  font-size: var(--text-body-sm);
+  color: var(--color-ink);
+}
+
+/* ── "places to locate" rows ─────────────────────────────────────────── */
+.mig-unmapped-row {
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.mig-unmapped-place {
+  font-family: var(--font-serif);
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mig-placebtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  padding: 6px 10px;
+  font-size: var(--text-label);
+  color: var(--color-on-primary, oklch(1 0 0));
+  background: var(--color-primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.mig-placebtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

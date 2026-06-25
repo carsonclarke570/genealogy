@@ -666,6 +666,10 @@ export function AddPerson({
           <input type="hidden" name="prov" value={JSON.stringify(prov)} />
           <input type="hidden" name="birthDate" value={serializePartialDate(bornDate) ?? ""} />
           <input type="hidden" name="deathDate" value={serializePartialDate(diedDate) ?? ""} />
+          {/* Full location values (with coordinates) so the Family Map can plot
+              birth/death places — the visible fields submit only the label. */}
+          <input type="hidden" name="birthPlaceLoc" value={bornPlace ? JSON.stringify(bornPlace) : ""} />
+          <input type="hidden" name="deathPlaceLoc" value={diedPlace ? JSON.stringify(diedPlace) : ""} />
           <input type="hidden" name="relationships" value={JSON.stringify(relationDrafts)} />
           <input type="hidden" name="relationshipOps" value={JSON.stringify(relationshipOps)} />
           <input type="hidden" name="names" value={JSON.stringify(nameDrafts)} />
