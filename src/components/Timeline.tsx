@@ -6,7 +6,7 @@ export interface TimelineItemProps {
   icon?: ReactNode;
   /** Small monospaced/tabular date shown first in the head row. */
   date?: ReactNode;
-  /** Short uppercase category label, tinted with `categoryColor`. */
+  /** Short category label (sentence case), tinted with `categoryColor`. */
   category?: ReactNode;
   /** Colour for the category label (a token). @default var(--color-muted) */
   categoryColor?: string;

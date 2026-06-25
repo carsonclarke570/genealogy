@@ -48,6 +48,15 @@
     --color-warning-tint: oklch(0.95 0.04 75);
     --color-danger: oklch(0.5 0.185 25);
     --color-danger-tint: oklch(0.95 0.04 25);
+    --color-on-danger: oklch(1 0 0);
+
+    /* Accessible foregrounds for small text on the matching *-tint fills (the
+       Badge variants, the "Living" tag). The role colours above are tuned to
+       read as icons/dots (≥3:1) and fall under the 4.5:1 text bar on their
+       near-white tint, so deepen them here for text. */
+    --color-on-success-tint: oklch(0.43 0.1 150);
+    --color-on-warning-tint: oklch(0.45 0.105 68);
+    --color-on-danger-tint: oklch(0.46 0.17 25);
 
     /* Modal scrim (translucent ink over the page behind a dialog) */
     --color-backdrop: oklch(0.24 0.012 45 / 0.4);
@@ -119,6 +128,9 @@
 
     --measure: 70ch; /* @kind font — prose line-length cap (65–75ch) */
 
+    /* Disabled-state dimming — one value for every control's :disabled */
+    --disabled-opacity: 0.55; /* @kind other */
+
     /* Radii */
     --radius-sm: 4px;
     --radius-md: 6px;
@@ -187,6 +199,14 @@
     --color-warning-tint: oklch(0.3 0.05 72);
     --color-danger: oklch(0.66 0.17 28);
     --color-danger-tint: oklch(0.3 0.07 26);
+    --color-on-danger: oklch(1 0 0);
+    /* On dark the tints are dark and the bright role colours already clear
+       4.5:1 as text on them — so the on-tint foregrounds ARE the role colours. */
+    --color-on-success-tint: var(--color-success);
+    --color-on-warning-tint: var(--color-warning);
+    /* Danger's role colour clears only ~4.2:1 on its dark tint — lift it so
+       small badge text passes 4.5:1 (success/warning role colours already do). */
+    --color-on-danger-tint: oklch(0.72 0.16 28);
     --color-backdrop: oklch(0 0 0 / 0.6);
     --edge: oklch(0.42 0.012 55);
 
@@ -315,7 +335,9 @@
   :focus-visible {
     outline: var(--focus-ring-width) solid var(--focus-ring-color);
     outline-offset: var(--focus-ring-offset);
-    border-radius: var(--radius-sm);
+    /* No border-radius override here: the outline follows each element's own
+       radius, so a pill (Chip), a card (PersonNode) and a rectangle all get a
+       shape-matched ring instead of a forced 4px one. */
   }
 
   ::selection {

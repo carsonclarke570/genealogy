@@ -184,3 +184,74 @@ Repo-specific gotchas for future syncs. Read this first.
   font version changes the files).
 - Browser system deps are not captured in any lockfile; a fresh machine needs
   the `playwright install-deps` step above before the render check will run.
+
+## 2026-06-25 sync (macOS) — 15 new components authored + playwright pin
+
+- **Playwright pin is machine-specific.** This macOS box's ms-playwright cache holds
+  **chromium-1134** (and 1129), NOT the WSL box's 1228. The release pinning build
+  1134 is **playwright@1.47.0 / 1.47.2** — `(cd .ds-sync && npm i playwright@1.47.2)`
+  so the render check launches the cached chromium with no download. Verify a
+  candidate by reading `node_modules/playwright-core/browsers.json` (chromium
+  revision) first. The "1228 → playwright@1.61.0" note above is the WSL box's pin.
+- **The discovered surface grew 32 → 47.** A full converter run discovers every
+  PascalCase export in `src/index.ts`; the prior sync had shipped 32. The 15 added
+  (AnchoredPopover, AvatarStack, ClickableCard, DetailRow, FileDropzone, Icon,
+  IconButton, LocationField, MediaPreview, MultiCombobox, ProvField, ProvLabel,
+  ProvLocationField, SearchInput, Slider) now have authored previews under
+  `.design-sync/previews/` and `cardMode` overrides in config (mostly `column`;
+  `AnchoredPopover` is `single` + viewport `360x300`). All graded good 2026-06-25.
+- **MediaPreview preview ships an offline data-URI SVG** as the photo `src` (a sepia
+  portrait) so the card never hits the network; a real archive passes a resolved
+  object-storage URL. **AnchoredPopover** portals to `document.body` (`position:
+  fixed`); its preview pins it `open` against a `useRef` trigger — `single` cardMode
+  captures it in-card. **ProvLocationField / LocationField** stub `onSearch` /
+  pass `suggestions` with archive places (offline-stable). **Icon** sweeps real
+  `GLYPHS` names.
+- **conventions.md** got a purely-additive paragraph listing the 15 new components
+  (existing prose untouched) — keeps the design-agent reference true.
+
+## Known render warns (check new warns against this list)
+
+- `[GRID_OVERFLOW]` on **Combobox, DateField, MultiSelect, MultiCombobox** — these
+  open-panel selects render an absolute/portal panel the multi-column grid "can't
+  present"; validate suggests `single`. They are intentionally `cardMode: "column"`
+  (every state full-width, open panel reserved via paddingBottom) and grade good
+  solo. Kept column for family consistency; the warn is **expected and non-blocking**.
+  Switch to `single` only if an open panel ever visibly overlaps a neighbour in the
+  live claude.ai/design grid.
+- thin / `[RENDER_THIN]` on **Slider, DetailRow** (and **Icon** at small sizes) — a
+  slider track and a single detail row legitimately are short; not a defect.
+
+## Component grouping (purpose folders, not `general/`)
+
+- Components are grouped into **6 purpose folders** via `cfg.docsDir =
+  ".design-sync/docs"`: `forms` (17), `data-display` (11), `feedback-overlays` (8),
+  `genealogy` (5), `actions` (3), `navigation` (3). The folder name is the slug of
+  each doc's `category` frontmatter.
+- **How it works:** the package shape defaults every component to `general`. The
+  group only comes from a matched doc's `category:` frontmatter (no `cfg.groups`
+  key exists). So `.design-sync/docs/<Name>.md` holds `---\ncategory: <Group>\n---`
+  for each component; discovery matches by name (no `docsMap` enumeration needed).
+- **The doc body IS the `prompt.md` body.** Each `docs/<Name>.md` was seeded from the
+  component's then-current synthesized `prompt.md` (everything after line 1, which is
+  the regenerated head) so no usage/Examples were lost. **Caveat:** because the doc now
+  drives `prompt.md`, editing a preview `.tsx` no longer flows new Examples into
+  `prompt.md` — only the rendered `.html` updates. If you substantially rework a
+  preview, regenerate that component's `docs/<Name>.md` body from the fresh
+  `prompt.md` (keep the `category` line). To move a component between groups, just
+  edit its `category:` and re-sync.
+- A regroup is a **path move** — the diff lists old `components/general/<Name>/*` in
+  `upload.deletePaths` and the new group paths as writes. `styleChanged:false`,
+  `renderChurned:0`, `unchanged:47` → renders identical, grades carry, **no
+  re-grade**. finalize_plan needs `deletes: ["components/general/**"]`.
+
+## Render-check timeout on a pure regroup (driver hung at 10 min)
+
+- The driver re-runs the FULL render check (47 cards) even when nothing rendered
+  differently; on this machine that exceeded a 10-min cap. For a **pure regroup or
+  any change with `renderChurned:0`**, skip it: after the driver's build+diff write
+  `.sync-diff.json`, run `node .ds-sync/package-validate.mjs ./ds-bundle
+  --no-render-check` (fast structural check — CSS reachable, @dsCard markers, anchor
+  matches disk), confirm the prior full validate was `bad:0`, then upload straight
+  from `.sync-diff.json` (`upload.deletePaths` + the rebuilt grouped paths). Only a
+  change that actually alters renders needs the full render check.

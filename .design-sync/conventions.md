@@ -98,6 +98,20 @@ transient feedback (an app-level viewport stacks them at `--z-toast`). `EmptySta
 teaches an empty surface rather than showing "nothing here"; `Skeleton` is preferred
 over `Spinner` when the incoming content's shape is known.
 
+Also first-class: `Icon` (the shared `GLYPHS` set — chrome + life-event marks) and
+`IconButton` (icon-only action, requires an `aria-label`); `SearchInput` (query field
+with clear/loading); `Slider` (the Family Map time scrubber); `FileDropzone` (rect or
+round upload target); `MediaPreview` (the one image/PDF/placeholder renderer);
+`AvatarStack` (overlapping avatars for the people on a shared fact); `DetailRow` (a
+label/value record row); `ClickableCard` (a whole record card that's one click target);
+`LocationField` (structured place picker with archive + geocoder suggestions; pairs with
+the `formatLocation` helper); `MultiCombobox` (searchable multi-select with chips — like
+`Combobox` but for several values). Provenance-bearing fields: `ProvField` and
+`ProvLocationField` (an `Input` / `LocationField` whose label carries its
+`ProvenanceMark`) and `ProvLabel` (just that label-with-mark — pass it as any control's
+`label`). `AnchoredPopover` is the low-level positioning primitive (a body-portaled,
+viewport-fixed panel that escapes clipping containers) — prefer the components built on it.
+
 ## Where the truth lives
 
 Read the bound `styles.css` (and its imports) for the full token set, and each

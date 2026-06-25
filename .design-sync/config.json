@@ -10,6 +10,7 @@
   "extraFonts": [".design-sync/fonts/brand-fonts.css"],
   "runtimeFontPrefixes": ["Cascadia"],
   "readmeHeader": ".design-sync/conventions.md",
+  "docsDir": ".design-sync/docs",
   "componentSrcMap": {
     "ProvenanceMark": "src/components/Provenance.tsx",
     "SourceCiteDialog": "src/components/Provenance.tsx"
@@ -30,6 +31,19 @@
     "MultiSelect": { "cardMode": "column", "primaryStory": "FilterByPerson" },
     "Combobox": { "cardMode": "column", "primaryStory": "PickRelative" },
     "ToastViewport": { "cardMode": "single", "primaryStory": "Stack" },
-    "DateField": { "cardMode": "column", "primaryStory": "KnownToTheMonth" }
+    "DateField": { "cardMode": "column", "primaryStory": "KnownToTheMonth" },
+    "Icon": { "cardMode": "column", "primaryStory": "Library" },
+    "SearchInput": { "cardMode": "column", "primaryStory": "WithQuery" },
+    "Slider": { "cardMode": "column", "primaryStory": "YearScrubber" },
+    "DetailRow": { "cardMode": "column", "primaryStory": "RecordFacts" },
+    "ClickableCard": { "cardMode": "column", "primaryStory": "PersonSummary" },
+    "FileDropzone": { "cardMode": "column", "primaryStory": "Document" },
+    "LocationField": { "cardMode": "column", "primaryStory": "Selected" },
+    "MediaPreview": { "cardMode": "column", "primaryStory": "Gallery" },
+    "MultiCombobox": { "cardMode": "column", "primaryStory": "TagPeople" },
+    "ProvField": { "cardMode": "column", "primaryStory": "ConfidenceStates" },
+    "ProvLabel": { "cardMode": "column", "primaryStory": "States" },
+    "ProvLocationField": { "cardMode": "column", "primaryStory": "Birthplace" },
+    "AnchoredPopover": { "cardMode": "single", "primaryStory": "BelowTrigger", "viewport": "360x300" }
   }
 }
