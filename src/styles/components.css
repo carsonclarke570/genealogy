@@ -41,7 +41,7 @@
 .fa-btn:disabled,
 .fa-btn[aria-disabled="true"] {
   cursor: not-allowed;
-  opacity: 0.55;
+  opacity: var(--disabled-opacity);
   transform: none;
 }
 
@@ -101,7 +101,7 @@
 /* Danger — destructive confirmation only */
 .fa-btn--danger {
   background-color: var(--color-danger);
-  color: oklch(1 0 0);
+  color: var(--color-on-danger);
 }
 .fa-btn--danger:hover:not(:disabled) {
   filter: brightness(0.92);
@@ -300,15 +300,15 @@ button.fa-chip:hover {
 }
 .fa-badge--success {
   background-color: var(--color-success-tint);
-  color: var(--color-success);
+  color: var(--color-on-success-tint);
 }
 .fa-badge--warning {
   background-color: var(--color-warning-tint);
-  color: var(--color-warning);
+  color: var(--color-on-warning-tint);
 }
 .fa-badge--danger {
   background-color: var(--color-danger-tint);
-  color: var(--color-danger);
+  color: var(--color-on-danger-tint);
 }
 
 /* ── Avatar ──────────────────────────────────────────────────────────── */
@@ -436,7 +436,7 @@ button.fa-chip:hover {
   font-size: 0.6875rem;
   font-weight: var(--fw-medium);
   line-height: 1.4;
-  color: var(--color-success);
+  color: var(--color-on-success-tint);
   background-color: var(--color-success-tint);
   padding: 0.05rem 0.4rem;
   border-radius: var(--radius-full);
@@ -860,7 +860,7 @@ button.fa-chip:hover {
 }
 .fa-switch:disabled {
   cursor: not-allowed;
-  opacity: 0.55;
+  opacity: var(--disabled-opacity);
 }
 
 /* ── Slider (range input) ────────────────────────────────────────────── */
@@ -876,7 +876,7 @@ button.fa-chip:hover {
 }
 .fa-slider:disabled {
   cursor: not-allowed;
-  opacity: 0.55;
+  opacity: var(--disabled-opacity);
 }
 /* Track — WebKit + Firefox, with a fill gradient driven by --fa-slider-fill. */
 .fa-slider::-webkit-slider-runnable-track {
@@ -1372,10 +1372,10 @@ button.fa-chip:hover {
 }
 .fa-seg__item--on {
   background-color: var(--color-primary);
-  color: #fff;
+  color: var(--color-on-primary);
 }
 .fa-seg__item:disabled {
-  opacity: 0.5;
+  opacity: var(--disabled-opacity);
   cursor: not-allowed;
 }
 .fa-seg__item:focus-visible {
@@ -1416,7 +1416,7 @@ button.fa-chip:hover {
   outline-offset: var(--focus-ring-offset);
 }
 .fa-iconbtn:disabled {
-  opacity: 0.5;
+  opacity: var(--disabled-opacity);
   cursor: not-allowed;
 }
 .fa-iconbtn svg {
@@ -1466,7 +1466,7 @@ button.fa-chip:hover {
   outline-offset: var(--focus-ring-offset);
 }
 .fa-dropzone:disabled {
-  opacity: 0.55;
+  opacity: var(--disabled-opacity);
   cursor: not-allowed;
 }
 .fa-dropzone--round {
@@ -1711,8 +1711,6 @@ button.fa-avstack__item {
 .fa-timeline__category {
   font-size: var(--text-label);
   font-weight: var(--fw-semibold);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 .fa-timeline__title {
   margin-top: 3px;
@@ -1861,7 +1859,7 @@ button.fa-avstack__item {
   justify-content: center;
   border-radius: var(--radius-sm);
   border: 1.5px solid var(--color-border);
-  color: #fff;
+  color: var(--color-on-primary);
 }
 .fa-multiselect__option--on .fa-multiselect__check {
   border-color: var(--color-primary);
@@ -2393,7 +2391,7 @@ button.fa-avstack__item {
 /* The recorded value — the one sienna voice inside the picker. */
 .fa-cal__cell--selected {
   background-color: var(--color-primary);
-  color: #fff;
+  color: var(--color-on-primary);
   font-weight: var(--fw-medium);
 }
 
