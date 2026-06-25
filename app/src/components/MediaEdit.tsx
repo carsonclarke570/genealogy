@@ -14,14 +14,13 @@ import {
   Select,
   Textarea,
 } from "@family-archive/ui";
-import type { LocationValue, PartialDate, ProvenanceStatus } from "@family-archive/ui";
+import type { LocationValue, PartialDate } from "@family-archive/ui";
 import { fullName, lifeDates, mediaFileUrl } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import { updateMedia } from "@/lib/media-client";
 import { MEDIA_TYPES } from "@/lib/media-validation";
 import { censusResidenceId } from "@/lib/census-ids";
 import { parsePartialDate, serializePartialDate } from "@/lib/dates";
-import { PROV_LABEL, provStatuses } from "@/lib/prov";
 import { DocViewer } from "./DocViewer";
 import { Icon } from "./Icon";
 import type { Screen } from "./AppShell";
@@ -70,7 +69,9 @@ export function MediaEdit({
   const [title, setTitle] = useState(media?.title ?? "");
   const [type, setType] = useState<(typeof MEDIA_TYPES)[number]>(media?.type ?? "photo");
   const [year, setYear] = useState(media?.year ? String(media.year) : "");
-  const [prov, setProv] = useState<ProvenanceStatus>(media?.prov ?? "unverified");
+  // Media confidence isn't edited here for now (a media file is self-sourcing);
+  // preserve whatever the record already carries so the update never wipes it.
+  const prov = media?.prov ?? "unverified";
   const [description, setDescription] = useState(media?.description ?? "");
   const [location, setLocation] = useState<LocationValue | null>(() => {
     if (!media) return null;
@@ -222,24 +223,9 @@ export function MediaEdit({
               </div>
             </div>
 
-            <div>
-              <Select
-                label="Confidence"
-                value={prov}
-                error={errors.prov}
-                onChange={(e) => setProv(e.target.value as ProvenanceStatus)}
-              >
-                {provStatuses.map((s) => (
-                  <option key={s} value={s}>
-                    {PROV_LABEL[s]}
-                  </option>
-                ))}
-              </Select>
-            </div>
-
             {type === "census" && (
               <LocationField
-                label="Where they lived (optional)"
+                label="Where they lived"
                 hint="The census place. Its event (and the residence, if a place is set) for everyone below stay in step with this — unless you’ve edited them by hand. Clear the place to drop the residence."
                 value={location}
                 onChange={setLocation}
@@ -250,7 +236,7 @@ export function MediaEdit({
 
             {type === "grave" && (
               <LocationField
-                label="Burial location (optional)"
+                label="Burial location"
                 hint="Where they’re buried — shown on their death event."
                 value={location}
                 onChange={setLocation}
@@ -259,22 +245,17 @@ export function MediaEdit({
               />
             )}
 
-            <div>
-              <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
-                People in this record
-              </div>
-              <MultiCombobox
-                aria-label="People in this record"
-                placeholder="Search people…"
-                value={selectedPeople}
-                onChange={setSelectedPeople}
-                options={personOptions}
-              />
-            </div>
+            <MultiCombobox
+              label="People in this record"
+              placeholder="Search people…"
+              value={selectedPeople}
+              onChange={setSelectedPeople}
+              options={personOptions}
+            />
 
             {type === "grave" && selectedPeople.length > 0 && (
               <div style={{ display: "grid", gap: "var(--space-md)" }}>
-                <div className="app-label">Date on the headstone (optional, per person)</div>
+                <span className="fa-field__label">Headstone dates</span>
                 {selectedPeople.map((pid) =>
                   people[pid] ? (
                     <DateField
@@ -289,7 +270,7 @@ export function MediaEdit({
             )}
 
             <Textarea
-              label="Description (optional)"
+              label="Description"
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
