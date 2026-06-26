@@ -1184,6 +1184,445 @@ body {
   .app-upload-formbody {
     overflow: visible;
   }
+  .app-fgrid {
+    grid-template-columns: 1fr;
+  }
+  .app-upload-form {
+    width: auto;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Staged upload wizard — the right column's stages (component: components/upload)
+
+   Layout glue only; the Stepper, Accordion, Callout, Badge and form controls
+   come from the design system. Every value is a token so light/dark flip.
+   ════════════════════════════════════════════════════════════════════════ */
+.app-upload-form {
+  width: 452px;
+}
+.app-upload-formtop {
+  flex: none;
+  padding: var(--space-lg) var(--space-xl) var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+
+/* stage scaffolding — animate transform only (never opacity) so a frozen frame
+   / print stays fully visible. */
+@media (prefers-reduced-motion: no-preference) {
+  .app-stagebody {
+    animation: app-stage-in 0.22s ease;
+  }
+}
+@keyframes app-stage-in {
+  from {
+    transform: translateY(6px);
+  }
+  to {
+    transform: none;
+  }
+}
+.app-stage-h {
+  font-family: var(--font-sans);
+  font-size: var(--text-title);
+  font-weight: 650;
+  color: var(--color-ink);
+  margin-bottom: var(--space-xs);
+  letter-spacing: -0.01em;
+}
+.app-stage-sub {
+  font-size: var(--text-body-sm);
+  margin: 0 0 var(--space-lg);
+  text-wrap: pretty;
+}
+.app-label {
+  font-size: var(--text-label);
+  font-weight: 500;
+  color: var(--color-muted);
+}
+.app-label-sm {
+  font-size: var(--text-label);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+.app-field-row {
+  display: flex;
+  gap: var(--space-md);
+}
+/* (.app-link is defined once, near the top of this file.) */
+
+/* a 2-column field grid; full-width fields set gridColumn:1/-1 inline */
+.app-fgrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+  align-items: start;
+}
+.app-fgrid > * {
+  min-width: 0;
+}
+
+/* dirty leaf (person / life facts) */
+.app-leaf {
+  position: relative;
+}
+.app-leaf.dirty::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 6px;
+  width: 3px;
+  height: calc(100% - 12px);
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+}
+.app-leaf-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+.app-leaf-was {
+  font-size: var(--text-label);
+  color: var(--color-muted);
+  font-style: italic;
+}
+.app-leaf-revert {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--text-label);
+}
+
+/* accordion model sections (stack of design-system Accordions) */
+.app-accord-stack {
+  display: grid;
+  gap: var(--space-sm);
+}
+.app-accord-blurb {
+  font-size: var(--text-body-sm);
+  color: var(--color-muted);
+  text-wrap: pretty;
+  margin-bottom: var(--space-sm);
+}
+
+/* birth / death row cards */
+.app-rows {
+  display: grid;
+  gap: var(--space-md);
+}
+.app-row-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  background: var(--color-surface);
+  display: grid;
+  gap: var(--space-sm);
+}
+.app-row-label {
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+/* collection editor */
+.app-coll {
+  display: grid;
+  gap: var(--space-md);
+}
+.app-coll-empty {
+  font-size: var(--text-body-sm);
+  color: var(--color-muted);
+  text-wrap: pretty;
+  padding: 2px 0;
+}
+.app-coll-list {
+  display: grid;
+  gap: var(--space-sm);
+}
+.app-coll-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  padding: var(--space-md);
+  display: grid;
+  gap: var(--space-sm);
+}
+.app-coll-cardhead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.app-coll-title {
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-ink);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-coll-x:hover {
+  color: var(--color-danger);
+}
+.app-coll-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 8px var(--space-md);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-body-sm);
+}
+.app-coll-row.removed {
+  background: var(--color-danger-tint);
+}
+.app-strike {
+  text-decoration: line-through;
+  color: var(--color-muted);
+  flex: 1;
+  min-width: 0;
+}
+
+/* people stage */
+.app-subjects {
+  display: grid;
+  gap: var(--space-sm);
+  margin: var(--space-md) 0 var(--space-lg);
+}
+.app-subjchip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.app-subjchip-nm {
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-ink);
+  display: flex;
+  align-items: center;
+}
+.app-subjhead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+.app-subjhead-name {
+  font-size: var(--text-title);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.app-subjhead-dates {
+  font-size: var(--text-body-sm);
+  font-family: var(--font-serif);
+}
+.app-ptag-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-muted);
+  border-radius: 50%;
+  padding: 0;
+  flex: none;
+}
+.app-ptag-x:hover {
+  background: var(--color-surface-sunken);
+  color: var(--color-danger);
+}
+
+/* add-new-person card */
+.app-newperson {
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  background: var(--color-surface-sunken);
+  display: grid;
+  gap: var(--space-md);
+  margin-top: var(--space-sm);
+  min-width: 0;
+}
+.app-newperson-h {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.app-newperson-conn {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-md);
+}
+.app-newperson-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+/* review stage */
+.app-review-doc {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  margin-bottom: var(--space-md);
+}
+.app-review-doc-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  color: var(--color-muted);
+}
+.app-review-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  font-size: var(--text-body-sm);
+  color: var(--color-muted);
+  margin-bottom: var(--space-lg);
+}
+.app-review-summary > span {
+  white-space: nowrap;
+}
+.app-review-summary strong {
+  color: var(--color-ink);
+  font-feature-settings: "tnum" 1;
+}
+.app-dot-sep {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--color-border-strong);
+  flex: none;
+}
+.app-danger-list {
+  list-style: none;
+  margin: var(--space-sm) 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-sm);
+}
+.app-danger-list li {
+  position: relative;
+  padding-left: var(--space-md);
+}
+.app-danger-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-warning);
+}
+.app-danger-what {
+  font-size: var(--text-body-sm);
+  color: var(--color-ink);
+}
+.app-danger-why {
+  font-size: var(--text-label);
+  color: var(--color-muted);
+  text-wrap: pretty;
+  margin-top: 1px;
+}
+
+/* per-person review groups */
+.app-review-people {
+  display: grid;
+  gap: var(--space-md);
+  margin-top: var(--space-lg);
+}
+.app-review-person {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.app-review-person-h {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface-sunken);
+  border-bottom: 1px solid var(--color-border);
+}
+.app-review-none {
+  font-size: var(--text-body-sm);
+  color: var(--color-muted);
+  padding: var(--space-sm) var(--space-md);
+}
+.app-review-changes {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  display: grid;
+  gap: 7px;
+}
+.app-review-changes li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  font-size: var(--text-body-sm);
+  color: var(--color-ink);
+}
+.app-chg-op {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  flex: none;
+  margin-top: 1px;
+  color: var(--color-muted);
+  background: var(--color-surface-sunken);
+}
+.app-chg-op.op-add {
+  color: var(--color-success);
+  background: var(--color-success-tint);
+}
+.app-chg-op.op-remove {
+  color: var(--color-danger);
+  background: var(--color-danger-tint);
+}
+.app-chg-label {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.4;
+}
+.app-chg-word {
+  font-weight: 600;
+}
+.app-chg-flag {
+  display: inline-flex;
+  color: var(--color-warning);
+  flex: none;
+  margin-top: 2px;
 }
 
 /* ════════════════════════════════════════════════════════════════════════

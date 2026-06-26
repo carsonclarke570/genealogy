@@ -3,13 +3,19 @@
  *
  * A route handler, not a server action: server actions cap request bodies near
  * 1 MB, and photos/PDFs need up to MAX_UPLOAD_BYTES (25 MB). Auth is already
- * enforced by middleware.ts (the matcher gates everything but login/health/
- * static), so this handler assumes an authenticated caller.
+ * enforced by middleware.ts, so this handler assumes an authenticated caller.
  *
- * Flow: parse form → size + magic-byte checks (never trust the client MIME) →
- * Zod-validate metadata → put the object → insert the `media` row + person_media
- * links → best-effort search index → revalidate. Put-then-insert by design: a
- * later failure leaves a harmless orphan object, never a row with a broken image.
+ * Two modes, sharing one validate → store → transaction pipeline:
+ *   - plain upload: file + metadata + `personIds` (+ census/grave extras).
+ *   - staged upload: additionally an `updates` JSON field — the wizard's batch of
+ *     incremental record changes. When present we create any new people, link the
+ *     document to every subject, and apply each subject's changes (citing the doc
+ *     as a verified source) — all inside the same transaction, so the whole upload
+ *     is atomic. The linked people then drive census derivation + search indexing.
+ *
+ * Put-then-insert by design: the object is stored before the row, so a failure
+ * leaves a harmless orphan object, never a row with a broken image. If the
+ * transaction itself fails, we delete that just-stored object to keep storage clean.
  */
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
@@ -18,9 +24,12 @@ import { inArray } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { person, media as mediaTable, personMedia } from "@/db/schema";
 import { getStore, mediaKey } from "@/lib/storage";
-import { indexMedia } from "@/lib/search/index-doc";
+import { indexMedia, indexPerson } from "@/lib/search/index-doc";
 import { mediaMetaSchema, sniffMime, MAX_UPLOAD_BYTES } from "@/lib/media-validation";
 import { syncCensusDerived } from "@/lib/census";
+import { batchUpdatesSchema } from "@/lib/staged-upload/batch-schema";
+import { applyBatch } from "@/lib/staged-upload/apply";
+import type { BatchUpdates } from "@/lib/staged-upload/payload";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +60,7 @@ export async function POST(req: Request): Promise<Response> {
     return bad({ file: "Unsupported file type. Upload a JPEG, PNG, WebP, GIF, or PDF." });
   }
 
-  // personIds + location arrive as JSON strings; tolerate absence/garbage.
+  // JSON fields arrive as strings; tolerate absence/garbage.
   const parseJsonField = (name: string): unknown => {
     const raw = form.get(name);
     if (typeof raw === "string" && raw.length) {
@@ -87,29 +96,38 @@ export async function POST(req: Request): Promise<Response> {
   }
   const meta = parsed.data;
 
+  // Staged-upload batch of record changes (optional). Malformed JSON is rejected
+  // rather than silently dropped — the wizard always sends a valid shape.
+  let batch: BatchUpdates | null = null;
+  const rawUpdates = parseJsonField("updates");
+  if (rawUpdates !== undefined) {
+    const parsedBatch = batchUpdatesSchema.safeParse(rawUpdates);
+    if (!parsedBatch.success) return bad({ form: "The record changes couldn't be read." });
+    batch = parsedBatch.data as BatchUpdates;
+  }
+
   const id = randomUUID();
   const originalFilename = file.name || "upload";
   const key = mediaKey(id, originalFilename);
+  let stored = false;
 
   try {
     const db = await getDb();
 
     // Keep only person ids that actually exist (the picker offers real people,
-    // but validate at the boundary anyway — cf. persistRelationships in actions.ts).
+    // but validate at the boundary anyway).
     let validPeople: string[] = [];
     if (meta.personIds.length > 0) {
-      const rows = await db
-        .select({ id: person.id })
-        .from(person)
-        .where(inArray(person.id, meta.personIds));
+      const rows = await db.select({ id: person.id }).from(person).where(inArray(person.id, meta.personIds));
       validPeople = rows.map((r) => r.id);
     }
 
     await getStore().put(key, buffer, { contentType: mimeType, size: buffer.length });
+    stored = true;
 
-    // Row + links + any census-derived records are one atomic unit: a Census that
-    // can't seed its residence/event must not leave a half-built archive.
-    await db.transaction(async (tx) => {
+    // Row + links + new people + record changes + census derivation are one atomic
+    // unit: a multi-person upload that can't finish must not leave a half-built archive.
+    const linkedIds = await db.transaction(async (tx) => {
       await tx.insert(mediaTable).values({
         id,
         type: meta.type,
@@ -124,9 +142,14 @@ export async function POST(req: Request): Promise<Response> {
         prov: meta.prov,
       });
 
-      if (validPeople.length > 0) {
+      // The staged wizard creates new people + applies each subject's changes, and
+      // tells us every subject (existing + new) so the document links to them all.
+      const subjectIds = batch ? (await applyBatch(tx, id, batch)).subjectIds : [];
+      const peopleToLink = [...new Set([...validPeople, ...subjectIds])];
+
+      if (peopleToLink.length > 0) {
         await tx.insert(personMedia).values(
-          validPeople.map((personId) => ({
+          peopleToLink.map((personId) => ({
             personId,
             mediaId: id,
             // Per-person grave date (the headstone's date for this person); null otherwise.
@@ -136,31 +159,41 @@ export async function POST(req: Request): Promise<Response> {
       }
 
       // A Census auto-generates a residence + event for the household it records.
-      // A fresh upload has no prior derived rows, so only the census path matters.
       if (meta.type === "census") {
         await syncCensusDerived(tx, {
           mediaId: id,
           type: meta.type,
           year: meta.year,
-          personIds: validPeople,
+          personIds: peopleToLink,
           location: meta.location,
           prov: meta.prov,
         });
       }
+
+      return peopleToLink;
     });
 
-    // Best-effort: index for search. A failure here must never fail the upload —
-    // the boot/`db:reindex` backfill reconciles any missed rows.
+    // Best-effort: index the document + every affected person for search. A failure
+    // here must never fail the upload — the boot/`db:reindex` backfill reconciles.
     try {
       await indexMedia(db, id);
+      for (const personId of linkedIds) await indexPerson(db, personId);
     } catch (err) {
-      console.error("Failed to index new media for search:", err);
+      console.error("Failed to index upload for search:", err);
     }
 
     revalidatePath("/");
     return NextResponse.json({ ok: true, id });
   } catch (err) {
     console.error("Media upload failed:", err);
+    // The transaction rolled back; remove the orphaned object so storage stays clean.
+    if (stored) {
+      try {
+        await getStore().delete(key);
+      } catch (cleanupErr) {
+        console.error("Failed to remove orphaned upload object:", cleanupErr);
+      }
+    }
     return NextResponse.json({ ok: false, errors: { form: "Upload failed. Please try again." } }, { status: 500 });
   }
 }
