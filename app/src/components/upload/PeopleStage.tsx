@@ -8,7 +8,7 @@
 "use client";
 
 import { useState } from "react";
-import { Avatar, Badge, Button, Input, MultiSelect, Select } from "@family-archive/ui";
+import { Avatar, Badge, Button, Input, MultiCombobox, Select } from "@family-archive/ui";
 import type { Dataset } from "@/lib/family-data";
 import { fullName, lifeDates } from "@/lib/family-data";
 import { model as registryModel, SEX, type CollectionModel, type CollItem } from "@/lib/staged-upload/registry";
@@ -41,7 +41,10 @@ export function PeopleStage({
   const [conn, setConn] = useState<CollItem>(blankConn);
 
   const ctx = buildCtx(dataset, subjects);
+  // Existing people are picked + shown as chips in the combobox; the list below
+  // is just for people the document introduces (they carry a "New" badge).
   const existingUids = subjects.filter((s) => s.kind === "existing").map((s) => s.uid);
+  const newSubjects = subjects.filter((s) => s.kind === "new");
 
   const setExisting = (ids: string[]) => {
     // Keep new subjects + the locked one; reconcile the existing selection.
@@ -94,47 +97,39 @@ export function PeopleStage({
       <div className="app-label" style={{ marginBottom: "var(--space-sm)" }}>
         People already in the archive
       </div>
-      <MultiSelect
+      <MultiCombobox
         aria-label="People in this record"
         placeholder="Search people…"
-        selected={existingUids}
+        value={existingUids}
         onChange={setExisting}
         options={peopleOpts}
-        summary={(n) => (n === 0 ? "Search people…" : `${n} ${n === 1 ? "person" : "people"}`)}
       />
 
       <div className="app-subjects">
-        {subjects.map((s) => {
-          const locked = s.uid === lockedUid;
-          return (
-            <div key={s.uid} className="app-subjchip">
-              <Avatar name={fullName(s.person)} size="sm" />
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div className="app-subjchip-nm">
-                  {fullName(s.person)}
-                  {s.kind === "new" && (
-                    <Badge tone="info" style={{ marginLeft: 6 }}>
-                      New
-                    </Badge>
-                  )}
-                </div>
-                <div className="app-muted" style={{ fontSize: "var(--text-label)" }}>
-                  {lifeDates(s.person)}
-                </div>
+        {newSubjects.map((s) => (
+          <div key={s.uid} className="app-subjchip">
+            <Avatar name={fullName(s.person)} size="sm" />
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div className="app-subjchip-nm">
+                {fullName(s.person)}
+                <Badge tone="info" style={{ marginLeft: 6 }}>
+                  New
+                </Badge>
               </div>
-              {!locked && (
-                <button
-                  type="button"
-                  className="app-ptag-x"
-                  aria-label={`Remove ${fullName(s.person)}`}
-                  onClick={() => onSubjects(subjects.filter((x) => x.uid !== s.uid))}
-                >
-                  <Icon name="close" size={14} />
-                </button>
-              )}
+              <div className="app-muted" style={{ fontSize: "var(--text-label)" }}>
+                {lifeDates(s.person)}
+              </div>
             </div>
-          );
-        })}
+            <button
+              type="button"
+              className="app-ptag-x"
+              aria-label={`Remove ${fullName(s.person)}`}
+              onClick={() => onSubjects(subjects.filter((x) => x.uid !== s.uid))}
+            >
+              <Icon name="close" size={14} />
+            </button>
+          </div>
+        ))}
         {subjects.length === 0 && <div className="app-coll-empty">No one added yet — a document needs at least one subject.</div>}
       </div>
 
