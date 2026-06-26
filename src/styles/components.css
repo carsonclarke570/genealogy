@@ -2457,12 +2457,462 @@ button.fa-avstack__item {
   }
 }
 
+/* ── Stepper ──────────────────────────────────────────────────────────────
+   Compact horizontal progress nav for a multi-step flow. Numbered until done,
+   then a check. Labels collapse for upcoming steps so a long flow stays narrow
+   and scrolls sideways rather than wrapping. */
+.fa-stepper {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.fa-stepper__list {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+  padding: 0 0 2px;
+  list-style: none;
+}
+.fa-step__item {
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+.fa-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 4px 2px;
+  font: inherit;
+  color: var(--color-muted);
+  border-radius: var(--radius-sm);
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+.fa-step:disabled {
+  cursor: default;
+  opacity: var(--disabled-opacity);
+}
+.fa-step:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+.fa-step__dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  font-weight: var(--fw-semibold);
+  font-feature-settings: "tnum" 1;
+  transition: border-color var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+/* Collapse upcoming-step labels to zero width without animating a layout
+   property: a single-column grid interpolates 0fr → 1fr (sizing to the label's
+   own content, so no magic max-width), and the inner span clips the overflow. */
+.fa-step__label {
+  display: grid;
+  grid-template-columns: 0fr;
+  opacity: 0;
+  transition: grid-template-columns var(--dur-slow) var(--ease-out-quart),
+    opacity var(--dur-base) var(--ease-standard);
+}
+.fa-step__label-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: var(--text-body-sm);
+}
+.fa-step--active .fa-step__label,
+.fa-step--done .fa-step__label {
+  grid-template-columns: 1fr;
+  opacity: 1;
+}
+.fa-step--active {
+  color: var(--color-ink);
+}
+.fa-step--active .fa-step__dot {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+.fa-step--done .fa-step__dot {
+  border-color: var(--color-primary);
+  background: var(--color-primary-tint);
+  color: var(--color-primary);
+}
+.fa-step__line {
+  flex: none;
+  width: 12px;
+  height: 1.5px;
+  margin: 0 1px;
+  background: var(--color-border);
+}
+.fa-step__line--done {
+  background: var(--color-primary);
+}
+@media (prefers-reduced-motion: reduce) {
+  .fa-step__label {
+    transition: opacity var(--dur-fast) var(--ease-standard);
+  }
+}
+
+/* ── DocViewer ────────────────────────────────────────────────────────────
+   A zoom / pan / rotate stage over an arbitrary document (image, PDF, scan).
+   Fills its (positioned) container; a floating toolbar sits below the content. */
+.fa-docviewer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fa-docviewer__surface {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  touch-action: none;
+  overflow: hidden;
+  background-color: var(--color-surface-sunken);
+  /* Faint graph paper so the document's edges read against the stage. */
+  background-image:
+    linear-gradient(var(--color-border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-border) 1px, transparent 1px);
+  background-size: 26px 26px;
+  background-position: center;
+}
+[data-theme="dark"] .fa-docviewer__surface {
+  background-color: color-mix(in oklab, #000 30%, var(--color-surface-sunken));
+}
+.fa-docviewer__surface.grabbing {
+  cursor: grabbing;
+}
+.fa-docviewer__content {
+  transform-origin: center center;
+  transition: transform 0.04s linear;
+  will-change: transform;
+  user-select: none;
+}
+/* Utility for the common case: a letterboxed image sheet. */
+.fa-docviewer__img {
+  display: block;
+  max-width: min(760px, 92%);
+  max-height: 82%;
+  border-radius: 2px;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-overlay-high);
+  background: #fff;
+}
+.fa-docviewer__tools {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-lg);
+  transform: translateX(-50%);
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-overlay-low);
+}
+.fa-docviewer__sep {
+  width: 1px;
+  height: 22px;
+  margin: 0 3px;
+  background: var(--color-border);
+}
+.fa-docviewer__zoom {
+  min-width: 52px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-label);
+  font-weight: var(--fw-semibold);
+  color: var(--color-ink);
+  font-feature-settings: "tnum" 1;
+  border-radius: var(--radius-sm);
+  transition: background-color var(--dur-fast) var(--ease-standard);
+}
+.fa-docviewer__zoom:hover {
+  background: var(--color-surface-sunken);
+}
+.fa-docviewer__zoom:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+@media (prefers-reduced-motion: reduce) {
+  .fa-docviewer__content {
+    transition: none;
+  }
+}
+
+/* ── Accordion ────────────────────────────────────────────────────────────
+   A collapsible disclosure: header (icon + title + count + danger mark + chev)
+   over a revealed body. Stack with a grid+gap wrapper for a settings list. */
+.fa-accordion {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  overflow: hidden;
+}
+.fa-accordion--open {
+  border-color: var(--color-border-strong);
+}
+.fa-accordion__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-md);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  color: var(--color-ink);
+  transition: background-color var(--dur-fast) var(--ease-standard);
+}
+.fa-accordion__head:hover {
+  background: var(--color-surface-sunken);
+}
+.fa-accordion__head:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: calc(-1 * var(--focus-ring-width));
+}
+.fa-accordion__icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--color-muted);
+}
+.fa-accordion__title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-body);
+  font-weight: var(--fw-semibold);
+}
+.fa-accordion__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: var(--text-label);
+  font-weight: var(--fw-semibold);
+  font-feature-settings: "tnum" 1;
+}
+.fa-accordion__danger {
+  display: inline-flex;
+  flex: none;
+  color: var(--color-on-warning-tint);
+}
+.fa-accordion__chev {
+  display: inline-flex;
+  flex: none;
+  color: var(--color-muted);
+  transition: transform var(--dur-base) var(--ease-out-quart);
+}
+.fa-accordion--open .fa-accordion__chev {
+  transform: rotate(90deg);
+}
+.fa-accordion__body {
+  padding: var(--space-md) var(--space-md) var(--space-lg);
+  border-top: 1px solid var(--color-border);
+  display: grid;
+  gap: var(--space-md);
+}
+@media (prefers-reduced-motion: reduce) {
+  .fa-accordion__chev {
+    transition: none;
+  }
+}
+
+/* ── Callout ──────────────────────────────────────────────────────────────
+   A persistent inline message — the quiet counterpart to a Toast. A full
+   border + tinted surface (never a side stripe), a tone-coloured mark, and ink
+   body text for legibility. Tones set the edge / tint / mark trio. */
+.fa-callout {
+  --callout-tint: var(--color-surface-sunken);
+  --callout-edge: var(--color-border);
+  --callout-mark: var(--color-muted);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--callout-edge);
+  border-radius: var(--radius-md);
+  background: var(--callout-tint);
+  color: var(--color-ink);
+  font-size: var(--text-body-sm);
+  text-wrap: pretty;
+}
+.fa-callout--info {
+  --callout-tint: var(--color-accent-tint);
+  --callout-edge: color-mix(in oklab, var(--color-accent) 28%, var(--color-border));
+  --callout-mark: var(--color-accent);
+}
+.fa-callout--success {
+  --callout-tint: var(--color-success-tint);
+  --callout-edge: color-mix(in oklab, var(--color-success) 32%, var(--color-border));
+  --callout-mark: var(--color-on-success-tint);
+}
+.fa-callout--warning {
+  --callout-tint: var(--color-warning-tint);
+  --callout-edge: color-mix(in oklab, var(--color-warning) 42%, var(--color-border));
+  --callout-mark: var(--color-on-warning-tint);
+}
+.fa-callout--danger {
+  --callout-tint: var(--color-danger-tint);
+  --callout-edge: color-mix(in oklab, var(--color-danger) 38%, var(--color-border));
+  --callout-mark: var(--color-on-danger-tint);
+}
+.fa-callout__icon {
+  display: inline-flex;
+  flex: none;
+  margin-top: 1px;
+  color: var(--callout-mark);
+}
+.fa-callout__body {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.fa-callout__title {
+  font-size: var(--text-body-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--color-ink);
+}
+.fa-callout__text {
+  color: var(--color-ink);
+}
+.fa-callout__text strong {
+  color: var(--color-ink);
+  font-weight: var(--fw-semibold);
+}
+
+/* ── PersonRow ────────────────────────────────────────────────────────────
+   The compact avatar + name + dates list-row, shared by relationship panels,
+   search results, a document's people, and the map's place focus. The lighter
+   cousin of the tree-atom PersonNode. */
+.fa-person-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  text-align: start;
+  font: inherit;
+  color: var(--color-ink);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard);
+}
+.fa-person-row:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface);
+}
+.fa-person-row:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+.fa-person-row--md {
+  gap: var(--space-md);
+  padding: 10px 14px;
+}
+.fa-person-row__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--row-accent, var(--color-muted));
+}
+.fa-person-row__avatar {
+  flex: none;
+  display: inline-flex;
+}
+.fa-person-row__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.0625rem;
+  min-width: 0;
+}
+.fa-person-row__name {
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  font-weight: var(--fw-medium);
+  line-height: 1.15;
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fa-person-row--md .fa-person-row__name {
+  font-size: var(--text-title);
+}
+.fa-person-row__dates {
+  font-size: var(--text-body-sm);
+  line-height: 1.35;
+  color: var(--color-muted);
+  font-feature-settings: "tnum" 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fa-person-row__trailing {
+  flex: none;
+  margin-inline-start: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--color-faint);
+}
+
 /* ── Touch targets ───────────────────────────────────────────────────────
    On touch (coarse) pointers, lift the smaller controls to a ~44px hit area
    (WCAG 2.5.5). Visual scale stays largely the same — min-height drives the
    row, and the icon-only controls grow to a square tap zone. Mouse/trackpad
    (fine pointers) keep the denser desktop sizing. */
 @media (pointer: coarse) {
+  .fa-step {
+    min-height: 44px;
+  }
+  .fa-accordion__head {
+    min-height: 44px;
+  }
+  .fa-person-row {
+    min-height: 44px;
+  }
+  /* The viewer's zoom-reset button sits in a pill of IconButtons that already
+     grow to 44px on touch; lift it to match (and clear the WCAG 2.5.5 floor). */
+  .fa-docviewer__zoom {
+    min-height: 44px;
+  }
   .fa-btn--sm {
     min-height: 44px;
   }
