@@ -6,6 +6,7 @@ import {
   Avatar,
   Breadcrumb,
   Button,
+  Callout,
   Card,
   Checkbox,
   Combobox,
@@ -674,23 +675,9 @@ export function AddPerson({
           <input type="hidden" name="relationshipOps" value={JSON.stringify(relationshipOps)} />
           <input type="hidden" name="names" value={JSON.stringify(nameDrafts)} />
           {errors.form && (
-            <div
-              role="alert"
-              style={{
-                gridColumn: "1 / -1",
-                display: "flex",
-                alignItems: "center",
-                gap: "var(--space-sm)",
-                padding: "var(--space-md)",
-                borderRadius: "var(--radius-md)",
-                background: "var(--color-danger-tint)",
-                color: "var(--color-danger)",
-                fontSize: "var(--text-body-sm)",
-              }}
-            >
-              <Icon name="alert" size={16} />
-              <span>{errors.form}</span>
-            </div>
+            <Callout tone="danger" role="alert" style={{ gridColumn: "1 / -1" }}>
+              {errors.form}
+            </Callout>
           )}
           <div style={{ display: "grid", gap: "var(--space-xl)" }}>
             <Card title="Identity">

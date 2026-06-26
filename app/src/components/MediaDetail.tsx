@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Avatar, Button, DetailRow, Dialog, DocChip, MediaPreview, ProvenanceMark } from "@family-archive/ui";
+import { Button, DetailRow, Dialog, DocChip, MediaPreview, PersonRow, ProvenanceMark } from "@family-archive/ui";
 import {
   fullName,
   lifeDates,
@@ -180,27 +180,16 @@ export function MediaDetail({
               const p = people[pid];
               if (!p) return null;
               return (
-                <button
+                <PersonRow
                   key={pid}
-                  className="app-mediaperson"
+                  name={fullName(p)}
+                  dates={lifeDates(p)}
+                  trailing={<Icon name="chevron" />}
                   onClick={() => {
                     close();
                     onOpen(pid);
                   }}
-                >
-                  <Avatar name={fullName(p)} size="sm" />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontFamily: "var(--font-serif)", fontSize: "var(--text-body)", color: "var(--color-ink)" }}>
-                      {fullName(p)}
-                    </div>
-                    <div className="app-muted tnum" style={{ fontSize: "var(--text-label)" }}>
-                      {lifeDates(p)}
-                    </div>
-                  </div>
-                  <span style={{ color: "var(--color-muted)", display: "inline-flex" }}>
-                    <Icon name="chevron" />
-                  </span>
-                </button>
+                />
               );
             })}
           </div>

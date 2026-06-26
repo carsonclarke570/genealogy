@@ -18,6 +18,7 @@ import type * as LT from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
   Avatar,
+  PersonRow,
   Badge,
   Button,
   Combobox,
@@ -1037,18 +1038,13 @@ function ClusterPeek({
           pp.nodes.forEach((n) => !plc.includes(n.place) && plc.push(n.place));
           const rep = pp.nodes.find((n) => n.kind === "birth") || pp.nodes[0];
           return (
-            <button key={pp.id} type="button" className="app-mininode" onClick={() => onPick(pp.id, rep)}>
-              <span className="mig-rowdot" style={{ ["--ln" as string]: lineColorOf(dataset, pp.id) }} />
-              <Avatar name={fullName(p)} size="sm" />
-              <span style={{ minWidth: 0, flex: 1 }}>
-                <span className="nm" style={{ display: "block" }}>
-                  {firstGiven(p.given)} {p.surname}
-                </span>
-                <span className="dt" style={{ display: "block" }}>
-                  {plc.join(", ")} · {yspan}
-                </span>
-              </span>
-            </button>
+            <PersonRow
+              key={pp.id}
+              name={`${firstGiven(p.given)} ${p.surname}`}
+              dates={`${plc.join(", ")} · ${yspan}`}
+              accentColor={lineColorOf(dataset, pp.id)}
+              onClick={() => onPick(pp.id, rep)}
+            />
           );
         })}
         {!shown.length && (
@@ -1124,21 +1120,14 @@ function CorridorPeek({
       )}
       <div style={{ display: "grid", gap: "var(--space-sm)", marginTop: list.length > 8 ? 0 : "var(--space-lg)" }}>
         {shown.map((p) => (
-          <button key={p.id} type="button" className="app-mininode" onClick={() => onIsolate(p.id)}>
-            <span className="mig-rowdot" style={{ ["--ln" as string]: lineColorOf(dataset, p.id) }} />
-            <Avatar name={fullName(p)} size="sm" />
-            <span style={{ minWidth: 0, flex: 1 }}>
-              <span className="nm" style={{ display: "block" }}>
-                {firstGiven(p.given)} {p.surname}
-              </span>
-              <span className="dt" style={{ display: "block" }}>
-                {lifeDates(p)}
-              </span>
-            </span>
-            <span style={{ color: "var(--color-muted)", display: "inline-flex" }}>
-              <Icon name="chevron" size={16} />
-            </span>
-          </button>
+          <PersonRow
+            key={p.id}
+            name={`${firstGiven(p.given)} ${p.surname}`}
+            dates={lifeDates(p)}
+            accentColor={lineColorOf(dataset, p.id)}
+            trailing={<Icon name="chevron" size={16} />}
+            onClick={() => onIsolate(p.id)}
+          />
         ))}
         {!shown.length && (
           <div className="app-muted" style={{ fontSize: "var(--text-body-sm)", padding: "var(--space-md) 0" }}>
@@ -1199,17 +1188,12 @@ function MapPeek({
         </div>
       </div>
 
-      <button type="button" className="app-mininode" style={{ marginTop: "var(--space-lg)" }} onClick={() => onOpen(focus.personId)}>
-        <Avatar name={fullName(p)} size="sm" />
-        <span style={{ minWidth: 0 }}>
-          <span className="nm" style={{ display: "block" }}>
-            {firstGiven(p.given)} {p.surname}
-          </span>
-          <span className="dt" style={{ display: "block" }}>
-            {lifeDates(p)}
-          </span>
-        </span>
-      </button>
+      <PersonRow
+        name={`${firstGiven(p.given)} ${p.surname}`}
+        dates={lifeDates(p)}
+        style={{ marginTop: "var(--space-lg)" }}
+        onClick={() => onOpen(focus.personId)}
+      />
 
       <div className="app-label" style={{ margin: "var(--space-lg) 0 var(--space-sm)" }}>
         What happened here
