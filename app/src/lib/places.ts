@@ -29,6 +29,9 @@ import { locationLabel } from "./locations";
 import { normalizePlace, placeKeyId } from "./place-key";
 
 type DB = NodePgDatabase<typeof schema>;
+/** A drizzle db handle or a transaction handle — both expose the query builder, so
+ *  capture-at-entry can run inside the staged-upload transaction. */
+type DbOrTx = DB | Parameters<Parameters<DB["transaction"]>[0]>[0];
 type PlaceSource = "geocoder" | "user" | "archive";
 
 const clean = (v: string | null | undefined): string | null => {
@@ -53,7 +56,7 @@ interface Coord {
  * a blank label or a coordinate with no lat/lng (use {@link registerPlaceLabel}
  * to merely note an unlocated place).
  */
-async function upsertResolved(db: DB, label: string, coord: Coord, source: PlaceSource): Promise<void> {
+async function upsertResolved(db: DbOrTx, label: string, coord: Coord, source: PlaceSource): Promise<void> {
   const normalized = normalizePlace(label);
   if (!normalized || coord.lat == null || coord.lng == null) return;
   const row = {
@@ -94,7 +97,7 @@ async function upsertResolved(db: DB, label: string, coord: Coord, source: Place
 }
 
 /** Note a place that exists in the archive but has no coordinate yet (insert-if-missing). */
-async function registerPlaceLabel(db: DB, label: string): Promise<void> {
+async function registerPlaceLabel(db: DbOrTx, label: string): Promise<void> {
   const normalized = normalizePlace(label);
   if (!normalized) return;
   await db
@@ -110,7 +113,7 @@ async function registerPlaceLabel(db: DB, label: string): Promise<void> {
  * geocoder) know it exists. Best-effort — never throws into the write path.
  */
 export async function capturePlace(
-  db: DB,
+  db: DbOrTx,
   value: LocationValue | null | undefined,
   source: PlaceSource = "archive",
 ): Promise<void> {
@@ -143,7 +146,7 @@ export async function capturePlace(
 
 /** Capture several places at once (skips blanks/dupes via the normalised key). */
 export async function capturePlaces(
-  db: DB,
+  db: DbOrTx,
   values: (LocationValue | null | undefined)[],
   source: PlaceSource = "archive",
 ): Promise<void> {
@@ -158,7 +161,7 @@ export async function capturePlaces(
 }
 
 /** Record a coordinate a curator placed by hand for an otherwise-unlocated place. */
-export async function setPlaceCoords(db: DB, label: string, lat: number, lng: number): Promise<void> {
+export async function setPlaceCoords(db: DbOrTx, label: string, lat: number, lng: number): Promise<void> {
   await upsertResolved(db, label, { lat, lng }, "user");
 }
 

@@ -2,48 +2,25 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Avatar,
-  Breadcrumb,
-  Button,
-  DateField,
-  FileDropzone,
-  IconButton,
-  Input,
-  LocationField,
-  MediaPreview,
-  MultiCombobox,
-  Select,
-  Textarea,
-} from "@family-archive/ui";
-import type { LocationValue, PartialDate } from "@family-archive/ui";
-import { fullName, lifeDates } from "@/lib/family-data";
+import { Breadcrumb, Button, FileDropzone, IconButton, MediaPreview, Stepper } from "@family-archive/ui";
+import { fullName } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
 import { uploadMedia } from "@/lib/media-client";
-import { MAX_UPLOAD_BYTES, MEDIA_TYPES } from "@/lib/media-validation";
-import { serializePartialDate } from "@/lib/dates";
+import { MAX_UPLOAD_BYTES } from "@/lib/media-validation";
+import { buildSubjectPayload } from "@/lib/staged-upload/diff";
+import { subjectChanges } from "@/lib/staged-upload/diff";
+import type { BatchUpdates, SubjectRef } from "@/lib/staged-upload/payload";
 import { DocViewer } from "./DocViewer";
 import { Icon } from "./Icon";
 import type { Screen } from "./AppShell";
+import { DocStage, type DocFields } from "./upload/DocStage";
+import { PeopleStage } from "./upload/PeopleStage";
+import { UpdateStage } from "./upload/UpdateStage";
+import { ReviewStage } from "./upload/ReviewStage";
+import { buildCtx, makeExistingSubject, type Subject } from "./upload/shared";
 
 const ACCEPT = "image/jpeg,image/png,image/webp,image/gif,application/pdf";
 const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"]);
-
-const TYPE_LABELS: [(typeof MEDIA_TYPES)[number], string][] = [
-  ["photo", "Photo"],
-  ["certificate", "Certificate"],
-  ["article", "Article"],
-  ["obituary", "Obituary"],
-  ["census", "Census"],
-  ["grave", "Grave"],
-  ["other", "Other"],
-];
-
-/** Fetch place suggestions from the auth-gated geocoder feeding `LocationField`. */
-const searchPlaces = (q: string) =>
-  fetch(`/api/geocode?q=${encodeURIComponent(q)}`)
-    .then((r) => r.json())
-    .then((d) => d.suggestions);
 
 function prettySize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -51,7 +28,6 @@ function prettySize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** Strip the extension off a filename to seed the title field. */
 function titleFromFilename(name: string): string {
   return name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim();
 }
@@ -59,10 +35,15 @@ function titleFromFilename(name: string): string {
 const isImageFile = (f: File) => f.type.startsWith("image/");
 
 /**
- * MediaUpload — the full-screen "Upload media" screen: a zoom/pan document
- * viewer on the left and the metadata form on the right, so a curator reads the
- * scan while entering what it says. Mirrors the archive's media fields and posts
- * through the same `uploadMedia` pipeline the rest of the app uses.
+ * MediaUpload — the staged "Upload media" wizard. A zoom/pan document viewer stays
+ * on the left across every stage; the right column is a stepper:
+ *   1. Document — title, type, year, description
+ *   2. People   — who the document mentions (existing + newly added)
+ *   3…. Updates — one schema-driven stage per person (granular record edits)
+ *   N. Review   — change summary + danger acknowledgment, then upload
+ * Everything the curator records is applied to the real records (citing this
+ * document as a verified source) in one transactional request — see
+ * lib/staged-upload and POST /api/media.
  */
 export function MediaUpload({
   onNavigate,
@@ -75,27 +56,56 @@ export function MediaUpload({
   preselectPersonId?: string;
 }) {
   const router = useRouter();
-  const { people } = useDataset();
+  const dataset = useDataset();
   const fileInput = useRef<HTMLInputElement>(null);
 
   const [file, setFile] = useState<File | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
-  const [title, setTitle] = useState("");
-  const [type, setType] = useState<(typeof MEDIA_TYPES)[number]>("photo");
-  const [year, setYear] = useState("");
-  const [description, setDescription] = useState("");
-  const [location, setLocation] = useState<LocationValue | null>(null);
-  const [graveDates, setGraveDates] = useState<Record<string, PartialDate | null>>({});
-  const [selectedPeople, setSelectedPeople] = useState<string[]>(preselectPersonId ? [preselectPersonId] : []);
+  const [doc, setDocRaw] = useState<DocFields>({ title: "", type: "certificate", year: "", description: "" });
+  const setDoc = (patch: Partial<DocFields>) => setDocRaw((d) => ({ ...d, ...patch }));
+  const [subjects, setSubjects] = useState<Subject[]>(() =>
+    preselectPersonId && dataset.people[preselectPersonId] ? [makeExistingSubject(dataset, dataset.people[preselectPersonId])] : [],
+  );
+  const [stepIdx, setStepIdx] = useState(0);
+  const [furthest, setFurthest] = useState(0);
+  const [ack, setAck] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
 
-  // The preview object URL is owned here; revoke the prior one whenever it
-  // changes and on unmount so we never leak blobs.
+  // Own the preview object URL; revoke the prior one whenever it changes / unmounts.
   useEffect(() => {
     if (!fileUrl) return;
     return () => URL.revokeObjectURL(fileUrl);
   }, [fileUrl]);
+
+  const ctx = useMemo(() => buildCtx(dataset, subjects), [dataset, subjects]);
+
+  // Stage list: document → people → one per subject → review.
+  const steps = useMemo(() => {
+    const list = [
+      { key: "doc", label: "Document" },
+      { key: "people", label: "People" },
+    ];
+    subjects.forEach((s) => list.push({ key: `subj:${s.uid}`, label: s.person.given.split(" ")[0] || "Person" }));
+    list.push({ key: "review", label: "Review" });
+    return list;
+  }, [subjects]);
+
+  // Keep the active step valid as the subject count changes.
+  useEffect(() => {
+    if (stepIdx > steps.length - 1) {
+      setStepIdx(steps.length - 1);
+      setFurthest((f) => Math.min(f, steps.length - 1));
+    }
+  }, [steps.length, stepIdx]);
+
+  const cur = steps[Math.min(stepIdx, steps.length - 1)];
+  const onReview = cur.key === "review";
+
+  const dangerCount = useMemo(
+    () => subjects.reduce((a, s) => a + subjectChanges(s.person, s.draft, ctx).filter((c) => c.danger).length, 0),
+    [subjects, ctx],
+  );
 
   const chooseFile = (f: File | null) => {
     if (!f) return;
@@ -110,7 +120,7 @@ export function MediaUpload({
     setErrors((e) => ({ ...e, file: "" }));
     setFile(f);
     setFileUrl(URL.createObjectURL(f));
-    if (!title) setTitle(titleFromFilename(f.name));
+    if (!doc.title) setDoc({ title: titleFromFilename(f.name) });
   };
 
   const clearFile = () => {
@@ -118,58 +128,77 @@ export function MediaUpload({
     setFileUrl(null);
   };
 
+  const goTo = (i: number) => setStepIdx(i);
+  const canAdvance = () => {
+    if (cur.key === "doc") {
+      const e: Record<string, string> = {};
+      if (!file) e.file = "Choose a file to upload.";
+      if (!doc.title.trim()) e.title = "Give this record a title.";
+      setErrors(e);
+      return Object.keys(e).length === 0;
+    }
+    if (cur.key === "people") return subjects.length > 0;
+    return true;
+  };
+  const next = () => {
+    if (!canAdvance()) return;
+    const i = Math.min(stepIdx + 1, steps.length - 1);
+    setStepIdx(i);
+    setFurthest((f) => Math.max(f, i));
+  };
+  const back = () => setStepIdx((i) => Math.max(0, i - 1));
+
+  const updateSubjectDraft = (uid: string, draft: Subject["draft"]) =>
+    setSubjects((ss) => ss.map((s) => (s.uid === uid ? { ...s, draft } : s)));
+  const activeSubject = cur.key.startsWith("subj:") ? subjects.find((s) => `subj:${s.uid}` === cur.key) ?? null : null;
+
   const submit = async () => {
     if (!file) {
-      setErrors((e) => ({ ...e, file: "Choose a file to upload." }));
+      setErrors({ file: "Choose a file to upload." });
       return;
     }
+    if (dangerCount > 0 && !ack) return;
+
+    const batch: BatchUpdates = {
+      subjects: subjects.map((s) => {
+        const ref: SubjectRef = s.kind === "new" && s.spec ? { kind: "new", spec: s.spec } : { kind: "existing", personId: s.uid };
+        return buildSubjectPayload(ref, s.person, s.draft, ctx);
+      }),
+    };
+    const totalChanges = batch.subjects.reduce((a, sp) => a + sp.changes.length, 0);
+
     setBusy(true);
     const form = new FormData();
     form.set("file", file);
-    form.set("title", title);
-    form.set("type", type);
-    form.set("year", year);
-    form.set("prov", "unverified");
-    form.set("description", description);
-    form.set("personIds", JSON.stringify(selectedPeople));
-    if (location) form.set("location", JSON.stringify(location));
-    if (type === "grave") {
-      const dates: Record<string, string> = {};
-      for (const pid of selectedPeople) {
-        const s = serializePartialDate(graveDates[pid]);
-        if (s) dates[pid] = s;
-      }
-      form.set("personDates", JSON.stringify(dates));
-    }
+    form.set("title", doc.title);
+    form.set("type", doc.type);
+    form.set("year", doc.year);
+    form.set("prov", "verified");
+    form.set("description", doc.description);
+    form.set("updates", JSON.stringify(batch));
 
     const result = await uploadMedia(form);
     setBusy(false);
     if (result.ok) {
-      onToast("Media uploaded");
+      onToast(totalChanges > 0 ? `Uploaded — ${totalChanges} record ${totalChanges === 1 ? "change" : "changes"} applied` : "Media uploaded to the archive");
       router.refresh();
       onNavigate("gallery");
     } else {
       setErrors(result.errors);
+      // Surface a doc-stage error (title/file) by jumping back to it.
+      if (result.errors.title || result.errors.file) setStepIdx(0);
     }
   };
 
-  const personOptions = useMemo(
-    () =>
-      Object.values(people).map((p) => ({
-        value: p.id,
-        label: fullName(p),
-        description: lifeDates(p),
-        leading: <Avatar name={fullName(p)} size="sm" />,
-      })),
-    [people],
-  );
-
-  const lockedName = preselectPersonId && people[preselectPersonId] ? fullName(people[preselectPersonId]) : null;
+  const primaryLabel = (() => {
+    if (cur.key === "doc") return "Continue";
+    if (cur.key === "people") return "Author updates";
+    if (steps[stepIdx + 1]?.key === "review") return "Review changes";
+    return "Next person";
+  })();
 
   return (
     <div className="app-upload">
-      {/* Shared hidden picker for the file-chip "Replace" affordance; the empty
-          state uses the design-system FileDropzone's own picker. */}
       <input
         ref={fileInput}
         type="file"
@@ -200,13 +229,11 @@ export function MediaUpload({
           )
         ) : (
           <div className="app-doc-stage app-doc-empty">
-            <FileDropzone className="app-upload-drop" accept={ACCEPT} onFile={chooseFile} aria-label="Upload a file">
+            <FileDropzone className="app-upload-drop" accept={ACCEPT} onFile={chooseFile} aria-label="Upload a document">
               <span className="app-upload-drop-ic">
                 <Icon name="upload" size={28} />
               </span>
-              <div style={{ fontFamily: "var(--font-serif)", fontSize: "var(--text-title)", color: "var(--color-ink)" }}>
-                Drop a document here
-              </div>
+              <div style={{ fontFamily: "var(--font-serif)", fontSize: "var(--text-title)", color: "var(--color-ink)" }}>Drop a document here</div>
               <div style={{ fontSize: "var(--text-body-sm)" }}>
                 or <span style={{ color: "var(--color-primary)" }}>click to browse</span> · JPEG, PNG, WebP, GIF, PDF · up to 25&nbsp;MB
               </div>
@@ -225,16 +252,7 @@ export function MediaUpload({
               <Icon name={isImageFile(file) ? "gallery" : "file"} size={16} />
             </span>
             <div style={{ minWidth: 0 }}>
-              <div
-                style={{
-                  fontSize: "var(--text-body-sm)",
-                  color: "var(--color-ink)",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  maxWidth: 220,
-                }}
-              >
+              <div style={{ fontSize: "var(--text-body-sm)", color: "var(--color-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 220 }}>
                 {file.name}
               </div>
               <div className="app-muted" style={{ fontSize: "var(--text-label)" }}>
@@ -251,138 +269,53 @@ export function MediaUpload({
         )}
       </div>
 
-      {/* ---- right: metadata form ---- */}
+      {/* ---- right: staged form ---- */}
       <aside className="app-upload-form">
-        <div className="app-upload-formbody app-scroll">
-          <Breadcrumb
-            items={[{ label: "Media archive", onClick: () => onNavigate("gallery") }, { label: "Upload" }]}
-          />
-          <div className="app-display" style={{ fontSize: "var(--text-headline)", margin: "var(--space-sm) 0 4px" }}>
+        <div className="app-upload-formtop">
+          <Breadcrumb items={[{ label: "Media archive", onClick: () => onNavigate("gallery") }, { label: "Upload" }]} />
+          <div className="app-display" style={{ fontSize: "var(--text-headline)", margin: "var(--space-sm) 0 var(--space-md)" }}>
             Upload media
           </div>
-          <div className="app-muted" style={{ fontSize: "var(--text-body-sm)", marginBottom: "var(--space-xl)" }}>
-            Add a photo, certificate, article, or other document. Enter what you see in the scan on the left.
-          </div>
+          <Stepper steps={steps} current={stepIdx} furthest={furthest} onSelect={goTo} />
+        </div>
 
-          <div style={{ display: "grid", gap: "var(--space-lg)" }}>
-            <Input
-              label="Title"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              error={errors.title}
-              placeholder="e.g. Eleanor Rivers — birth certificate"
-            />
-
-            <div style={{ display: "flex", gap: "var(--space-md)", flexWrap: "wrap" }}>
-              <div style={{ flex: 1, minWidth: 160 }}>
-                <Select label="Type" value={type} onChange={(e) => setType(e.target.value as (typeof MEDIA_TYPES)[number])}>
-                  {TYPE_LABELS.map(([k, label]) => (
-                    <option key={k} value={k}>
-                      {label}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div style={{ width: 140, flex: "none" }}>
-                <Input
-                  label="Year"
-                  inputMode="numeric"
-                  value={year}
-                  onChange={(e) => setYear(e.target.value)}
-                  error={errors.year}
-                  placeholder="e.g. 1915"
-                />
-              </div>
+        <div className="app-upload-formbody app-scroll" key={cur.key}>
+          {cur.key === "doc" && <DocStage doc={doc} set={setDoc} errors={errors} />}
+          {cur.key === "people" && <PeopleStage dataset={dataset} subjects={subjects} onSubjects={setSubjects} lockedUid={preselectPersonId} />}
+          {activeSubject && <UpdateStage subject={activeSubject} ctx={ctx} onDraft={(d) => updateSubjectDraft(activeSubject.uid, d)} />}
+          {cur.key === "review" && <ReviewStage doc={doc} subjects={subjects} ctx={ctx} ack={ack} setAck={setAck} />}
+          {errors.form && (
+            <div role="alert" style={{ color: "var(--color-danger)", fontSize: "var(--text-body-sm)", marginTop: "var(--space-lg)" }}>
+              {errors.form}
             </div>
-
-            {type === "census" && (
-              <LocationField
-                label="Where they lived"
-                hint="We’ll add a census event for everyone below. Add a place and we’ll also record a residence there."
-                value={location}
-                onChange={setLocation}
-                onSearch={searchPlaces}
-                error={errors.location}
-              />
-            )}
-
-            {type === "grave" && (
-              <LocationField
-                label="Burial location"
-                hint="Where they’re buried — shown on their death event."
-                value={location}
-                onChange={setLocation}
-                onSearch={searchPlaces}
-                error={errors.location}
-              />
-            )}
-
-            {lockedName ? (
-              <div className="fa-field">
-                <span className="fa-field__label">People in this record</span>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "var(--space-sm)",
-                    fontSize: "var(--text-body-sm)",
-                    color: "var(--color-muted)",
-                  }}
-                >
-                  <Avatar name={lockedName} size="sm" /> {lockedName}
-                </div>
-              </div>
-            ) : (
-              <MultiCombobox
-                label="People in this record"
-                placeholder="Search people…"
-                value={selectedPeople}
-                onChange={setSelectedPeople}
-                options={personOptions}
-              />
-            )}
-
-            {type === "grave" && selectedPeople.length > 0 && (
-              <div style={{ display: "grid", gap: "var(--space-md)" }}>
-                <span className="fa-field__label">Headstone dates</span>
-                {selectedPeople.map((pid) =>
-                  people[pid] ? (
-                    <DateField
-                      key={pid}
-                      label={fullName(people[pid])}
-                      value={graveDates[pid] ?? null}
-                      onChange={(d) => setGraveDates((prev) => ({ ...prev, [pid]: d }))}
-                    />
-                  ) : null,
-                )}
-              </div>
-            )}
-
-            <Textarea
-              label="Description"
-              rows={3}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Notes, provenance, who/what/where…"
-            />
-
-            {errors.form && (
-              <div role="alert" style={{ color: "var(--color-danger)", fontSize: "var(--text-body-sm)" }}>
-                {errors.form}
-              </div>
-            )}
-          </div>
+          )}
         </div>
 
         <div className="app-upload-actions">
-          <Button variant="ghost" onClick={() => onNavigate("gallery")} disabled={busy}>
-            Cancel
-          </Button>
+          {stepIdx === 0 ? (
+            <Button variant="ghost" onClick={() => onNavigate("gallery")} disabled={busy}>
+              Cancel
+            </Button>
+          ) : (
+            <Button variant="ghost" iconStart={<Icon name="chevron" size={16} style={{ transform: "rotate(180deg)" }} />} onClick={back} disabled={busy}>
+              Back
+            </Button>
+          )}
           <div style={{ flex: 1 }} />
-          <Button variant="primary" iconStart={<Icon name="upload" size={16} />} onClick={submit} loading={busy}>
-            Upload
-          </Button>
+          {!onReview ? (
+            <Button
+              variant="primary"
+              iconStart={<Icon name="chevron" size={16} />}
+              onClick={next}
+              disabled={cur.key === "people" && subjects.length === 0}
+            >
+              {primaryLabel}
+            </Button>
+          ) : (
+            <Button variant="primary" iconStart={<Icon name="upload" size={16} />} onClick={submit} loading={busy} disabled={dangerCount > 0 && !ack}>
+              {dangerCount > 0 && !ack ? "Confirm changes to upload" : "Upload to archive"}
+            </Button>
+          )}
         </div>
       </aside>
     </div>

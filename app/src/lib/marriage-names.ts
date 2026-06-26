@@ -4,7 +4,7 @@
 // can be unit-tested in isolation — the I/O (resolving edges, surnames, existing
 // rows) lives in `buildSurnameNameDrafts`, the decision lives here.
 
-import type { NameDraft } from "./actions";
+import type { NameDraft } from "./records-core";
 
 /** A spouse the form flagged as "the subject took their surname". */
 export interface FlaggedSpouse {
