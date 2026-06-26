@@ -22,6 +22,21 @@ export type { AvatarProps, AvatarSize } from "./components/Avatar";
 export { PersonNode } from "./components/PersonNode";
 export type { PersonNodeProps } from "./components/PersonNode";
 
+export { PersonRow } from "./components/PersonRow";
+export type { PersonRowProps } from "./components/PersonRow";
+
+export { Stepper } from "./components/Stepper";
+export type { StepperProps, StepperStep } from "./components/Stepper";
+
+export { DocViewer } from "./components/DocViewer";
+export type { DocViewerProps } from "./components/DocViewer";
+
+export { Accordion } from "./components/Accordion";
+export type { AccordionProps } from "./components/Accordion";
+
+export { Callout } from "./components/Callout";
+export type { CalloutProps, CalloutTone } from "./components/Callout";
+
 export { Dialog } from "./components/Dialog";
 export type { DialogProps } from "./components/Dialog";
 

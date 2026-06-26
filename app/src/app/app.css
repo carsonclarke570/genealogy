@@ -302,35 +302,8 @@ body {
 /* ClickableCard's stretched-button overlay (.fa-card-open) and the raise helper
    (.fa-card-raise) now come from the design system. */
 
-/* Clickable "person in this record" row in the media-detail dialog. */
-.app-mediaperson {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  width: 100%;
-  text-align: left;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  padding: 8px 12px;
-  cursor: pointer;
-  font: inherit;
-}
-.app-mediaperson:hover {
-  border-color: var(--color-border-strong);
-}
-.app-mediaperson:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 1px;
-}
-/* Touch input needs a larger target (≥44px) than a mouse. */
-@media (pointer: coarse) {
-  .app-mediaperson {
-    min-height: 44px;
-  }
-}
-
-/* The file drop target now comes from the design system (FileDropzone). */
+/* The compact person rows in the media-detail dialog now come from the design
+   system (PersonRow). The file drop target comes from FileDropzone. */
 
 /* doc-type dot */
 .app-docdot {
@@ -356,37 +329,7 @@ body {
   background: var(--doc-other);
 }
 
-.app-mininode {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: 8px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
-  cursor: pointer;
-  width: 100%;
-  text-align: left;
-  font: inherit;
-}
-.app-mininode:hover {
-  border-color: var(--color-border-strong);
-  background: var(--color-surface);
-}
-.app-mininode .nm {
-  font-family: var(--font-serif);
-  font-size: 1rem;
-  line-height: 1.1;
-  color: var(--color-ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.app-mininode .dt {
-  font-size: var(--text-body-sm);
-  color: var(--color-muted);
-  font-feature-settings: "tnum" 1;
-}
+/* The compact related-person row now comes from the design system (PersonRow). */
 
 .tnum {
   font-feature-settings: "tnum" 1;
@@ -729,8 +672,7 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .app-shelf-chev,
-  .app-shelf-body,
-  .app-doc-content {
+  .app-shelf-body {
     transition: none;
   }
 }
@@ -1147,43 +1089,8 @@ body {
   align-items: center;
   justify-content: center;
 }
-.app-doc-surface {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: grab;
-  touch-action: none;
-  overflow: hidden;
-  background-color: var(--color-surface-sunken);
-  background-image:
-    linear-gradient(var(--color-border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--color-border) 1px, transparent 1px);
-  background-size: 26px 26px;
-  background-position: center;
-}
-[data-theme="dark"] .app-doc-surface {
-  background-color: color-mix(in oklab, #000 30%, var(--color-surface-sunken));
-}
-.app-doc-surface.grabbing {
-  cursor: grabbing;
-}
-.app-doc-content {
-  transform-origin: center center;
-  transition: transform 0.04s linear;
-  will-change: transform;
-  user-select: none;
-}
-.app-doc-img {
-  display: block;
-  max-width: min(760px, 92%);
-  max-height: 82%;
-  border-radius: 2px;
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-overlay-high);
-  background: #fff;
-}
+/* The zoom/pan/rotate stage + its toolbar now come from the design system
+   (DocViewer). The app keeps only the surrounding chrome below. */
 /* PDF / non-image: the design-system MediaPreview embeds the native viewer. */
 .app-doc-native {
   width: min(820px, 92%);
@@ -1192,45 +1099,6 @@ body {
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-overlay-high);
   background: var(--color-bg);
-}
-
-/* viewer toolbar — a floating pill, bottom-center, outside the scaled content */
-.app-doc-tools {
-  position: absolute;
-  left: 50%;
-  bottom: var(--space-lg);
-  transform: translateX(-50%);
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  padding: 4px;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-overlay-low);
-}
-.app-doc-sep {
-  width: 1px;
-  height: 22px;
-  background: var(--color-border);
-  margin: 0 3px;
-}
-.app-doc-zoom {
-  min-width: 52px;
-  height: 32px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--text-label);
-  font-weight: var(--fw-semibold);
-  color: var(--color-ink);
-  font-feature-settings: "tnum" 1;
-  border-radius: var(--radius-sm);
-}
-.app-doc-zoom:hover {
-  background: var(--color-surface-sunken);
 }
 
 /* file chip — floats top-left of the viewer */
@@ -1597,13 +1465,8 @@ body {
 
 /* small lineage dots reused in peeks + combobox options */
 .mig-linedot,
-.mig-rowdot {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-full);
-  background: var(--ln, var(--color-primary));
-}
+/* The lineage dot on a person row now comes from the design system
+   (PersonRow's accentColor). */
 .mig-swatch {
   display: inline-block;
   width: 12px;

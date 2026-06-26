@@ -9,10 +9,6 @@ const APP_GLYPHS = {
   gallery: "M3 5h18v14H3zM3 15l5-5 4 4 3-3 6 6M8 9a1.5 1.5 0 100-1.9",
   // Folded map with route fold lines — the Family Map nav mark.
   map: "M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14",
-  // Clockwise rotate arrow — for the document viewer's "rotate 90°" control.
-  rotate: "M21 12a9 9 0 11-2.64-6.36M21 3v4h-4",
-  // Fit-to-bounds (expand arrows into corners) — the map's "fit all" control.
-  fit: "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5",
 } as const;
 
 const PATHS = { ...GLYPHS, ...APP_GLYPHS };

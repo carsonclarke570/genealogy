@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { Avatar, MediaPreview } from "@family-archive/ui";
+import { MediaPreview, PersonRow } from "@family-archive/ui";
 import type { DocType } from "@family-archive/ui";
 import { shortName, lifeDates, mediaFileUrl, type MediaItem } from "@/lib/family-data";
 import { useDataset } from "@/lib/dataset";
@@ -54,17 +54,11 @@ export function MiniNode({
   const p = people[id];
   if (!p) return null;
   return (
-    <button type="button" className="app-mininode" onClick={() => onOpen?.(id)}>
-      <Avatar name={`${p.given} ${p.surname}`} size="sm" />
-      <span style={{ minWidth: 0 }}>
-        <span className="nm" style={{ display: "block" }}>
-          {shortName(p)}
-        </span>
-        <span className="dt" style={{ display: "block" }}>
-          {rel ? `${rel} · ` : ""}
-          {lifeDates(p)}
-        </span>
-      </span>
-    </button>
+    <PersonRow
+      name={shortName(p)}
+      relation={rel}
+      dates={lifeDates(p)}
+      onClick={() => onOpen?.(id)}
+    />
   );
 }

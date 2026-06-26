@@ -44,6 +44,11 @@
     "ProvField": { "cardMode": "column", "primaryStory": "ConfidenceStates" },
     "ProvLabel": { "cardMode": "column", "primaryStory": "States" },
     "ProvLocationField": { "cardMode": "column", "primaryStory": "Birthplace" },
-    "AnchoredPopover": { "cardMode": "single", "primaryStory": "BelowTrigger", "viewport": "360x300" }
+    "AnchoredPopover": { "cardMode": "single", "primaryStory": "BelowTrigger", "viewport": "360x300" },
+    "Stepper": { "cardMode": "column", "primaryStory": "MidFlow" },
+    "DocViewer": { "cardMode": "single", "primaryStory": "Certificate", "viewport": "520x420" },
+    "Accordion": { "cardMode": "column", "primaryStory": "Open" },
+    "Callout": { "cardMode": "column", "primaryStory": "Tones" },
+    "PersonRow": { "cardMode": "column", "primaryStory": "Relationships" }
   }
 }

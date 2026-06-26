@@ -112,6 +112,20 @@ the `formatLocation` helper); `MultiCombobox` (searchable multi-select with chip
 `label`). `AnchoredPopover` is the low-level positioning primitive (a body-portaled,
 viewport-fixed panel that escapes clipping containers) — prefer the components built on it.
 
+Recent additions: `Stepper` (a numbered multi-step wizard nav with done/active/
+reachable states — pass `steps`, `current`, and `furthest`, for the staged upload
+flow); `Accordion` (a collapsible disclosure with a leading icon, optional count
+pill, and a danger mark — controlled or uncontrolled; stack several with a
+`grid`+`gap` wrapper for a settings-style list); `Callout` (a persistent inline
+`info`/`success`/`warning`/`danger` banner — the quiet, in-layout counterpart to
+`Toast`; full-bordered + tinted, never a side stripe; pass `role="alert"` for a
+live validation error); `DocViewer` (a zoom / pan / rotate stage for inspecting a
+scan or PDF — the interactive sibling of the static `MediaPreview`; give it a
+sized, positioned parent and pass `resetKey`); and `PersonRow` (the compact
+avatar + name + life-dates list-row used in relationship panels, search results,
+a document's people, and map peeks — the lighter cousin of `PersonNode`, with an
+optional `relation` label, lineage `accentColor` dot, and `trailing` slot).
+
 ## Where the truth lives
 
 Read the bound `styles.css` (and its imports) for the full token set, and each

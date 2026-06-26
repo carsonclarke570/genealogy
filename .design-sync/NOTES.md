@@ -255,3 +255,55 @@ Repo-specific gotchas for future syncs. Read this first.
   matches disk), confirm the prior full validate was `bad:0`, then upload straight
   from `.sync-diff.json` (`upload.deletePaths` + the rebuilt grouped paths). Only a
   change that actually alters renders needs the full render check.
+
+## 2026-06-25 sync (macOS) — 5 more components (47 → 52)
+
+- **Added Stepper, DocViewer, Accordion, Callout, PersonRow** (imported from the
+  `Family Archive.html` Claude Design project's `hf/` reference; built into the DS
+  and wired into the app). Previews under `.design-sync/previews/`, docs (with
+  `category:` frontmatter) under `.design-sync/docs/`, `cardMode` overrides in
+  config. Groups: `Stepper`/`Accordion` → Navigation, `Callout` →
+  Feedback & Overlays, `DocViewer` → Data Display, `PersonRow` → Genealogy.
+  All cells graded good 2026-06-25.
+- **macOS playwright cache is `~/Library/Caches/ms-playwright`** (NOT `~/.cache/`).
+  It holds **chromium-1134** (+1129); `.ds-sync/node_modules/playwright-core`
+  already pins 1134 (playwright@1.47.x) so the render check launches with no
+  download. (The `~/.cache/ms-playwright` check in §4.1 comes up empty on mac —
+  look in `~/Library/Caches`.)
+- **DocViewer is `position:absolute; inset:0`** (fills its container) → its preview
+  wraps it in a sized, relatively-positioned stage and uses `cardMode: "single"` +
+  `viewport: "520x420"`. Any future fill-the-container component needs the same
+  preview stage. `Callout`/`Accordion`/`PersonRow`/`Stepper` are `cardMode:
+  "column"` (each state full width; none tripped `[GRID_OVERFLOW]`).
+- **Two glyphs (`rotate`, `fit`) were promoted into the DS `GLYPHS` set** (Icon)
+  for DocViewer's toolbar — so `Icon`'s `.d.ts`/`.prompt.md` changed and it rode in
+  the upload set (its render was unchanged, so it stayed out of the verify partition).
+- **Upload byte-bound (HTTP 500):** `write_files` 500'd on a ~60-file batch that
+  bundled `_ds_bundle.js` (148K) + `_ds_bundle.css` (94K) + the 51 `_preview/*.js`.
+  The cap is **payload bytes, not file count** (a 2-file batch with `_vendor/react.js`
+  at 1.19MB went through). Fix per the skill: halve and retry — ~30-file batches that
+  include the big bundle files upload fine; 104 small component files in one call is
+  also fine. Keep the two big bundle files in a smaller batch.
+- **conventions.md** got a purely-additive paragraph listing the 5 new components
+  (existing prose untouched); validated clean against the fresh build (no name drift).
+
+## 2026-06-25 polish re-sync — component-source edits ride in the bundle
+
+- A round of polish touched component **source** (Callout info-icon → none, Stepper
+  grid-fr label reveal, DocViewer/PersonRow refactors) + `components.css` + one doc
+  (`docs/Callout.md`). Key re-sync mechanics confirmed:
+  - A component **source/markup** edit (not its preview `.tsx` or doc) changes only
+    `_ds_bundle.js` — its `renderHash`/`sourceKey`/`sourceHashes` stay put, so it is
+    **NOT** in `upload.components` and **NOT** in the verify `changed` partition.
+    Uploading the fresh `_ds_bundle.js` (`bundle:true`) propagates every such render
+    change. So a 4-component source change can legitimately show `upload.components:
+    ["Callout"]` (only Callout's **doc** changed → its `prompt.md`/`.d.ts` differ).
+  - `verification.changed` is keyed on **sourceKeys** (preview `.tsx` + preview
+    config) = grade-tracking; a pure source/CSS edit leaves it `[]` and all grades
+    carry. Verify the changed renders yourself (screenshot the card) since the
+    pipeline won't re-grade them.
+  - `capture` reporting `skipped: "empty_worklist"` (and a "FAIL"-looking `ok:null`)
+    on such a run is **normal** — nothing to capture, gate still met.
+  - Scoped upload for this shape = changed component dir(s) + `_preview/<Name>.js` +
+    `_ds_bundle.{js,css}` + `styles.css` (+ `_ds_sync.json` last). The render changes
+    for source-only-edited components are already inside `_ds_bundle.js`.
